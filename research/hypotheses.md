@@ -16,13 +16,18 @@ This document separates assumptions from validated facts.
 - Suppliers benefit from publishing once instead of maintaining many customer-specific integrations.
 - Historical/versioned prices have operational and audit value.
 - ERP and estimation vendors would prefer one PriceSync integration over many supplier integrations.
+- Turning an existing supplier Excel/CSV export into normalized, validated price data can provide supplier-side standalone value even before any customer is connected.
+- Suppliers may value having their normalized price data immediately available as standardized Excel/CSV/API output.
 
 ## Adoption hypotheses
 
 - Suppliers will join if onboarding requires little or no custom development.
 - Existing Excel/CSV exports are enough to bootstrap most suppliers.
+- AI-assisted first-time mapping can reduce supplier onboarding from an integration project to a short confirmation workflow.
+- Mapping should become deterministic after confirmation; AI should primarily propose or repair mappings rather than reinterpret every production import.
+- A supplier may adopt PriceSync for normalization alone, allowing network distribution to become incremental value later.
 - A small cluster of overlapping buyers can create enough pressure/incentive for suppliers to join.
-- Free basic connectivity will increase network growth.
+- Free basic connectivity and/or normalization will increase network growth.
 - Suppliers or customers will pay for automation once the network is useful.
 
 ## Market hypotheses
@@ -43,7 +48,19 @@ This document separates assumptions from validated facts.
 8. What would prevent a supplier from joining PriceSync?
 9. Which side has the strongest willingness to pay?
 10. Which existing products already solve enough of this problem to reduce demand?
+11. How consistent are supplier Excel exports over time?
+12. Can AI-assisted mapping correctly identify the minimum canonical fields across real supplier files with low correction effort?
+13. Is normalized Excel/CSV/API output valuable enough to suppliers before any customer is connected?
+14. Which mapping failures or ambiguities require human confirmation to make the workflow trustworthy?
 
 ## Validation rule
 
 Do not mark a hypothesis validated based only on positive reactions to the concept. Prefer evidence from current workflows, measurable cost, real data, pilots and actual willingness to integrate or pay.
+
+For AI-assisted mapping specifically, validate using real supplier files and measure:
+
+- percentage of fields mapped correctly on first suggestion
+- number of manual corrections required
+- time from upload to confirmed normalized PriceSet
+- stability of the saved mapping across subsequent exports
+- whether suppliers perceive the normalized output as useful independently of network distribution
