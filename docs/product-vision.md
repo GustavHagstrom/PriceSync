@@ -2,16 +2,41 @@
 
 ## Vision
 
-PriceSync should become neutral infrastructure for synchronizing agreed B2B prices between trading partners.
+PriceSync should become a **neutral integration hub for synchronizing agreed B2B prices between trading partners**.
 
 A supplier should be able to publish prices once. Customers should be able to consume those prices through their own ERP, estimation, purchasing or analytics systems without separate point-to-point integrations.
 
+The product is not primarily a price-list portal. The hub itself is the product: a common technical integration layer between supplier and customer systems.
+
+## Why a hub
+
+The current model often creates an N × M integration problem:
+
+```text
+Supplier A ── Customer 1
+Supplier A ── Customer 2
+Supplier A ── Customer 3
+Supplier B ── Customer 1
+Supplier B ── Customer 2
+...
+```
+
+PriceSync changes the topology to:
+
+```text
+Supplier systems ──► PriceSync ──► Customer systems
+```
+
+Each participant should ideally need to solve integration with PriceSync once rather than maintain separate price-distribution workflows for every trading partner.
+
 ## What PriceSync is
 
-- A technical price-distribution network
+- A technical integration hub for B2B prices
+- A neutral price-distribution network
 - A canonical model for customer-specific B2B prices
 - A synchronization and versioning layer
 - An authorization boundary between supplier and customer
+- A transformation boundary between external file/API formats and the canonical model
 - An integration point for software vendors and internal systems
 
 ## What PriceSync is not
@@ -40,7 +65,7 @@ Supplier C      synchronized
 Supplier D      not connected
 ```
 
-The user may never need to visit PriceSync directly.
+The user may never need to visit PriceSync directly. Native integrations should be able to make PriceSync almost invisible infrastructure.
 
 ## Adoption principle
 
@@ -107,16 +132,18 @@ This means PriceSync can act as a transformation layer on both sides:
 ```text
 Supplier format
       |
-  import mapping
+  import adapter
       |
       v
 Canonical PriceSet
       |
-  export mapping
+  export adapter
       |
       v
 Customer format
 ```
+
+Supplier- and customer-specific formats should stay at the platform boundary. The canonical model should remain independent of individual ERP/file layouts.
 
 A customer may therefore adopt PriceSync before its ERP or estimation system has native support.
 
