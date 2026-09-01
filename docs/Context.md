@@ -26,8 +26,15 @@ The role of an Organization that provides prices to another Organization within 
 The role of an Organization that consumes prices from another Organization within a specific trading relationship. It is a contextual role, not a permanent organization type.
 
 **Trading Relationship**:
-A mutually accepted, directed connection in which one Organization acts as Supplier and another as Customer for price distribution. Acceptance authorizes the connection, not individual prices or updates.
+A directed Supplier–Customer business relationship established outside PriceSync and represented in the platform to scope price access. PriceSync does not create, negotiate, or accept the relationship and it does not contain the parties' commercial price terms.
 _Avoid_: Price acceptance, contract
+
+**Price Agreement**:
+The Supplier-published commercial price terms that apply between a Supplier and Customer within a Trading Relationship. The Supplier controls the terms; the Customer may report discrepancies but cannot change them.
+_Avoid_: Trading Relationship, connection
+
+**Price Agreement Version**:
+An immutable, published version of a Price Agreement used together with Price List Versions to calculate a Customer Price Projection.
 
 **External Supplier Reference**:
 A customer's private identification of the actual supplier behind Customer-Managed External Prices when that supplier is not yet represented by a connected Organization in PriceSync. It may later be linked to the supplier's Organization.
@@ -42,7 +49,7 @@ The resolved monetary amount, excluding taxes but including mandatory article-sp
 _Avoid_: Raw price, unresolved price
 
 **Price Basis**:
-The amount, Price Quantity, and Unit of Measure that together state what a Customer Price is charged for within the currency of its Customer Price List. For example, 1,200 per 100 metres.
+The amount, Price Quantity, and Unit of Measure that together state what a Customer Price is charged for within its source currency. For example, 1,200 per 100 metres.
 _Avoid_: Unit price
 
 **Price Quantity**:
@@ -57,15 +64,23 @@ A Customer Price stated directly by the supplier rather than calculated by Price
 **List Price**:
 A supplier's general price for an article that can serve as the basis for calculating a Customer Price.
 
+**General Price List**:
+A Supplier-owned, reusable collection of List Prices that exists independently of Customers and Trading Relationships. A Price Agreement supplies the Customer-specific discounts needed to derive Customer Prices from it.
+_Avoid_: Customer Price List, net price list
+
+**Customer-Specific Net Price List**:
+A Supplier-published list of Net Prices prepared for one Customer. Its prices are already resolved and receive no additional Customer Discount.
+_Avoid_: General Price List, discounted price list
+
 **Customer Discount**:
-A customer-specific percentage reduction applied to a List Price to calculate a Customer Price. It may apply to an entire Customer Price List or to a Supplier Price Group; applicable discounts are alternatives and are never stacked.
+A customer-specific percentage reduction in a Price Agreement applied to a List Price. It may apply generally to the referenced General Price List or specifically to a Supplier Price Group; applicable discounts are alternatives and are never stacked.
 
 **Supplier Price Group**:
 A supplier-defined commercial grouping of articles used to assign pricing rules such as a Customer Discount. It is not a general product classification.
 _Avoid_: Product category, product classification
 
 **Rounding Policy**:
-The decimal precision and rounding method used by a Customer Price List when resolving a Customer Price from a List Price and Customer Discount.
+The decimal precision and rounding method used when a Price Agreement resolves a Customer Price from a List Price and Customer Discount.
 
 **Price Calculation Basis**:
 The List Price, applicable Customer Discount, and Rounding Policy used to resolve a Customer Price. It exists only when PriceSync performs that calculation; a specific Net Price has no inferred calculation basis.
@@ -80,22 +95,33 @@ _Avoid_: Supplier-published prices
 **Price Source**:
 The selected origin for one price-list context defined by Supplier, currency, and Market or commercial purpose: Supplier-Published Prices or Customer-Managed External Prices.
 
-**Price Snapshot**:
-A complete, versioned, and reproducible view of a Customer Price List at the time of publication. A Price Snapshot is published atomically and is never a partial update.
-_Avoid_: Partial price list, price patch
+**Price List Version**:
+An immutable, complete version of one logical General Price List or Customer-Specific Net Price List. It is published atomically and remains permanently available as a calculation source.
+_Avoid_: Partial price list, price patch, Customer Price Snapshot
+
+**Customer Price Projection**:
+The complete Customer Price view calculated from exact Price List Versions and a Price Agreement Version. It may be materialized for performance but is rebuildable cache rather than an audit record.
+_Avoid_: Customer Price Snapshot, published customer list
+
+**Price Delivery**:
+The permanent, immutable record of the exact Customer Price Projection a Customer chose to download or import. It retains its source versions, calculation-rule version, canonical result, content hash, exported representation, and delivery history.
+_Avoid_: Cache, mutable export
 
 **Price Draft**:
-Mutable price-list work awaiting successful validation and publication. It is not visible to consumers and is not part of a Customer Price List's published history.
-_Avoid_: Price Snapshot
+Mutable price-list work awaiting successful validation and publication as a Price List Version. It is not visible to consumers and is not part of published history.
+_Avoid_: Price List Version
 
 **Import Profile**:
-An Organization-private, reusable mapping from an external Excel or CSV layout to PriceSync's canonical price fields. It is used for file imports, not for canonical API payloads.
+An Organization-private, reusable onboarding mapping from an external Excel or CSV layout, field values, and identifiers to PriceSync's canonical price model. It is used for file imports, not for canonical API payloads.
+
+**Export Profile**:
+A Customer-private, reusable transformation from a canonical Customer Price Projection to the file or API layout required by a Customer system. It changes delivery format without changing the canonical prices.
 
 **Source File**:
-The original Excel or CSV file supplied for a manual import. It is private audit evidence owned by the uploading Organization and is not distributed with the canonical Price Snapshot.
+The original Excel or CSV file supplied for a manual import. It is private audit evidence owned by the uploading Organization and is not distributed with a Price Delivery.
 
 **Source Retention Policy**:
-An Organization's rule for how long its Source Files are retained. Expiry removes the file but not the canonical Price Snapshot or its provenance metadata.
+An Organization's rule for how long its Source Files are retained. Expiry removes the file but not published Price List Versions, Price Deliveries, or their provenance metadata.
 
 **Validation Error**:
 A violation of a required domain rule that prevents a Price Draft from being published.
@@ -107,51 +133,59 @@ A suspicious but domain-valid condition that requires explicit acknowledgement o
 The Supplier's rules for acknowledging Validation Warnings before a Price Draft may be published.
 
 **Consumption Policy**:
-The Customer's rules for notifying, pausing, or allowing downstream processing of a published Price Snapshot. It does not affect the snapshot's publication or commercial validity.
+The Customer's rules for notifying, reviewing, approving, or automatically delivering a changed Customer Price Projection. Manual Import Approval is the default; automatic delivery requires an explicit Customer choice.
+
+**Import Approval**:
+The Customer's authorization to create and transfer a Price Delivery from the complete current Customer Price Projection. Approval is atomic and cannot select individual entries; it is an internal processing decision, not acceptance of commercial prices.
+_Avoid_: Price acceptance, publication approval
 
 **Transfer Status**:
-The observable state of a Price Snapshot's transfer to a Customer channel, such as available, retrieved, or delivered. It does not prove that the receiving system applied the prices.
+The observable state of a Price Delivery's transfer to a Customer channel, such as prepared, retrieved, or delivered. It does not prove that the receiving system applied the prices.
 
 **Application Status**:
-The reported outcome of applying a Price Snapshot in a consuming system: applied, failed, or not reported. A manual confirmation is distinguished from a system-reported outcome.
+The reported outcome of applying a Price Delivery in a consuming system: applied, failed, or not reported. A manual confirmation is distinguished from a system-reported outcome.
 
-**Customer Price List**:
-An ongoing, single-currency price publication scope for one Customer and Supplier source, optionally associated with a market or commercial purpose. The source may be a Trading Relationship or an External Supplier Reference; successive Price Snapshots version the list.
+**Synchronization Status**:
+The relationship between the current Customer Price Projection and the most recent Price Delivery reported as applied in a Customer system. A channel is Out of Sync when those canonical results differ.
+_Avoid_: Price validity, commercial acceptance
 
 **Archived Price List**:
-A Customer Price List closed to future publication while its snapshots and audit history remain available. Archiving does not itself change Price Validity.
+A logical Price List closed to future publication while its Price List Versions and related Price Deliveries remain available. Archiving does not itself change Price Validity.
 _Avoid_: Deleted price list
 
 **Market**:
-The destination market or commercial context in which a Customer Price List is intended to be used. It is independent of the Customer Organization's registration country, and its relevance may differ by Supplier.
+The destination market or commercial context in which a logical Price List is intended to be used. It is independent of the Customer Organization's registration country, and its relevance may differ by Supplier.
 _Avoid_: Customer country
 
 **Publication Time**:
-The time at which a Price Snapshot was published through PriceSync. It records when PriceSync knew the published price information, not when each price becomes commercially valid.
+The time at which a Price List Version or Price Agreement Version was published through PriceSync. It records when PriceSync knew the source information, not when each resulting price becomes commercially valid.
 
 **Price Correction**:
-A new Price Snapshot that corrects previously published price information without rewriting publication history. Its corrected Price Validity may begin before its own Publication Time.
+A new Price List Version or Price Agreement Version that corrects published source information without rewriting publication history. Its corrected Price Validity may begin before its own Publication Time.
 _Avoid_: Edited snapshot, overwritten snapshot
 
 **Price Change Set**:
-The immutable canonical difference between a Price Snapshot and the preceding snapshot of the same Customer Price List, classifying entries as added, changed, or removed.
+The canonical difference between the current Customer Price Projection and the Customer's most recent Price Delivery, classifying entries as added, changed, or removed. The comparison is captured immutably when a new Price Delivery is created.
 
 **Price Validity**:
-The period from a required Valid From to an optional Valid To during which a Customer Price applies commercially. Prices within the same Price Snapshot may have different validity periods.
+The period from a required Valid From to an optional Valid To during which a Customer Price applies commercially. Prices within the same Price List Version or Customer Price Projection may have different validity periods.
 
 **Article Reference**:
-The versioned, minimal article information captured in a Price Snapshot to associate a price with an article: the supplier and the supplier's Article ID. It may also carry external identifiers and a short Article Name but is not a product record.
+The versioned, minimal article information captured in a Price List Version to associate a price with an entry: the Supplier, logical Price List, and Supplier Article ID. It may also carry external identifiers and a short Article Name but is not a product record.
 _Avoid_: Product, catalog item
 
 **Supplier Article ID**:
-The supplier-assigned identifier for an article. It is unique only within that supplier and is the required article identifier in PriceSync.
+The Supplier-assigned identifier for an article within one logical Price List. The same identifier may represent separate Price List Entries in different lists.
+
+**PriceSync Article ID**:
+The short, opaque, globally unique, and immutable identifier PriceSync assigns to the combination of Supplier, logical Price List, and Supplier Article ID. It remains stable through successive versions of that list and may be used by Customer systems without manual article-number mapping.
 
 **Article Name**:
 A short human-readable designation stored with an Article Reference. It is display information, not a full product description.
 _Avoid_: Product description
 
 **Price List Entry**:
-The unique occurrence of an Article Reference within a specific Customer Price List. One Supplier Article ID has one Price Basis and at most one commercially valid Customer Price at a time in that list.
+The uniquely identified occurrence of an Article Reference within one logical Price List. Its identity persists through successive list versions.
 
 ## Adding a term
 

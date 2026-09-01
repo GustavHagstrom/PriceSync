@@ -36,21 +36,25 @@ The initial model provides a small set of fixed, combinable system roles: Organi
 
 ### Publication authority
 
-A Price Publisher may validate and publish a Price Draft without approval from a second person. PriceSync records who imported the source, acknowledged each Validation Warning, and published the resulting Price Snapshot.
+A Price Publisher may validate and publish a Price Draft without approval from a second person. PriceSync records who imported the source, acknowledged each Validation Warning, and published the resulting Price List Version.
 
 Mandatory separation between draft author and approver is an initial non-goal. It may later become an optional Supplier-side enterprise control and would not represent Customer acceptance of prices.
 
 ## Trading relationships
 
-A Trading Relationship is a directed connection between a Supplier Organization and a Customer Organization. Either party may request the connection, but both Organizations must accept it before the relationship becomes active and supplier-published prices may be distributed through it.
+A Trading Relationship represents a directed Supplier–Customer business relationship established outside PriceSync. PriceSync does not provide a workflow for requesting, negotiating, or accepting that relationship. Its representation scopes which Supplier-published prices and terms the Customer may review.
 
-Relationship acceptance authorizes ongoing price distribution. It does not accept an individual Customer Price or Price Snapshot; future publications are synchronized without per-update approval.
+The Customer may verify that the represented Price Agreement matches the external agreement, but this is not acceptance of the relationship or individual commercial prices inside PriceSync. Future source publications update the Customer Price Projection without per-update commercial approval.
+
+A Trading Relationship establishes access for price distribution but does not itself contain commercial price terms. Those terms belong to a separate Price Agreement associated with the relationship. This separation allows the connection to remain active when an agreement is replaced or expires.
+
+The Supplier owns, maintains, and publishes the Price Agreement as the authoritative representation of the terms it offers. The Customer may report a discrepancy but cannot edit the Supplier's terms. Publishing or updating the Price Agreement does not require per-update Customer approval inside PriceSync because the commercial agreement is assumed to exist outside the platform.
 
 Customer-Managed External Prices do not require an active Trading Relationship because they remain private to the Customer that registered them.
 
 ### Ending a relationship
 
-Either party may end a Trading Relationship. Ending it stops future distribution but does not delete previously received Price Snapshots or audit history from the Customer's view.
+Either party may end a Trading Relationship. Ending it stops future distribution but does not delete previously completed Price Deliveries or audit history from the Customer's view.
 
 Previously received prices remain accessible and are clearly marked as originating from an ended, no-longer-synchronized relationship. Ending the relationship does not itself change any Customer Price's `Valid To`, because technical disconnection does not establish that the external commercial agreement has ended.
 
@@ -58,9 +62,21 @@ Previously received prices remain accessible and are clearly marked as originati
 
 If an Organization leaves PriceSync, future distribution stops and its private working artifacts such as Price Drafts, Import Profiles, and Source Files follow the applicable deletion and retention policies.
 
-Canonical Price Snapshots already delivered to another Organization remain in that recipient's audit history and are marked as originating from an inactive source Organization. A Supplier cannot retroactively remove delivered business facts from a Customer's history, and a Customer's departure does not erase the Supplier's publication and delivery evidence. Personal actor information may be anonymized without removing the business events.
+Completed Price Deliveries remain in the recipient's audit history and are marked as originating from an inactive source Organization. A Supplier cannot retroactively remove delivered business facts from a Customer's history, and a Customer's departure does not erase publication and delivery evidence. Personal actor information may be anonymized without removing the business events.
 
 ## Price representation
+
+A General Price List is a Supplier-owned, reusable collection of List Prices. Multiple Price Agreements may refer to the same General Price List, allowing its List Prices to be maintained and versioned independently of any individual Customer. Customer-specific discounts remain in the Price Agreement rather than being duplicated in the shared list.
+
+A Supplier may create, maintain, and publish a General Price List before any Customer or Trading Relationship exists. Publication versions the Supplier's price basis but does not distribute Customer Prices by itself. Distribution begins only when an active Trading Relationship and applicable Price Agreement connect a Customer to that list.
+
+Publishing a new General Price List Version invalidates the affected cached Customer Price Projections. It does not immediately recalculate every Customer's price rows or create permanent Customer copies or Price Deliveries.
+
+A General Price List Version cannot be published unless it can produce valid Customer Price Projections for every active Price Agreement Version that uses it. Incompatibilities such as an unresolved Supplier Price Group, invalid discount, or currency mismatch block publication and must be corrected in the list or agreement first. Once the version is published, recalculation of all affected projections is guaranteed to succeed.
+
+A Supplier may also publish a Customer-Specific Net Price List. Its Net Prices are already resolved for that Customer and receive no additional Customer Discount.
+
+General and customer-specific net lists do not establish an automatic precedence rule. When commercial conditions make two offers distinct sellable forms—for example a net-priced standard white door and a configurable door priced from the General Price List—they are distinct Price List Entries from the Customer's perspective. Their Supplier Article IDs may be identical because the logical Price List is part of entry identity.
 
 A supplier may provide a Customer Price in either of two forms:
 
@@ -75,25 +91,24 @@ The calculation basis is retained so that the resolved Customer Price can be exp
 
 A Customer always sees the resolved Customer Price in its own list. When PriceSync calculated the price from a List Price and Customer Discount, the Customer also sees that Price Calculation Basis, including the applicable discount and rounding.
 
-A specific Net Price exposes no inferred discount or fictional calculation. Customers never see another Customer's prices, discounts, snapshots, or calculation basis. A shared List Price is exposed only through entries that belong to the receiving Customer's own price list, not as the Supplier's complete internal pricing material.
+A specific Net Price exposes no inferred discount or fictional calculation. Customers never see another Customer's prices, discounts, projections, deliveries, or calculation basis. A shared List Price is exposed only through the receiving Customer's own projection, not as the Supplier's complete internal pricing material.
 
-### Price calculation priority
+### Discount selection
 
-A Customer Price may be resolved from three levels of pricing input, in descending priority:
+A Customer Price derived from a General Price List uses one of two discount levels, in descending priority:
 
-1. a Net Price for the specific Price List Entry
-2. a Customer Discount for the entry's Supplier Price Group applied to its List Price
-3. a general Customer Discount for the Customer Price List applied to its List Price
+1. a Customer Discount for the entry's Supplier Price Group applied to its List Price
+2. a general Customer Discount for the applicable Price Agreement applied to its List Price
 
 A Supplier Price Group is commercial pricing metadata owned by the Supplier. It does not make PriceSync responsible for product classification.
 
-Only one pricing input determines a Customer Price. A Supplier Price Group discount replaces the general Customer Discount rather than combining with it, and a specific Net Price replaces either discount calculation. More complex source arrangements must be normalized to a Net Price at the platform boundary.
+Only one Customer Discount determines a Customer Price derived from a General Price List. A Supplier Price Group discount replaces the general Customer Discount rather than combining with it. A Customer-Specific Net Price List is a separate price source whose prices receive no discount; it does not override entries derived from a General Price List.
 
 A Customer Discount is always expressed as a percentage in the core domain. Fixed deductions, factors, and supplier-specific formulas are normalized at the platform boundary to either an unambiguous percentage or a resolved Net Price.
 
 ### Rounding
 
-Each Customer Price List has an explicit Rounding Policy consisting of decimal precision and rounding method. All price calculations use decimal arithmetic.
+Each Price Agreement has an explicit Rounding Policy consisting of decimal precision and rounding method. All price calculations use decimal arithmetic.
 
 Currency may provide a suggested default precision, but a list may require greater precision than the currency's smallest payment unit. The resolved and rounded Customer Price is retained together with its calculation basis so that the publication is deterministic and auditable.
 
@@ -111,9 +126,9 @@ Order-, delivery-, and project-specific costs such as freight are outside the Pr
 
 ### Price basis
 
-Every Customer Price states an amount together with a Price Quantity and Unit of Measure. These three values form the Price Basis. Currency belongs to the Customer Price List containing the price.
+Every Customer Price states an amount together with a Price Quantity and Unit of Measure. These three values form the Price Basis. Currency belongs to the applicable Price List Version.
 
-For example, an amount of `1,200 / 100 metre` in a SEK Customer Price List means that 1,200 SEK covers 100 metres. Price Quantity is distinct from package size, minimum order quantity, or other commercial conditions.
+For example, an amount of `1,200 / 100 metre` in a SEK Price List Version means that 1,200 SEK covers 100 metres. Price Quantity is distinct from package size, minimum order quantity, or other commercial conditions.
 
 ### Quantity-based prices
 
@@ -121,151 +136,155 @@ The initial domain model allows one Customer Price per Price List Entry and vali
 
 Price Quantity remains part of the Price Basis; it states what quantity the amount covers and is not a quantity-discount threshold. Quantity breaks are an explicit initial non-goal until evidence from real price lists demonstrates the need.
 
-Within one Customer Price List, a Supplier Article ID has exactly one Price List Entry and one Price Basis. It may have successive Customer Prices with non-overlapping validity periods, but never multiple simultaneously valid prices. Different sellable forms such as piece and pallet must use different Supplier Article IDs rather than parallel entries for the same article number.
+Within one logical Price List, a Supplier Article ID has exactly one Price List Entry and one Price Basis. It may have successive Customer Prices with non-overlapping validity periods, but never multiple simultaneously valid prices. Different sellable forms in the same list require different Supplier Article IDs; the same identifier in another logical list identifies a separate entry.
 
 ## Article identity
 
-A Customer Price applies to an Article Reference identified by the combination of supplier and Supplier Article ID. A Supplier Article ID is required and is unique only within its supplier's namespace.
+A Customer Price applies to an Article Reference identified by the combination of Supplier, logical Price List, and Supplier Article ID. A Supplier Article ID is required and is unique only within that list's namespace.
 
 An Article Reference may include:
 
 - an Article Name for concise human-readable display
 - a GTIN or other external identifier
 
-The Supplier Article ID remains the PriceSync identity. Optional identifiers support matching and integration but do not replace it. Currency and Market do not change article identity; the same Article Reference may appear in multiple Customer Price Lists.
+PriceSync assigns a short, opaque, immutable, and globally unique PriceSync Article ID to that combination. The Supplier, logical Price List, and Supplier Article ID remain separately available as readable business fields rather than being encoded into the identifier. The logical Price List identity remains stable through all its versions, so a new version does not create new article identities. Optional identifiers support matching and integration but do not replace the composite business key.
 
-An Article Reference appears in a Customer Price List as a Price List Entry. The same supplier article may therefore have separate Swedish and German Price List Entries while remaining one supplier article in PriceSync.
+A Supplier Article ID may occur in both a General Price List and a Customer-Specific Net Price List, producing two separate Price List Entries and PriceSync Article IDs. PriceSync does not infer that entries in different lists are the same article merely because their Supplier Article IDs match.
 
-Customer systems own their internal article identifiers. Mapping a Supplier Article ID to a consuming system's identifier is integration configuration and does not belong to the core price domain. PriceSync may support such mappings in an import or export profile when a concrete external format requires them.
+Changing a Supplier Article ID within a logical Price List creates a new Price List Entry and PriceSync Article ID. The previous entry is reported as removed and the new entry as added; PriceSync never infers identity continuity from similar names, prices, or other attributes.
+
+Customer systems may use the PriceSync Article ID as a guaranteed unique external article identifier. Mapping it to an existing internal article, creating a local article, or handling an unmatched entry belongs to the Customer's connector or integration and is outside the PriceSync core domain.
+
+PriceSync mapping is limited to onboarding incoming price data into the canonical model through an Import Profile. It does not provide a general product-master matching engine or AI-based reconciliation for Customer systems.
 
 PriceSync does not own a product catalog. The Article Name is deliberately limited to a short designation; full descriptions, classifications, images, documents, and other product content remain outside the domain boundary.
 
-The complete Article Reference is versioned as part of each Price Snapshot. Later changes to an Article Name or optional identifier do not rewrite how the article appeared in an earlier snapshot.
+The complete Article Reference is captured in each Price List Version and completed Price Delivery. Later changes to an Article Name or optional identifier do not rewrite earlier versions or deliveries.
 
-## Price snapshots
+## Price-list versions, projections, and deliveries
 
-A Customer Price List uses the same price, snapshot, validation, history, and distribution semantics regardless of Price Source.
+PriceSync separates published source facts, calculated Customer views, and delivered audit records.
 
-- A Supplier-published list belongs to an active Trading Relationship and is owned and published by the Supplier.
-- A Customer-managed external list belongs privately to the Customer and identifies its source through an External Supplier Reference; it requires no Trading Relationship.
+- A Price List Version is an immutable, complete Supplier or Customer-managed source publication.
+- A Price Agreement Version is an immutable Supplier representation of externally agreed Customer terms.
+- A Customer Price Projection is the complete calculated Customer view derived from exact source versions.
+- A Price Delivery is the immutable result a Customer chose to download or import.
 
-One Customer and Supplier source may have multiple Customer Price Lists, for example for different currencies or Markets. Each Customer Price List has exactly one currency and may have a Market. Successive Price Snapshots version that list.
+This separation avoids creating permanent Customer copies for changes that are never consumed while retaining exact evidence for every actual delivery.
 
-Market does not describe where the Customer Organization is registered. A Swedish Customer may simultaneously use a Supplier's Swedish list for domestic projects and German list for exports to Germany. For the same export project, another Supplier's Swedish list may still be the applicable list. Price-list applicability is therefore selected per Supplier rather than globally for the Customer or destination market.
+### Price-list scope and versions
 
-Every publication produces a complete, versioned Price Snapshot of one Customer Price List. Publication is atomic: consumers see either the previous complete snapshot or the new complete snapshot, never an intermediate state.
+A Supplier or Customer-managed source may maintain multiple logical Price Lists for different currencies, Markets, or commercial purposes. Each logical list has a stable identity through all its versions. A Price List Version is complete and published atomically: consumers see either the preceding complete version or the new complete version, never an intermediate state.
 
-External integrations may submit a complete draft in multiple transport batches, but those batches must be assembled and validated before they can be published as a new complete Price Snapshot. A batch or partial update is not itself a publication.
+Market does not describe where the Customer Organization is registered. Applicability is selected per Supplier and Price Agreement rather than globally for a Customer or destination country.
+
+External integrations may assemble a Price Draft through multiple transport batches, but a batch or patch is never itself a publication. The complete draft must pass validation before it becomes a Price List Version.
 
 ### Draft and validation
 
-Imported or incrementally assembled price data remains a Price Draft until the complete list passes validation. A draft may be incomplete or invalid and is not visible to consuming systems.
+Imported or incrementally assembled data remains a Price Draft until the complete logical list passes validation. A draft may be incomplete or invalid and is not visible to Customers.
 
-Any validation error prevents publication of the entire draft. The previous Price Snapshot remains current, and validation reports all detected errors for correction. Valid rows are never published as a partial snapshot because omitted invalid rows would be indistinguishable from intentional price removals.
+Any Validation Error blocks publication of the entire draft. The preceding Price List Version remains current. Valid rows are never published partially because omitted invalid rows would be indistinguishable from intentional removals.
 
-A Validation Warning identifies a suspicious but domain-valid condition, such as an unusually large price change or many omitted articles. It does not make the draft invalid. Manual publication requires explicit acknowledgement; automated publication follows a configured policy that either permits the warning or pauses the draft for review.
+A Validation Warning identifies suspicious but domain-valid content, such as an unusually large price change or many omitted entries. Manual publication requires explicit acknowledgement; automated publication follows the Supplier's Publication Policy.
+
+A General Price List Version must also be compatible with every active Price Agreement Version that uses it. Publication is blocked if any resulting Customer Price Projection would be invalid.
 
 ### Initial ingestion paths
 
 The initial model has two ingestion paths:
 
 1. Manual File Upload accepts Excel or CSV and uses an Import Profile to map the Organization's external layout into a Price Draft.
-2. API Publication accepts JSON conforming to PriceSync's canonical contract and creates a Price Draft without an Import Profile.
+2. API Publication accepts canonical JSON and creates a Price Draft without an Import Profile.
 
-Import Profiles are private to their owning Organization and reusable across compatible file uploads within that Organization. Both ingestion paths produce the same canonical draft and use the same validation and publication rules.
+Import Profiles are private to their owning Organization and reusable across compatible uploads. Both paths produce the same canonical draft and use the same validation and publication rules. SFTP or other automated file delivery may later reuse the same Import Profiles.
 
-Automated file delivery such as SFTP is a future transport channel rather than an initial ingestion path. It may later reuse file Import Profiles without changing the price domain.
+An API client may assemble one complete Price Draft through multiple idempotent batches. Standalone API patches that directly publish individual entries are an initial non-goal.
 
-An API client may build one Price Draft through multiple batches and then explicitly declare the draft complete. PriceSync validates and publishes the assembled draft atomically. Standalone API patches that publish changes to individual entries are an initial non-goal.
+### Manual file flow and duplicate ingestion
 
-API batch limits do not apply to Manual File Upload. A file is received and processed through its own import flow before producing a Price Draft.
+A manual Excel or CSV upload never publishes directly. It is associated with an existing or newly configured Import Profile, parsed, normalized, and validated asynchronously into a reviewable Price Draft. Reusing a compatible profile never bypasses validation.
 
-### Manual file flow
-
-A manual Excel or CSV upload never publishes directly. The complete file is received, associated with an existing or newly configured Import Profile, parsed, and validated asynchronously into a reviewable Price Draft.
-
-Reusing a compatible Import Profile may skip repeated mapping work, but it never bypasses validation. A Price Publisher reviews the result, acknowledges any Validation Warnings, and explicitly publishes the draft atomically.
-
-### Duplicate ingestion
-
-PriceSync detects canonical content that has already been processed for the same Customer Price List. Retrying a file upload or API request is idempotent and does not automatically create another Price Draft, Price Snapshot, or set of notifications.
-
-The user is informed of the existing result and may resume an incomplete attempt. Creating a new draft from identical price content but meaningfully different source metadata requires an explicit choice.
-
-Deduplication is determined after normalization into the canonical Price Draft. Binary differences such as Excel formatting, column order, or file metadata do not create a new price version when the resulting canonical content is identical. A raw-file checksum may provide an earlier shortcut, while distinct source files remain separate audit evidence.
+PriceSync detects canonical content already processed for the same logical Price List. Retrying an upload or API request is idempotent and does not create another draft, version, or notification. Binary differences such as Excel formatting or column order do not create a new Price List Version when normalized canonical content is identical.
 
 ### Source-file privacy
 
-The original Source File is retained as private audit evidence for the uploading Organization and linked to its import attempt and resulting Price Draft or Price Snapshot. Only authorized members of that Organization may access it.
+The original Source File is private audit evidence for the uploading Organization and is linked to its import attempt, Price Draft, and resulting Price List Version. It is never distributed to a Customer unless the owning Organization takes a separate explicit action.
 
-Customers receive the canonical Price Snapshot and never automatically receive the Supplier's Source File. Source-file retention is governed independently from the immutable snapshot history, so expiry of a file does not erase the canonical publication record.
+Source-file retention is independent of published and delivered business records. When a Source File expires, PriceSync may delete the file while retaining non-content provenance such as checksum, filename, upload time, actor, Import Profile, and links to the resulting Price List Version. Price List Versions, Price Agreement Versions, and completed Price Deliveries are not deleted.
 
-Each Organization has a configurable Source Retention Policy. When a Source File expires, PriceSync retains non-content provenance including its checksum, file name, upload time, actor, Import Profile, and links to resulting drafts or snapshots. Canonical Price Snapshots and their audit metadata have a separate long-term lifecycle.
+### Customer Price Projection
 
-The Supplier owns the Publication Policy that determines how warnings affect publication. The Customer independently owns a Consumption Policy that may notify, pause, or permit downstream import of an already published snapshot. A Consumption Policy never changes whether the snapshot is published or commercially valid and does not introduce per-update price acceptance.
+PriceSync deterministically calculates a complete Customer Price Projection from exact Price List Versions, the applicable Price Agreement Version, and a versioned calculation rule. The projection shows resolved Customer Prices and their Price Calculation Basis.
+
+Customer Price Projections are calculated lazily. Publishing a relevant Price List Version or Price Agreement Version marks affected cached projections as stale and notifies Customers without materializing every Customer's price rows. PriceSync calculates a projection when a Customer opens its review or requests delivery, then may cache that result for subsequent reads.
+
+Publication performs compatibility validation without materializing complete projections, including checks for valid currencies, discounts, rounding rules, and referenced Supplier Price Groups. Projection materialization is rebuildable cache rather than a business record: it may be evicted, recalculated, or stored incrementally without changing domain meaning.
+
+PriceSync does not create a permanent Customer record merely because a source version changes. Any newly published source version relevant to the Customer produces a notification, even when its effect on resolved Customer Prices has not yet been calculated or may ultimately be zero.
+
+### Import approval and deferral
+
+The Customer's Consumption Policy determines whether a changed projection requires manual Import Approval or may be delivered automatically. Manual approval is the default.
+
+Import Approval applies atomically to the complete current Customer Price Projection. The Customer cannot approve selected entries while retaining old values for others. The Customer may approve delivery or defer the decision, optionally choosing a reminder date. Deferral does not reject or alter Supplier source publications; suspected errors are reported separately.
+
+If source versions change while review is pending, the projection is recalculated and clearly identified as changed. Approval binds the exact projection displayed at that moment.
+
+Future prices are available for review immediately. The Customer chooses whether to approve and deliver them before or after `Valid From`; PriceSync does not schedule their application inside the Customer system.
+
+### Price Delivery
+
+Import Approval or an applicable automatic Consumption Policy creates one complete Price Delivery. A completed Price Delivery is immutable and cannot be edited or deleted. Corrections and later prices produce a new delivery rather than rewriting history.
+
+Every Price Delivery permanently retains:
+
+- the exact Price List Versions and Price Agreement Version used
+- the calculation-rule version
+- the complete canonical Customer Price result
+- a canonical content hash
+- each generated export representation
+- Transfer Status and Application Status history
+- actor and timing provenance, subject to personal-data anonymization
+
+PriceSync may store the canonical result using compression, deduplication, or content-addressed components, but these implementation choices may not compromise permanent exact retrieval. Calculation cache, previews, and abandoned attempts are not Price Deliveries and may be removed.
+
+A Customer may deliver the newest projection without replaying intermediate source changes. Earlier source versions remain in history, while completed prior Price Deliveries remain permanently available.
 
 ### Transfer and application status
 
-PriceSync tracks delivery separately for each Customer integration or download channel. Transfer Status records observable facts such as a snapshot becoming available, being retrieved as a file, or being accepted by a destination endpoint.
+Delivery is generated from the canonical projection through a Customer-owned Export Profile. Manual integration creates a Customer-formatted file; partial integration transfers after manual Import Approval; full automation permits approval and transfer through the Consumption Policy. The Supplier's Source File is never the delivery artifact.
 
-Application Status records whether a consuming system has reported that the snapshot was applied or failed. When a downloaded file provides no feedback, its Application Status is `Not Reported`; retrieval is never treated as proof of import.
+Transfer Status records observable delivery facts such as prepared, retrieved, or accepted by a destination endpoint. Application Status records whether a Customer system reported the delivery as applied or failed. Retrieval never proves application; a manual confirmation is explicitly distinguished from a system-reported result.
 
-A Customer may optionally mark a manual file import as applied for internal traceability. This is identified as a manual confirmation and is not presented as a system-verified result. No manual status entry is required.
+Synchronization Status compares the current projection with the most recent Price Delivery reported as applied for that channel. A difference marks the channel Out of Sync. PriceSync may remind the Customer but never bypasses its Consumption Policy.
 
-### Change notifications
+### Change review and notifications
 
-One snapshot publication produces one summarized notification event per Customer integration or configured notification channel, rather than one notification per changed article.
+When a relevant Price List Version or Price Agreement Version is published, PriceSync produces one notification per configured Customer channel rather than one notification per article. Notification does not require PriceSync to prove that resolved Customer Prices changed.
 
-The summary includes counts of added, changed, and removed entries together with useful aggregate indicators such as the largest price change and range of effective dates. The full Price Change Set remains available for detailed processing. The Customer's Consumption Policy determines whether the summary is logged, notified, or used to pause downstream automation.
+When the Customer opens the review, PriceSync calculates or loads the current projection and compares it with the canonical result of the Customer's most recent Price Delivery. It presents:
 
-A Price Snapshot is a logical, reproducible domain view. It may be reconstructed from versioned components such as a shared List Price, Customer Discounts, and customer-specific Net Prices. The domain model does not require every resolved Customer Price to be physically duplicated or materialized for every customer.
+1. a summary with counts of added, changed, and removed Price List Entries and aggregate percentage indicators for comparable price changes
+2. a list of added entries
+3. a list of removed entries
+4. a list of changed entries showing the complete previous and new row, including Article Name and Customer Price, together with percentage price change
 
-### Archiving a price list
+The primary aggregate indicator is the median percentage change among comparable entries. The review also shows arithmetic mean, minimum, and maximum percentage change. Added and removed entries are excluded from these indicators.
 
-A Customer Price List may be archived but not deleted after publication. An Archived Price List accepts no new snapshots while its complete history remains available and clearly marked as no longer synchronized.
+For a Customer with no previous Price Delivery, every entry is classified as added. A changed entry identifies every canonical field that differs and shows both previous and new values. The exact Price Change Set reviewed is captured permanently when the resulting Price Delivery is created.
 
-Archiving does not alter the commercial validity of its Customer Prices. If prices should cease to apply, the Supplier publishes the appropriate `Valid To` values before archiving the list.
+If the review finds no canonical Customer Price changes, no new Price Delivery or import is needed. The Customer can still see which source versions triggered the notification.
 
-An Archived Price List may be reactivated only when its business identity remains the same: Supplier, Customer, currency, and Market or commercial purpose. Reactivation does not make an old snapshot current again. The Supplier must publish a new complete Price Snapshot before synchronization resumes, after which version history continues in the same list.
+### Archiving, validity, and corrections
 
-If the business identity has changed, a new Customer Price List is created instead.
+A logical Price List may be archived but not deleted after publication. It accepts no new Price List Versions while its versions and related Price Deliveries remain available. Reactivation is allowed only when its stable business identity is unchanged.
 
-### Price-list identity
+Publication Time and Price Validity are separate facts. Publication Time records when a Price List Version or Price Agreement Version became available through PriceSync. Price Validity records when an individual resulting Customer Price applies commercially. One version or projection may contain both current and future prices.
 
-Before its first publication, a Customer Price List's Supplier source, Customer, currency, and Market or commercial purpose may be corrected. The Supplier source is either a Supplier Organization in a Trading Relationship or an External Supplier Reference. The first publication fixes those identity attributes permanently; later changes require a new list.
+Each Customer Price has a required `Valid From` and may have a `Valid To`. Prices with identical conditions must not have overlapping validity. Omitting an entry from a new complete Price List Version ends its prior open representation according to the publication and validity rules captured by that source model.
 
-The display name remains editable because it does not change business meaning. A replaced list is archived and may link to its successor so readers can follow the history without rewriting earlier snapshots.
-
-### Publication and validity
-
-The Publication Time of a Price Snapshot and the Price Validity of its Customer Prices are separate facts.
-
-- Publication Time records when the snapshot became available through PriceSync.
-- Price Validity records when an individual Customer Price applies commercially.
-
-Customer Prices within the same Price Snapshot may begin to apply at different times. A snapshot may therefore contain both current and future prices.
-
-Each Customer Price has a required `Valid From` and may have a `Valid To`. An explicit end allows a price to expire without being replaced.
-
-When a new Customer Price replaces an open-ended price for the same article and price conditions, the previous price ceases to apply when the new one begins. Prices with identical conditions must not have overlapping Price Validity.
-
-Because every Price Snapshot is complete, omitting an article from a newly published snapshot ends its previously open Customer Price at the new snapshot's Publication Time. If a price should end at a future time, the article remains in the snapshot with an explicit `Valid To`. Earlier snapshots retain the historical price and Article Reference.
-
-### Corrections
-
-A published Price Snapshot is immutable. Incorrect information is corrected by publishing a new Price Snapshot rather than editing or deleting publication history.
-
-A Price Correction may assign corrected Price Validity retroactively. Its Publication Time still records when PriceSync learned about the correction, so consumers can distinguish what was commercially valid from what PriceSync knew at any given time. The incorrect snapshot remains available in the audit history.
-
-### Change sets
-
-Publishing a new Price Snapshot creates an immutable Price Change Set against the immediately preceding snapshot of the same Customer Price List. PriceSync derives the difference from canonical content rather than trusting change indicators in a Source File or API client.
-
-The change set classifies Price List Entries as added, changed, or removed. Consumers may retrieve either the complete snapshot or its canonical changes.
-
-For the first Price Snapshot, every Price List Entry is classified as added. A changed entry identifies each canonical field that differs and retains both its previous and new value. A removed entry retains the previous canonical entry and the time at which omission ended it.
-
-A Price Correction is compared with the immediately preceding publication like any other snapshot. Differences limited to source-file formatting, column order, or other non-canonical metadata do not appear in the Price Change Set.
+Published Price List Versions and Price Agreement Versions are immutable. Incorrect source information is corrected by publishing a new version, possibly with retroactive Price Validity. Earlier versions and every completed Price Delivery remain available so readers can distinguish what was commercially valid, what PriceSync knew, and what a Customer actually received.
 
 ## Customer-managed external prices
 
