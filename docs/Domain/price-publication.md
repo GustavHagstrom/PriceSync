@@ -4,7 +4,7 @@
 
 Own the lifecycle from a logical Price List through mutable draft and validation to an immutable published Price List Version.
 
-The area covers both General Price Lists and Customer-Specific Net Price Lists.
+The area covers General Price Lists, Customer-Specific Net Price Lists, and Customer-Managed External Net Price Lists.
 
 ## Aggregate model
 
@@ -22,6 +22,10 @@ At most one active Price Draft may exist for a logical Price List. The mechanism
 
 Each `PriceListVersion` is a separate immutable, complete canonical publication referencing `PriceListId`. Published versions are not modeled as a growing child collection of `PriceList`.
 
+### ExternalSupplierReference
+
+`ExternalSupplierReference` belongs to Price Publication and identifies the real external source for Customer-Managed External Net Price Lists. It does not create a Trading Relationship and does not make the Customer Organization a Supplier to itself.
+
 ## Core invariants
 
 - At most one active Price Draft exists per logical Price List.
@@ -30,7 +34,11 @@ Each `PriceListVersion` is a separate immutable, complete canonical publication 
 - A validation error blocks the entire publication.
 - A General Price List may exist and be published independently of any Customer or Trading Relationship.
 - A Customer-Specific Net Price List is scoped to exactly one Customer and contains already resolved Net Prices with no additional Customer Discount.
-- General and Customer-Specific Net Price Lists share the same publication/versioning concepts while differing in scope and pricing semantics.
+- A Customer-Managed External Net Price List follows the same publication/versioning flow as a Customer-Specific Net Price List, but is administered by the consuming Customer Organization for its own use and identifies the actual source through an `ExternalSupplierReference`.
+- Customer-managed external prices do not require a Trading Relationship or Price Agreement.
+- General, Customer-Specific Net, and Customer-Managed External Net Price Lists share the same publication/versioning concepts while differing in source authority, scope, and pricing semantics.
+
+Publication does not imply consumption approval. Customer-Specific Net and Customer-Managed External Net Price List Versions still flow through Customer Price Projection and Import Approval before they become available for retrieval.
 
 ## Cross-context collaboration still under discovery
 
