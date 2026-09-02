@@ -42,6 +42,10 @@ Publishing a newer Price List Version, activating a newer Agreement Version, or 
 
 If the Customer never approves the newer candidate projection, the previous Import Approval remains the current approved basis indefinitely unless another explicit domain action is introduced in the future.
 
+Two valid projections for the same Customer and logical Price List may be approved concurrently. Both immutable Import Approval facts may be recorded. The current approved basis is whichever approval is registered last according to a deterministic server-defined ordering; approval does not require serializing a mutable current pointer.
+
+A reviewed projection remains approvable even if a newer source basis becomes current before the Customer confirms approval. Approval always refers to the exact immutable projection the Customer reviewed, not to an implicitly refreshed latest projection.
+
 ## Consumption
 
 `ImportApproval` is also the durable identity for the approved price basis that later becomes available for retrieval or export. A separate `PriceDelivery` domain concept is not required.
@@ -52,4 +56,4 @@ Each successful retrieval is recorded separately as an immutable `PriceRetrieval
 
 ## Context relationships
 
-Customer Approval consumes only valid `CustomerPriceProjection` results plus their `PriceChangeSet` and non-blocking Projection Warnings from Customer Pricing. Integration Configuration may provide versioned Export Profile configuration when an approved price basis is exported. Successful retrievals belong to the retrieval/consumption responsibility and reference the exact `ImportApproval` that was retrieved.
+Customer Approval consumes only valid `CustomerPriceProjection` results plus their `PriceChangeSet` and non-blocking Projection Warnings from Customer Pricing. Projection Warnings are informational and never require a separate acknowledgement before Import Approval. Integration Configuration may provide versioned Export Profile configuration when an approved price basis is exported. Successful retrievals belong to the retrieval/consumption responsibility and reference the exact `ImportApproval` that was retrieved.
