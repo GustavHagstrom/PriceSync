@@ -168,7 +168,7 @@ PriceSync separates published source facts, calculated Customer views, and deliv
 - A Price List Version is an immutable, complete Supplier or Customer-managed source publication.
 - A Price Agreement Version is an immutable Supplier representation of externally agreed Customer terms.
 - A Customer Price Projection is the complete calculated Customer view derived from exact source versions.
-- A Price Delivery is the immutable result a Customer chose to download or import.
+- A Price Delivery is the immutable result a Customer chose to make available for retrieval or import.
 
 This separation avoids creating permanent Customer copies for changes that are never consumed while retaining exact evidence for every actual delivery.
 
@@ -225,19 +225,19 @@ PriceSync does not create a permanent Customer record merely because a source ve
 
 ### Import approval and deferral
 
-The Customer's Consumption Policy determines whether a changed projection requires manual Import Approval or may be delivered automatically. Manual approval is the default.
+The Customer's Consumption Policy determines whether a changed projection requires manual Import Approval or may create a Price Delivery automatically. Manual approval is the default.
 
 Import Approval applies atomically to the complete Customer Price Projection actually presented for approval. The Customer cannot approve selected entries while retaining old values for others. The approved projection is identified by its exact source versions and calculation rule, and approval never silently switches to a newer projection published while the Customer was reviewing.
 
 If a newer relevant source version is published while a review is open, that review becomes stale. The Customer may still explicitly approve the exact projection already reviewed, or leave that review and inspect the newest current projection instead. A stale review never changes its contents underneath the Customer.
 
-Repeated or concurrent approval of the same projection for the same Customer channel is idempotent from the domain perspective and creates at most one Price Delivery. An explicit later redelivery of that Price Delivery is a transfer action, not creation of another equivalent business record.
+Repeated or concurrent approval of the same projection for the same Customer channel is idempotent from the domain perspective and creates at most one Price Delivery. Retrieving that Price Delivery multiple times never creates another equivalent business record.
 
 The Customer may defer a pending change, optionally choosing a reminder date. Deferral does not reject or alter Supplier source publications. Any later relevant Price List Version or Price Agreement Version cancels the existing deferral and creates a new notification, even if PriceSync has not yet calculated whether the resulting canonical Customer Prices actually differ. The initial model deliberately favors this simple publication-based rule over calculating projection equality before deciding whether to interrupt deferral.
 
-A Customer does not need to review or deliver every intermediate projection. If several source versions are published before the Customer acts, a newly opened review uses the newest current projection and compares it with the Customer's relevant prior delivery; intermediate source versions remain part of publication history without becoming mandatory review steps.
+A Customer does not need to review or deliver every intermediate projection. If several source versions are published before the Customer acts, a newly opened review uses the newest current projection and compares it with the Customer's most recent Price Delivery; intermediate source versions remain part of publication history without becoming mandatory review steps.
 
-Future prices are available for review immediately. The Customer chooses whether to approve and deliver them before or after `Valid From`; PriceSync does not schedule their application inside the Customer system.
+Future prices are available for review immediately. The Customer chooses whether to approve them before or after `Valid From`; PriceSync does not schedule their application inside the Customer system.
 
 ### Price Delivery
 
@@ -252,32 +252,24 @@ Every Price Delivery permanently retains:
 - the complete canonical Customer Price result
 - a canonical content hash
 - each generated export representation
-- Transfer Status and Application Status history
+- Retrieval Status
 - actor and timing provenance, subject to personal-data anonymization
 
-PriceSync may store the canonical result using compression, deduplication, or content-addressed components, but these implementation choices may not compromise permanent exact retrieval. Calculation cache, previews, and abandoned attempts are not Price Deliveries and may be removed.
+PriceSync may store the canonical result using compression, deduplication, or content-addressed components, but these implementation choices may not compromise permanent exact retrieval. Calculation cache and previews are not Price Deliveries and may be removed.
 
-A Customer may deliver the newest projection without replaying intermediate source changes. Earlier source versions remain in history, while completed prior Price Deliveries remain permanently available.
+A Customer may create a Price Delivery from the newest projection without replaying intermediate source changes. Earlier source versions and prior Price Deliveries remain permanently available as history.
 
-A newer Price Delivery may supersede an older one as the delivery PriceSync is actively trying to synchronize for the same Customer channel. Superseding never deletes or rewrites the older Price Delivery or its transfer history. It only changes which delivery future transfer attempts target.
+Creation of a newer Price Delivery does not require an earlier Price Delivery to have been retrieved. Because every Price Delivery contains a complete canonical projection rather than a patch, the newer delivery can be consumed directly without first consuming older deliveries.
 
-Creation of a newer Price Delivery does not require the preceding Price Delivery to have transferred or applied successfully. A Customer may therefore approve P2 and create D2 even when D1 never reached the Customer system. D1 remains in history with its actual transfer and application outcomes, while D2 becomes the current delivery for subsequent synchronization attempts.
+### Retrieval
 
-### Transfer and application status
+PriceSync makes Price Deliveries available for retrieval; it does not push them into Customer systems. Customer-owned integrations or users retrieve deliveries through the available PriceSync interface and remain responsible for any downstream import, retry, or application behavior inside the Customer environment.
 
-Delivery is generated from the canonical projection through a Customer-owned Export Profile. Manual integration creates a Customer-formatted file; partial integration transfers after manual Import Approval; full automation permits approval and transfer through the Consumption Policy. The Supplier's Source File is never the delivery artifact.
+A new Price Delivery starts with `Retrieval Status = Available`. The first successful retrieval changes that status to `Retrieved`. Subsequent retrievals of the same immutable Price Delivery remain allowed and do not change its business meaning or create another delivery.
 
-Once a Price Delivery has been created, PriceSync continues transferring that exact delivery even if a newer source version is published before transfer begins. The newer source version becomes a separate pending change and does not retroactively alter the approved delivery.
+When multiple Price Deliveries exist for a Customer channel, the newest Price Delivery is the current one returned when an integration requests the current delivery. Older deliveries remain available through explicit historical access and do not need to be retrieved in sequence.
 
-A failed transfer may be retried while that Price Delivery remains the current delivery for the Customer channel. When a newer Price Delivery is created for the same channel, future retries of the older delivery stop and the newer delivery becomes the active synchronization target.
-
-A transfer attempt that is already in flight when a newer Price Delivery is created is allowed to complete. PriceSync does not assume that such an attempt can be revoked after it has left the platform. The newer delivery is then transferred afterward so that the destination can converge on the newest approved state.
-
-Transfer Status records observable delivery facts such as prepared, attempted, retrieved, or accepted by a destination endpoint. Application Status records whether a Customer system reported the delivery as applied or failed. Retrieval never proves application; a manual confirmation is explicitly distinguished from a system-reported result.
-
-Source publication, Import Approval, Price Delivery creation, transfer, and application are separate facts with separate lifecycles. A later fact does not rewrite an earlier one even when it supersedes which delivery PriceSync is currently trying to synchronize.
-
-Synchronization Status compares the current projection with the most recent Price Delivery reported as applied for that channel. A difference marks the channel Out of Sync. PriceSync may remind the Customer but never bypasses its Consumption Policy.
+PriceSync does not model whether a Customer system later applied the retrieved prices and does not expose an initial Synchronization Status. The platform records only facts observable at its own boundary.
 
 ### Change review and notifications
 
