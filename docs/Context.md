@@ -41,7 +41,7 @@ The Customer's acknowledgement that it has seen a specific Price Agreement Versi
 _Avoid_: Supplier approval, contract signing
 
 **Active Price Agreement Version**:
-The accepted Price Agreement Version currently selected for Customer Price Projections within its scope. Normally the newest accepted version whose Valid From has been reached becomes active. A Customer may explicitly activate an accepted future version earlier without changing the Supplier-defined Valid From.
+The accepted Price Agreement Version currently selected for Customer Price Projections within its scope. Normally PriceSync considers accepted versions whose validity includes the current date and selects the one with the latest Valid From; when a newer version expires, an older still-valid accepted version may therefore become active again. A Customer may explicitly activate an accepted future version earlier without changing the Supplier-defined Valid From.
 
 **External Supplier Reference**:
 A customer's private identification of the actual supplier behind Customer-Managed External Prices when that supplier is not yet represented by a connected Organization in PriceSync. It may later be linked to the supplier's Organization.
@@ -110,7 +110,7 @@ An immutable, complete version of one logical General Price List or Customer-Spe
 _Avoid_: Partial price list, price patch, Customer Price Snapshot
 
 **Customer Price Projection**:
-The complete Customer Price view calculated from exact Price List Versions and the Active Price Agreement Version. It may be materialized for performance but is rebuildable cache rather than an audit record. Every new projection must be manually approved by the Customer before a Price Delivery may be created in the initial model.
+The complete Customer Price view calculated from exact Price List Versions and the Active Price Agreement Version. It may be materialized for performance but is rebuildable cache rather than an audit record. Changing the Active Price Agreement Version produces a new projection; every new projection must be manually approved by the Customer before a Price Delivery may be created in the initial model.
 _Avoid_: Customer Price Snapshot, published customer list
 
 **Price Delivery**:
