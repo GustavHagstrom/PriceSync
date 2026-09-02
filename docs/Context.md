@@ -69,8 +69,11 @@ A Supplier-owned, reusable collection of List Prices that exists independently o
 _Avoid_: Customer Price List, net price list
 
 **Customer-Specific Net Price List**:
-A Supplier-published list of Net Prices prepared for one Customer. Its prices are already resolved and receive no additional Customer Discount.
+A Supplier-published list of Net Prices prepared for one Customer. Its prices are already resolved and receive no additional Customer Discount. The Customer is part of the list's scope from creation.
 _Avoid_: General Price List, discounted price list
+
+**Price List**:
+The stable logical identity and scope for a sequence of Price List Versions. A Price List is created before its first import or publication. Its Type, Currency, Market, and applicable Customer define its scope and are immutable after the first publication; its Name is display metadata and may change without creating a new version.
 
 **Customer Discount**:
 A customer-specific percentage reduction in a Price Agreement applied to a List Price. It may apply generally to the referenced General Price List or specifically to a Supplier Price Group; applicable discounts are alternatives and are never stacked.
@@ -96,7 +99,7 @@ _Avoid_: Supplier-published prices
 The selected origin for one price-list context defined by Supplier, currency, and Market or commercial purpose: Supplier-Published Prices or Customer-Managed External Prices.
 
 **Price List Version**:
-An immutable, complete version of one logical General Price List or Customer-Specific Net Price List. It is published atomically and remains permanently available as a calculation source.
+An immutable, complete version of one logical General Price List or Customer-Specific Net Price List. Each version is a complete canonical snapshot and is published atomically. Canonically identical content does not create a new version.
 _Avoid_: Partial price list, price patch, Customer Price Snapshot
 
 **Customer Price Projection**:
@@ -108,7 +111,7 @@ The permanent, immutable record of the exact Customer Price Projection a Custome
 _Avoid_: Cache, mutable export
 
 **Price Draft**:
-Mutable price-list work awaiting successful validation and publication as a Price List Version. It is not visible to consumers and is not part of published history.
+Mutable price-list work awaiting successful validation and publication as a Price List Version. At most one active Price Draft exists per logical Price List. Replaced or abandoned drafts are working material rather than permanent domain history.
 _Avoid_: Price List Version
 
 **Import Profile**:
