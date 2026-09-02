@@ -31,7 +31,9 @@ Its natural identity is:
 
 A projection always represents exactly one logical Price List for one Customer. Multiple lists from the same Supplier, and lists from different Suppliers, therefore produce separate projections and can be reviewed and approved independently.
 
-For a General Price List, Customer Pricing calculates resolved Customer Prices from the Price List Version and Active accepted Price Agreement Version. For Customer-Specific Net Price Lists and Customer-Managed External Net Price Lists, the projection is effectively an identity projection of the already-resolved source prices into the same Customer-facing review model.
+For a General Price List, Customer Pricing calculates resolved Customer Prices from the exact Price List Version and Price Agreement Version supplied to it. For Customer-Specific Net Price Lists and Customer-Managed External Net Price Lists, the projection is effectively an identity projection of the already-resolved source prices into the same Customer-facing review model.
+
+The same exact input tuple always represents the same semantic projection, regardless of when or how many times it is materialized. Time affects selection of which source versions are current or applicable, not evaluation of an already selected immutable input tuple.
 
 This keeps the downstream review, approval, export, and retrieval flow consistent across all supported price-list forms without inventing a Price Agreement where none exists.
 
@@ -46,6 +48,8 @@ Building/evaluating a projection therefore produces an explicit domain result:
 
 Projection validity is atomic. If any required price row cannot be resolved correctly, the complete projection is invalid and cannot be approved. PriceSync does not silently omit invalid rows or substitute speculative pricing fallbacks.
 
+Projection Issues and valid/invalid evaluation status are rebuildable results of the immutable inputs rather than permanent business facts. They may be cached or recorded in technical observability, but no permanent `ProjectionFailure` aggregate is introduced.
+
 Warnings represent suspicious but still valid outcomes, such as unusually large price changes. They do not block Import Approval. In the initial model the warning rules and thresholds are fixed system rules rather than Customer-configurable policies.
 
 ## Price Change Set
@@ -56,10 +60,20 @@ The current approved basis is the latest relevant Import Approval for `CustomerI
 
 A newer Price List Version or agreement input does not invalidate that approved basis. It merely makes a newer candidate projection possible. The previously approved basis remains current until the Customer approves another valid projection for that logical Price List.
 
+## Source selection and orchestration
+
+Price Publication owns selection of the currently applicable `PriceListVersionId` for a logical Price List. Agreements owns selection of the currently Active accepted `PriceAgreementVersionId` for General Price Lists.
+
+Customer Pricing does not inspect either context's version history to decide what is current. A thin application/use-case orchestrator obtains those context-owned selections, combines them with `CustomerId`, and asks Customer Pricing to evaluate the resulting exact immutable tuple.
+
+That orchestration does not require a distributed transaction or globally atomic snapshot across contexts. If Price Publication or Agreements changes between reads, the resulting tuple is still an exact reproducible projection basis. A newer candidate may be produced on a subsequent orchestration.
+
+A projection that has already been built for review remains approvable even if a newer source basis becomes current while the review is open. The reviewed projection never mutates underneath the Customer; the UI may indicate that a newer candidate exists.
+
 ## Materialization
 
 New source versions do not require eager recalculation across all affected Customers. Candidate projections are calculated lazily when requested or otherwise needed. Cache invalidation and background precomputation may be implementation optimizations, but do not change which Import Approval is the current approved basis.
 
 ## Context relationships
 
-Customer Pricing consumes immutable Price List Versions from Price Publication and, only for General Price Lists, the currently Active accepted agreement state from Agreements. It exposes valid projections, invalid Projection Issues, Projection Warnings, and Price Change Sets for Customer review and approval.
+Customer Pricing consumes exact immutable Price List Versions from Price Publication and, for General Price Lists, exact immutable Price Agreement Versions selected by Agreements. It exposes valid projections, invalid Projection Issues, Projection Warnings, and Price Change Sets for Customer review and approval.
