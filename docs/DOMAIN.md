@@ -68,6 +68,8 @@ Completed Price Deliveries remain in the recipient's audit history and are marke
 
 A General Price List is a Supplier-owned, reusable collection of List Prices. Multiple Price Agreements may refer to the same General Price List, allowing its List Prices to be maintained and versioned independently of any individual Customer. Customer-specific discounts remain in the Price Agreement rather than being duplicated in the shared list.
 
+A Supplier creates the logical Price List before importing or publishing its first version. The logical list carries stable scope such as Type, Currency and Market. A Customer-Specific Net Price List also identifies exactly one Customer from creation. These scope properties may be edited before first publication, but after the first Price List Version has been published they are fixed; changing the scope requires a new logical Price List. The list Name is display metadata and may be renamed without creating a new Price List or Price List Version.
+
 A Supplier may create, maintain, and publish a General Price List before any Customer or Trading Relationship exists. Publication versions the Supplier's price basis but does not distribute Customer Prices by itself. Distribution begins only when an active Trading Relationship and applicable Price Agreement connect a Customer to that list.
 
 Publishing a new General Price List Version invalidates the affected cached Customer Price Projections. It does not immediately recalculate every Customer's price rows or create permanent Customer copies or Price Deliveries.
@@ -174,15 +176,21 @@ This separation avoids creating permanent Customer copies for changes that are n
 
 ### Price-list scope and versions
 
-A Supplier or Customer-managed source may maintain multiple logical Price Lists for different currencies, Markets, or commercial purposes. Each logical list has a stable identity through all its versions. A Price List Version is complete and published atomically: consumers see either the preceding complete version or the new complete version, never an intermediate state.
+A Supplier or Customer-managed source may maintain multiple logical Price Lists for different currencies, Markets, or commercial purposes. Each logical list has a stable identity through all its versions. Each Price List Version is a complete canonical snapshot and is published atomically: consumers see either the preceding complete version or the new complete version, never an intermediate state or a patch that must be replayed.
 
 Market does not describe where the Customer Organization is registered. Applicability is selected per Supplier and Price Agreement rather than globally for a Customer or destination country.
 
 External integrations may assemble a Price Draft through multiple transport batches, but a batch or patch is never itself a publication. The complete draft must pass validation before it becomes a Price List Version.
 
+Canonical equality is based on all business-relevant fields in the complete Price List Version, not only monetary price values. Changes to fields such as Article Name, Unit of Measure, Price Quantity, validity, Supplier Price Group, identifiers, or price data are therefore version-relevant. Technical input differences such as Excel row order, workbook formatting, file name, or upload time do not change canonical content. Hashing or another deterministic fingerprint may be used to detect equality, but the domain rule is canonical-content equality rather than a specific hashing algorithm.
+
+If the normalized canonical content of a draft is identical to the currently published Price List Version, publishing it does not create another Price List Version. Renaming the logical Price List likewise does not create a new Price List Version because Name is not part of versioned canonical article content.
+
 ### Draft and validation
 
 Imported or incrementally assembled data remains a Price Draft until the complete logical list passes validation. A draft may be incomplete or invalid and is not visible to Customers.
+
+At most one active Price Draft exists for a logical Price List. If a Supplier starts a new import while a draft already exists, the Supplier explicitly confirms replacing the existing draft. The replaced draft is discarded as mutable working material rather than preserved as permanent domain history; separate technical audit information may still be retained according to operational needs.
 
 Any Validation Error blocks publication of the entire draft. The preceding Price List Version remains current. Valid rows are never published partially because omitted invalid rows would be indistinguishable from intentional removals.
 
