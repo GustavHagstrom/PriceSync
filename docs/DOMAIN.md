@@ -169,20 +169,23 @@ PriceSync mapping is limited to onboarding incoming price data into the canonica
 
 PriceSync does not own a product catalog. The Article Name is deliberately limited to a short designation; full descriptions, classifications, images, documents, and other product content remain outside the domain boundary.
 
-The complete Article Reference is captured in each Price List Version and completed Price Delivery. Later changes to an Article Name or optional identifier do not rewrite earlier versions or deliveries.
+The complete Article Reference is captured in each Price List Version. Completed Price Deliveries retain immutable provenance that identifies the exact source versions used; they do not permanently duplicate every projected article row.
 
-## Price-list versions, projections, and deliveries
+## Price-list versions, projections, approvals, and deliveries
 
-PriceSync separates published source facts, calculated Customer views, and delivered audit records.
+PriceSync separates published source facts, calculated Customer views, Customer authorization, and delivered audit records.
 
 - A Price List Version is an immutable, complete Supplier or Customer-managed source publication.
 - A Price Agreement Version is an immutable, complete Supplier representation of externally agreed Customer terms.
 - Agreement Acceptance records that the Customer has seen a specific Price Agreement Version.
 - An Active Price Agreement Version is the accepted version currently used for Customer Price Projections.
-- A Customer Price Projection is the complete calculated Customer view derived from exact source versions.
-- A Price Delivery is the immutable result a Customer chose to make available for retrieval or import.
+- A Customer Price Projection is the complete calculated Customer view derived from exact source versions. It is rebuildable derived state rather than a permanent audit record.
+- Import Approval is the immutable Customer authorization of the exact projection that was reviewed.
+- A Price Delivery is the immutable metadata/provenance record created at approval time for that exact approved price basis; it does not permanently contain every projected price row.
+- A Delivery Artifact is a specific immutable exported representation of a Price Delivery.
+- Successful retrievals are recorded as immutable facts rather than mutable state on the Price Delivery.
 
-This separation avoids creating permanent Customer copies for changes that are never consumed while retaining exact evidence for every actual delivery.
+This separation avoids permanent Customer copies of every calculated price row while retaining enough immutable source and calculation provenance to identify and deterministically reproduce what the Customer approved.
 
 ### Price-list scope and versions
 
@@ -255,39 +258,33 @@ Repeated or concurrent approval of the same projection for the same Customer cha
 
 The Customer may defer a pending change, optionally choosing a reminder date. Deferral does not reject or alter Supplier source publications. Any later relevant Price List Version or activation of a different Price Agreement Version cancels the existing deferral and creates a new notification, even if PriceSync has not yet calculated whether the resulting canonical Customer Prices actually differ.
 
-A Customer does not need to review or deliver every intermediate projection. If several source versions are published before the Customer acts, a newly opened review uses the newest current projection and compares it with the Customer's most recent Price Delivery; intermediate source versions remain part of publication history without becoming mandatory review steps.
+A Customer does not need to review or deliver every intermediate projection. If several source versions are published before the Customer acts, a newly opened review uses the newest current projection and compares it with the Customer's most recent Price Delivery basis; intermediate source versions remain part of publication history without becoming mandatory review steps.
 
 Future prices are available for review immediately. The Customer chooses whether to approve them before or after `Valid From`; PriceSync does not schedule their application inside the Customer system.
 
 ### Price Delivery
 
-Manual Import Approval creates one complete Price Delivery bound to the exact approved Customer Price Projection. Approval is the commit point for that delivery: a later source publication or agreement activation does not change, cancel, or replace the contents of a Price Delivery already created.
+Manual Import Approval creates one Price Delivery bound to the exact approved Customer Price Projection. Approval is the commit point for that delivery: a later source publication or agreement activation does not change, cancel, or replace a Price Delivery already created.
 
 A completed Price Delivery is immutable and cannot be edited or deleted. Corrections and later prices produce a new delivery rather than rewriting history.
 
-Every Price Delivery permanently retains:
+A Price Delivery permanently retains compact immutable metadata and provenance sufficient to identify the exact approved price basis and reproduce it deterministically. This includes the exact Price List Versions and Price Agreement Version used, the calculation-rule version, Customer/channel scope, approval provenance, and a deterministic projection or canonical-content identity/hash.
 
-- the exact Price List Versions and Price Agreement Version used
-- the calculation-rule version
-- the complete canonical Customer Price result
-- a canonical content hash
-- each generated export representation
-- Retrieval Status
-- actor and timing provenance, subject to personal-data anonymization
+The complete Customer Price Projection is not required to be stored permanently as rows inside the Price Delivery. It may be materialized and cached for performance and rebuilt from immutable inputs and the retained calculation-rule version when needed.
 
-PriceSync may store the canonical result using compression, deduplication, or content-addressed components, but these implementation choices may not compromise permanent exact retrieval. Calculation cache and previews are not Price Deliveries and may be removed.
+Exported representations are separate Delivery Artifacts rather than mutable fields of the Price Delivery. The persistence and regeneration policy for the artifact bytes remains under discovery.
 
 A Customer may create a Price Delivery from the newest projection without replaying intermediate source changes. Earlier source versions and prior Price Deliveries remain permanently available as history.
 
-Creation of a newer Price Delivery does not require an earlier Price Delivery to have been retrieved. Because every Price Delivery contains a complete canonical projection rather than a patch, the newer delivery can be consumed directly without first consuming older deliveries.
+Creation of a newer Price Delivery does not require an earlier Price Delivery to have been retrieved. A newer delivery identifies a complete approved price basis rather than a patch, so it can be consumed directly without first consuming older deliveries.
 
 ### Retrieval
 
-PriceSync makes Price Deliveries available for retrieval; it does not push them into Customer systems. Customer-owned integrations or users retrieve deliveries through the available PriceSync interface and remain responsible for any downstream import, retry, or application behavior inside the Customer environment.
+PriceSync makes Price Deliveries and their Delivery Artifacts available for retrieval; it does not push them into Customer systems. Customer-owned integrations or users retrieve them through the available PriceSync interface and remain responsible for any downstream import, retry, or application behavior inside the Customer environment.
 
-A new Price Delivery starts with `Retrieval Status = Available`. The first successful retrieval changes that status to `Retrieved`. Subsequent retrievals of the same immutable Price Delivery remain allowed and do not change its business meaning or create another delivery.
+Retrieval Status is not mutable state on Price Delivery. Each successful retrieval is recorded as an immutable retrieval fact associated with the relevant delivery or artifact. `Available` means no successful retrieval fact exists; `Retrieved` means one or more exist.
 
-When multiple Price Deliveries exist for a Customer channel, the newest Price Delivery is the current one returned when an integration requests the current delivery. Older deliveries remain available through explicit historical access and do not need to be retrieved in sequence.
+Subsequent retrievals remain allowed and do not change the Price Delivery's business meaning or create another delivery. When multiple Price Deliveries exist for a Customer channel, the newest Price Delivery is the current one returned when an integration requests the current delivery. Older deliveries remain available through explicit historical access and do not need to be retrieved in sequence.
 
 PriceSync does not model whether a Customer system later applied the retrieved prices and does not expose an initial Synchronization Status. The platform records only facts observable at its own boundary.
 
@@ -295,7 +292,7 @@ PriceSync does not model whether a Customer system later applied the retrieved p
 
 When a relevant Price List Version is published, or a different Price Agreement Version becomes Active for the Customer, PriceSync produces one notification per configured Customer channel rather than one notification per article. Notification does not require PriceSync to prove that resolved Customer Prices changed.
 
-When the Customer opens the review, PriceSync calculates or loads the current projection and compares it with the canonical result of the Customer's most recent Price Delivery. It presents:
+When the Customer opens the review, PriceSync calculates or loads the current projection and compares it with the reproducible price basis identified by the Customer's most recent Price Delivery. It presents:
 
 1. a summary with counts of added, changed, and removed Price List Entries and aggregate percentage indicators for comparable price changes
 2. a list of added entries
@@ -304,7 +301,7 @@ When the Customer opens the review, PriceSync calculates or loads the current pr
 
 The primary aggregate indicator is the median percentage change among comparable entries. The review also shows arithmetic mean, minimum, and maximum percentage change. Added and removed entries are excluded from these indicators.
 
-For a Customer with no previous Price Delivery, every entry is classified as added. A changed entry identifies every canonical field that differs and shows both previous and new values. The exact Price Change Set reviewed is captured permanently when the resulting Price Delivery is created.
+For a Customer with no previous Price Delivery, every entry is classified as added. A changed entry identifies every canonical field that differs and shows both previous and new values. The exact projection identity and calculation basis approved by the Customer are retained through Import Approval and Price Delivery provenance.
 
 If the review finds no canonical Customer Price changes, no new Price Delivery or import is needed. The Customer can still see which source versions triggered the notification.
 
@@ -316,7 +313,7 @@ Publication Time and Price Validity are separate facts. Publication Time records
 
 Each Customer Price has a required `Valid From` and may have a `Valid To`. Prices with identical conditions must not have overlapping validity. Omitting an entry from a new complete Price List Version ends its prior open representation according to the publication and validity rules captured by that source model.
 
-Published Price List Versions and Price Agreement Versions are immutable. Incorrect source information is corrected by publishing a new version, possibly with retroactive Price Validity. Earlier versions and every completed Price Delivery remain available so readers can distinguish what was commercially valid, what PriceSync knew, which agreement the Customer had accepted and activated, and what the Customer actually received.
+Published Price List Versions and Price Agreement Versions are immutable. Incorrect source information is corrected by publishing a new version, possibly with retroactive Price Validity. Earlier versions and every completed Price Delivery remain available so readers can distinguish what was commercially valid, what PriceSync knew, which agreement the Customer had accepted and activated, and what the Customer approved for delivery.
 
 ## Customer-managed external prices
 
@@ -338,7 +335,13 @@ Connecting to a Supplier does not automatically replace Customer-Managed Externa
 
 Once selected, future publications to that list participate in the normal Customer review and manual Import Approval flow. The previous customer-managed list is archived, retained as history, and linked to its Supplier-published successor rather than remaining an active competing source.
 
+## Established domain areas
+
+The current bounded-context candidates and aggregate ownership are documented under [docs/Domain](./Domain/readme.md).
+
 ## Unresolved questions
 
-- Which concepts change together and therefore belong in the same domain module?
-- Which domain modules or bounded contexts exist within PriceSync?
+- How should Price Publication validate compatibility against Active Agreement state across contexts without creating a giant cross-context transaction?
+- Should Delivery Artifact bytes be retained permanently or regenerated deterministically from immutable delivery inputs and versioned export configuration?
+- Which context owns Customer-Managed External Price source selection and successor linking?
+- Which cross-context relationships should use immutable snapshots, ID/query references, emitted facts, or synchronous validation?
