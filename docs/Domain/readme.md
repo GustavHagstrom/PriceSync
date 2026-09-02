@@ -23,18 +23,23 @@ These are domain ownership and consistency seams, not deployment boundaries. Pri
 - Agreements reference the applicable Trading Relationship and Organizations rather than duplicating those concepts.
 - Price Publication owns General, Customer-Specific Net, and Customer-Managed External Net Price Lists. Customer-managed external lists use `ExternalSupplierReference` without creating a Trading Relationship or making the Customer a Supplier to itself.
 - Price Publication validates a Price List intrinsically. It does not iterate all Customers and Agreements to guarantee every possible projection before publishing.
-- Customer Pricing consumes one exact Price List Version per projection. General Price Lists additionally use the Active accepted Price Agreement Version; already-resolved net price lists do not.
+- Price Publication owns which `PriceListVersionId` is currently applicable for a logical Price List. Agreements owns which accepted `PriceAgreementVersionId` is Active for a General Price List relationship.
+- A thin application/use-case orchestrator combines those context-owned selections with `CustomerId` and asks Customer Pricing to evaluate the exact immutable tuple. No new domain context or distributed transaction is introduced for that orchestration.
 - Customer Pricing owns compatibility of those exact inputs. Projection evaluation returns either a complete valid projection (optionally with non-blocking warnings) or structured issues; partial projections are not approvable.
+- Projection Issues and valid/invalid evaluation status are rebuildable results rather than permanent domain facts. Technical caching and observability do not change domain meaning.
 - `CustomerPriceProjection` has no stable domain ID, calculation-rule version, or projection fingerprint. Its natural identity is `CustomerId + PriceListVersionId + optional PriceAgreementVersionId`.
-- Customer Approval records one immutable Import Approval for that exact natural projection identity. Invalid projections cannot be approved.
+- The same exact immutable input tuple always denotes the same semantic projection. Time affects source-version selection, not evaluation of an already selected tuple.
+- Customer Approval records one immutable Import Approval for that exact natural projection identity. Invalid projections cannot be approved and Projection Warnings never block approval.
 - Each Customer has an independently derived current approved basis per logical Price List: the latest relevant Import Approval. New source data does not replace it until another projection for that list is explicitly approved.
+- A reviewed projection may still be approved after a newer source basis becomes current; approval is always for the exact projection the Customer actually reviewed.
+- Concurrent approvals of different valid projections for the same Customer and logical Price List may both succeed. A deterministic server-defined registration order determines which immutable Import Approval is the current approved basis.
 - Publication and consumption approval remain separate for all supported price-list forms, including Customer-managed external prices.
 - Import Approval, rather than a separate Price Delivery, is the durable identity of the approved price basis available for later export/retrieval.
 - Exported representations are deterministic derived results and may be cached rather than permanently stored when they can be regenerated from immutable approval provenance plus versioned export configuration.
 - Retrieval & Consumption records each successful handoff as a separate immutable `PriceRetrieval` fact; repeated retrievals therefore form an append-only log rather than mutable retrieval state.
 - Integration Configuration transforms external formats to or from the canonical model and does not own pricing facts.
 
-Exact cross-context collaboration styles remain under discovery in Issue #7.
+The remaining Issue #7 discovery can now focus on whether any additional domain seams or collaboration details materially change these ownership rules.
 
 ## How to use these pages
 
