@@ -112,6 +112,12 @@ price.changed
 price.removed
 ```
 
+### Hypothesis: API draft batching
+
+Canonical JSON publication may assemble one price draft through multiple idempotent API batches before final validation and atomic publication. A reasonable initial limit to test is 5,000 entries or 5 MiB of JSON per request, whichever is reached first.
+
+This is a technical starting hypothesis rather than a domain constraint. Final limits should remain configurable and be established using representative payloads and load tests. Manual Excel/CSV upload uses a separate file-processing flow and is not subject to the JSON batch limit.
+
 ## Integration adapters
 
 The canonical platform may be API-first while still accepting simpler transports:
