@@ -18,7 +18,16 @@ Customer Approval owns:
 
 There is currently no established domain need for a `CustomerReview` aggregate with a workflow such as Pending -> Approved. Review is a user interaction around a projection; the durable business fact is the approval itself.
 
-An approval identifies the exact immutable pricing basis that was reviewed and accepted. It therefore carries or references the exact Price List Version(s), Price Agreement Version, versioned calculation rules, Customer identity, approval actor/time, and a deterministic projection identity or fingerprint sufficient to reproduce the approved Customer Price Projection.
+An approval identifies the exact immutable pricing basis that was reviewed and accepted through explicit references:
+
+- `CustomerId`
+- `PriceListVersionId`
+- optional `PriceAgreementVersionId`
+- approval actor and time
+
+`PriceAgreementVersionId` is absent for Customer-Specific Net and Customer-Managed External Net Price Lists because those prices are already resolved and require no agreement calculation.
+
+No separate projection fingerprint, `CalculationRuleVersion`, or stable `CustomerPriceProjectionId` is required in the domain model. The exact projection is naturally identified by the Customer plus the immutable source-version references above.
 
 The approved projection rows themselves do not need permanent storage. They may be cached and deterministically rebuilt from the immutable approval provenance.
 
