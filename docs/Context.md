@@ -104,7 +104,7 @@ The complete Customer Price view calculated from exact Price List Versions and a
 _Avoid_: Customer Price Snapshot, published customer list
 
 **Price Delivery**:
-The permanent, immutable record of the exact Customer Price Projection a Customer authorized for download or import. It retains its source versions, calculation-rule version, canonical result, content hash, exported representation, and delivery history. A later Price Delivery may supersede it as the delivery PriceSync actively tries to synchronize without rewriting or deleting the earlier record.
+The permanent, immutable record of the exact Customer Price Projection a Customer authorized for retrieval or import. It retains its source versions, calculation-rule version, canonical result, content hash, exported representation, retrieval state, and provenance. A newer Price Delivery may become the current delivery for a Customer channel without rewriting or deleting earlier deliveries.
 _Avoid_: Cache, mutable export
 
 **Price Draft**:
@@ -133,21 +133,15 @@ A suspicious but domain-valid condition that requires explicit acknowledgement o
 The Supplier's rules for acknowledging Validation Warnings before a Price Draft may be published.
 
 **Consumption Policy**:
-The Customer's rules for notifying, reviewing, approving, or automatically delivering a changed Customer Price Projection. Manual Import Approval is the default; automatic delivery requires an explicit Customer choice.
+The Customer's rules for notifying, reviewing, approving, or automatically creating a Price Delivery from a changed Customer Price Projection. Manual Import Approval is the default; automatic creation requires an explicit Customer choice.
 
 **Import Approval**:
-The Customer's atomic authorization to create and transfer a Price Delivery from the exact Customer Price Projection being approved. Approval is bound to that projection, cannot select individual entries, and is an internal processing decision rather than acceptance of commercial prices. Repeated or concurrent approval of the same projection for the same Customer channel does not create duplicate Price Deliveries.
+The Customer's atomic authorization to create a Price Delivery from the exact Customer Price Projection being approved. Approval is bound to that projection, cannot select individual entries, and is an internal processing decision rather than acceptance of commercial prices. Repeated or concurrent approval of the same projection for the same Customer channel does not create duplicate Price Deliveries.
 _Avoid_: Price acceptance, publication approval
 
-**Transfer Status**:
-The observable state and history of a Price Delivery's transfer to a Customer channel, such as prepared, attempted, retrieved, or delivered. Transfer attempts do not alter the immutable Price Delivery and do not prove that the receiving system applied the prices.
-
-**Application Status**:
-The reported outcome of applying a Price Delivery in a consuming system: applied, failed, or not reported. A manual confirmation is distinguished from a system-reported outcome.
-
-**Synchronization Status**:
-The relationship between the current Customer Price Projection and the most recent Price Delivery reported as applied in a Customer system. A channel is Out of Sync when those canonical results differ.
-_Avoid_: Price validity, commercial acceptance
+**Retrieval Status**:
+The observable state of a Price Delivery at the PriceSync boundary. `Available` means the delivery can be retrieved; `Retrieved` means it has been successfully retrieved at least once. Later retrievals remain allowed and do not create a new Price Delivery.
+_Avoid_: Transfer Status, Application Status, Synchronization Status
 
 **Archived Price List**:
 A logical Price List closed to future publication while its Price List Versions and related Price Deliveries remain available. Archiving does not itself change Price Validity.
