@@ -30,18 +30,25 @@ A directed Supplier–Customer business relationship established outside PriceSy
 _Avoid_: Price acceptance, contract
 
 **Price Agreement**:
-The Supplier-published commercial price terms that apply between a Supplier and Customer within a Trading Relationship. The Supplier controls the terms; the Customer may report discrepancies but cannot change them.
+The Supplier-published commercial price terms that apply between a Supplier and Customer within a Trading Relationship. The Supplier controls and publishes the terms; the Customer may accept a published version to confirm that it has seen the agreement before that version may become active for projections.
 _Avoid_: Trading Relationship, connection
 
 **Price Agreement Version**:
-An immutable, published version of a Price Agreement used together with Price List Versions to calculate a Customer Price Projection.
+An immutable, complete, published version of a Price Agreement. Each version carries its own commercial validity and may be accepted by the Customer independently. Older versions remain immutable history.
+
+**Agreement Acceptance**:
+The Customer's acknowledgement that it has seen a specific Price Agreement Version. Acceptance is required before that version may become active for Customer Price Projections. It is not bilateral contract formation in PriceSync and does not require Supplier acceptance.
+_Avoid_: Supplier approval, contract signing
+
+**Active Price Agreement Version**:
+The accepted Price Agreement Version currently selected for Customer Price Projections within its scope. Normally the newest accepted version whose Valid From has been reached becomes active. A Customer may explicitly activate an accepted future version earlier without changing the Supplier-defined Valid From.
 
 **External Supplier Reference**:
 A customer's private identification of the actual supplier behind Customer-Managed External Prices when that supplier is not yet represented by a connected Organization in PriceSync. It may later be linked to the supplier's Organization.
 _Avoid_: Self-supplier, placeholder organization
 
 **Agreed Price**:
-A commercial price made available through PriceSync by a supplier and assumed by PriceSync to have been agreed with the customer outside the platform. PriceSync neither negotiates the price nor verifies or records its acceptance.
+A commercial price made available through PriceSync by a supplier and assumed by PriceSync to have been agreed with the customer outside the platform. PriceSync neither negotiates the price nor verifies the underlying commercial agreement.
 _Avoid_: Approved price, PriceSync-negotiated price
 
 **Customer Price**:
@@ -103,7 +110,7 @@ An immutable, complete version of one logical General Price List or Customer-Spe
 _Avoid_: Partial price list, price patch, Customer Price Snapshot
 
 **Customer Price Projection**:
-The complete Customer Price view calculated from exact Price List Versions and a Price Agreement Version. It may be materialized for performance but is rebuildable cache rather than an audit record.
+The complete Customer Price view calculated from exact Price List Versions and the Active Price Agreement Version. It may be materialized for performance but is rebuildable cache rather than an audit record. Every new projection must be manually approved by the Customer before a Price Delivery may be created in the initial model.
 _Avoid_: Customer Price Snapshot, published customer list
 
 **Price Delivery**:
@@ -135,12 +142,9 @@ A suspicious but domain-valid condition that requires explicit acknowledgement o
 **Publication Policy**:
 The Supplier's rules for acknowledging Validation Warnings before a Price Draft may be published.
 
-**Consumption Policy**:
-The Customer's rules for notifying, reviewing, approving, or automatically creating a Price Delivery from a changed Customer Price Projection. Manual Import Approval is the default; automatic creation requires an explicit Customer choice.
-
 **Import Approval**:
-The Customer's atomic authorization to create a Price Delivery from the exact Customer Price Projection being approved. Approval is bound to that projection, cannot select individual entries, and is an internal processing decision rather than acceptance of commercial prices. Repeated or concurrent approval of the same projection for the same Customer channel does not create duplicate Price Deliveries.
-_Avoid_: Price acceptance, publication approval
+The Customer's atomic authorization to create a Price Delivery from the exact Customer Price Projection being approved. Every new projection requires manual Import Approval in the initial model. Approval is bound to that projection, cannot select individual entries, and is separate from Agreement Acceptance. Repeated or concurrent approval of the same projection for the same Customer channel does not create duplicate Price Deliveries.
+_Avoid_: Agreement Acceptance, price acceptance, publication approval
 
 **Retrieval Status**:
 The observable state of a Price Delivery at the PriceSync boundary. `Available` means the delivery can be retrieved; `Retrieved` means it has been successfully retrieved at least once. Later retrievals remain allowed and do not create a new Price Delivery.
