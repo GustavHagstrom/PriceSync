@@ -80,9 +80,7 @@ A Supplier creates the logical Price List before importing or publishing its fir
 
 A Supplier may create, maintain, and publish a General Price List before any Customer or Trading Relationship exists. Publication versions the Supplier's price basis but does not distribute Customer Prices by itself. Distribution begins only when an active Trading Relationship and an Active accepted Price Agreement Version connect a Customer to that list.
 
-Publishing a new General Price List Version invalidates the affected cached Customer Price Projections. It does not immediately recalculate every Customer's price rows or create permanent Customer copies.
-
-A General Price List Version cannot be published unless it can produce valid Customer Price Projections for every Active Price Agreement Version that uses it. Incompatibilities such as an unresolved Supplier Price Group, invalid discount, or currency mismatch block publication and must be corrected in the list or agreement first. Once the version is published, recalculation of all affected projections is guaranteed to succeed.
+Publishing a new General Price List Version does not synchronously recalculate every Customer's projection and does not replace any Customer's current approved basis. It only creates a newer source version from which a candidate projection may later be built.
 
 A Supplier may also publish a Customer-Specific Net Price List. Its Net Prices are already resolved for that Customer and receive no additional Customer Discount. A Customer-Managed External Net Price List follows the same publication, versioning, projection, review, approval, and retrieval flow, but the consuming Customer administers the source itself and no Price Agreement or Trading Relationship is required.
 
@@ -212,7 +210,7 @@ Any Validation Error blocks publication of the entire draft. The preceding Price
 
 A Validation Warning identifies suspicious but domain-valid content, such as an unusually large price change or many omitted entries. Manual publication requires explicit acknowledgement; automated publication follows the publishing Organization's Publication Policy.
 
-A General Price List Version must also be compatible with every Active Price Agreement Version that uses it. Publication is blocked if any resulting Customer Price Projection would be invalid.
+Price Publication validates the Price List itself and does not validate every Customer/Agreement combination before publication. Cross-context compatibility is evaluated later by Customer Pricing when an exact projection is requested or otherwise needed.
 
 ### Initial ingestion paths
 
@@ -239,17 +237,24 @@ Source-file retention is independent of published and approved business records.
 
 ### Customer Price Projection
 
-PriceSync deterministically produces a complete Customer Price Projection for one Customer and one logical Price List.
+PriceSync deterministically evaluates a complete Customer Price Projection for one Customer and one logical Price List.
 
 For a General Price List, the projection is calculated from the exact Price List Version and the applicable Active accepted Price Agreement Version, using the domain's pricing rules and the agreement's explicit terms such as discounts and Rounding Policy.
 
 For a Customer-Specific Net Price List or Customer-Managed External Net Price List, the source already contains resolved Customer prices. The projection therefore directly exposes those source prices through the same Customer-facing review model and has no Price Agreement Version.
 
-Customer Price Projections are calculated lazily. Publishing a relevant Price List Version, accepting or activating a Price Agreement Version, or reaching the `Valid From` of a newer accepted version may invalidate the affected cached projection. PriceSync calculates a projection when a Customer opens its review, then may cache that result for subsequent reads.
+Projection evaluation is explicit domain behavior rather than an exception-driven technical operation. The result is either:
+
+- a complete valid Customer Price Projection, optionally carrying non-blocking Projection Warnings
+- or an invalid result containing structured Projection Issues
+
+The projection is atomic. If any required row cannot be resolved correctly, the whole candidate projection is invalid and cannot be approved. PriceSync does not silently drop unresolved rows or substitute speculative fallback pricing.
+
+Projection Warnings identify suspicious but still valid outcomes, for example unusually large changes compared with the Customer's current approved basis. Warnings do not block Import Approval. Customer Pricing owns the warning and Price Change Set semantics. The initial model uses fixed system warning rules rather than Customer-configurable warning policies.
+
+Customer Price Projections are calculated lazily. Publishing a newer Price List Version, accepting or activating a Price Agreement Version, or reaching the `Valid From` of a newer accepted version may make a newer candidate projection available, but does not invalidate or replace the Customer's current approved basis. PriceSync calculates a candidate projection when a Customer opens its review or when another use case needs it, and may cache the result for subsequent reads.
 
 A published but unaccepted Price Agreement Version does not become a projection source and does not displace the Customer's current Active accepted agreement. Superseded intermediate Agreement Versions do not have to be accepted in sequence.
-
-Publication performs compatibility validation without materializing complete projections, including checks for valid currencies, discounts, rounding rules, and referenced Supplier Price Groups. Projection materialization is rebuildable cache rather than a business record: it may be evicted, recalculated, or stored incrementally without changing domain meaning.
 
 PriceSync does not create a permanent Customer record merely because a source version changes. Relevant source changes may notify the Customer even when their effect on resolved Customer Prices has not yet been calculated or may ultimately be zero.
 
@@ -257,15 +262,19 @@ PriceSync does not create a permanent Customer record merely because a source ve
 
 Every new Customer Price Projection requires manual Import Approval in the initial domain model, including projections from Customer-Specific Net Price Lists and Customer-Managed External Net Price Lists. Publication and consumption approval are separate decisions. Automatic projection approval is an explicit future possibility but is not part of the initial model.
 
-Import Approval applies atomically to the complete Customer Price Projection actually presented for approval. The Customer cannot approve selected entries while retaining old values for others. The approval stores explicit immutable references to `CustomerId`, `PriceListVersionId`, and optional `PriceAgreementVersionId`, plus approval actor and time. No separate projection fingerprint, Calculation Rule Version, or Customer Price Projection ID is required.
+Import Approval applies atomically to the complete valid Customer Price Projection actually presented for approval. Invalid projections cannot be approved. The Customer cannot approve selected entries while retaining old values for others. The approval stores explicit immutable references to `CustomerId`, `PriceListVersionId`, and optional `PriceAgreementVersionId`, plus approval actor and time. No separate projection fingerprint, Calculation Rule Version, or Customer Price Projection ID is required.
 
 The same exact Customer Price Projection may be approved at most once by the Customer. Repeated or concurrent attempts to approve the same natural projection identity are idempotent and resolve to the existing Import Approval rather than creating duplicate approval facts.
 
-If a newer relevant source version or Active Price Agreement Version changes while a review is open, that review becomes stale. The Customer may still explicitly approve the exact projection already reviewed, or leave that review and inspect the newest current projection instead. A stale review never changes its contents underneath the Customer.
+A Customer has one current approved basis per logical Price List, not one global basis across all price sources. The current basis is derived from the latest relevant Import Approval for `CustomerId + logical PriceListId`; PriceSync does not maintain a separate mutable pointer for it.
+
+A newer source version, a newer active agreement, or a newly calculated candidate projection does not move the current approved basis. If the Customer never approves the candidate, the previous Import Approval remains current. Only a new explicit Import Approval for that logical Price List replaces it.
+
+If a newer relevant source version or Active Price Agreement Version changes while a review is open, that review becomes stale. The Customer may still explicitly approve the exact projection already reviewed, or leave that review and inspect the newest candidate projection instead. A stale review never changes its contents underneath the Customer.
 
 The Customer may defer a pending change, optionally choosing a reminder date. Deferral does not reject or alter source publications. Any later relevant Price List Version or activation of a different Price Agreement Version cancels the existing deferral and creates a new notification, even if PriceSync has not yet calculated whether the resulting canonical Customer Prices actually differ.
 
-A Customer does not need to review or approve every intermediate projection. If several source versions are published before the Customer acts, a newly opened review uses the newest current projection and compares it with the Customer's most recent Import Approval for that logical Price List; intermediate source versions remain part of publication history without becoming mandatory review steps.
+A Customer does not need to review or approve every intermediate projection. If several source versions are published before the Customer acts, a newly opened review uses the newest current candidate projection and compares it with the Customer's current approved basis for that logical Price List; intermediate source versions remain part of publication history without becoming mandatory review steps.
 
 Future prices are available for review immediately. The Customer chooses whether to approve them before or after `Valid From`; PriceSync does not schedule their application inside the Customer system.
 
