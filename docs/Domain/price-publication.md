@@ -32,6 +32,7 @@ Each `PriceListVersion` is a separate immutable, complete canonical publication 
 - Publication is atomic: a complete valid draft becomes one complete immutable Price List Version.
 - Canonically identical content does not create another version.
 - A validation error blocks the entire publication.
+- Price Publication validates the Price List intrinsically as a Price List. It does not validate every Customer/Agreement projection combination before publication.
 - A General Price List may exist and be published independently of any Customer or Trading Relationship.
 - A Customer-Specific Net Price List is scoped to exactly one Customer and contains already resolved Net Prices with no additional Customer Discount.
 - A Customer-Managed External Net Price List follows the same publication/versioning flow as a Customer-Specific Net Price List, but is administered by the consuming Customer Organization for its own use and identifies the actual source through an `ExternalSupplierReference`.
@@ -40,6 +41,6 @@ Each `PriceListVersion` is a separate immutable, complete canonical publication 
 
 Publication does not imply consumption approval. Customer-Specific Net and Customer-Managed External Net Price List Versions still flow through Customer Price Projection and Import Approval before they become available for retrieval.
 
-## Cross-context collaboration still under discovery
+## Context relationship
 
-General Price List publication currently has a domain rule requiring compatibility with every Active Price Agreement Version using it. How Price Publication obtains and validates that agreement state without creating an oversized transaction boundary remains intentionally unresolved in Issue #7.
+Compatibility between a published Price List Version and a specific applicable Price Agreement Version belongs to Customer Pricing. A Price List Version may therefore be valid and publishable even if a later Customer projection from that source and a particular agreement is invalid.
