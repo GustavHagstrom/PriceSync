@@ -6,9 +6,10 @@ Customer Approval owns the Customer's explicit authorization of an exact Custome
 
 Customer Approval owns:
 
-- the review decision for an exact projection
+- the review decision for an exact valid projection
 - `ImportApproval` as an immutable business fact
 - the rule that approval applies atomically to the complete projection presented to the Customer
+- the rule that an invalid projection cannot be approved
 - the rule that a new projection requires a new approval
 - the rule that the same exact projection may be approved at most once by the Customer
 
@@ -31,6 +32,16 @@ No separate projection fingerprint, `CalculationRuleVersion`, or stable `Custome
 
 The approved projection rows themselves do not need permanent storage. They may be cached and deterministically rebuilt from the immutable approval provenance.
 
+## Current approved basis
+
+A Customer has a current approved basis independently for each logical Price List.
+
+The current approved basis is derived as the latest relevant `ImportApproval` for the Customer and logical Price List. There is no separate mutable `CurrentImportApprovalId` pointer that must be kept in sync.
+
+Publishing a newer Price List Version, activating a newer Agreement Version, or calculating a newer valid projection does not replace the current approved basis. Only an explicit Import Approval of another projection for that same logical Price List does so.
+
+If the Customer never approves the newer candidate projection, the previous Import Approval remains the current approved basis indefinitely unless another explicit domain action is introduced in the future.
+
 ## Consumption
 
 `ImportApproval` is also the durable identity for the approved price basis that later becomes available for retrieval or export. A separate `PriceDelivery` domain concept is not required.
@@ -41,4 +52,4 @@ Each successful retrieval is recorded separately as an immutable `PriceRetrieval
 
 ## Context relationships
 
-Customer Approval consumes `CustomerPriceProjection` and `PriceChangeSet` from Customer Pricing. Integration Configuration may provide versioned Export Profile configuration when an approved price basis is exported. Successful retrievals belong to the retrieval/consumption responsibility and reference the exact `ImportApproval` that was retrieved.
+Customer Approval consumes only valid `CustomerPriceProjection` results plus their `PriceChangeSet` and non-blocking Projection Warnings from Customer Pricing. Integration Configuration may provide versioned Export Profile configuration when an approved price basis is exported. Successful retrievals belong to the retrieval/consumption responsibility and reference the exact `ImportApproval` that was retrieved.
