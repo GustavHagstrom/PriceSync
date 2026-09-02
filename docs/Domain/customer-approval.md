@@ -1,6 +1,6 @@
 # Customer Approval
 
-Customer Approval owns the Customer's explicit authorization of an exact Customer Price Projection for delivery.
+Customer Approval owns the Customer's explicit authorization of an exact Customer Price Projection and the durable identity of that approved price basis.
 
 ## Responsibilities
 
@@ -10,6 +10,7 @@ Customer Approval owns:
 - `ImportApproval` as an immutable business fact
 - the rule that approval applies atomically to the complete projection presented to the Customer
 - the rule that a new projection requires a new approval
+- the rule that the same exact projection may be approved at most once by the Customer
 
 ## Aggregate model
 
@@ -17,8 +18,18 @@ Customer Approval owns:
 
 There is currently no established domain need for a `CustomerReview` aggregate with a workflow such as Pending -> Approved. Review is a user interaction around a projection; the durable business fact is the approval itself.
 
-An approval identifies the exact projection inputs or projection identity that was reviewed and accepted. It never silently follows a newer projection.
+An approval identifies the exact immutable pricing basis that was reviewed and accepted. It therefore carries or references the exact Price List Version(s), Price Agreement Version, versioned calculation rules, Customer identity, approval actor/time, and a deterministic projection identity or fingerprint sufficient to reproduce the approved Customer Price Projection.
+
+The approved projection rows themselves do not need permanent storage. They may be cached and deterministically rebuilt from the immutable approval provenance.
+
+## Consumption
+
+`ImportApproval` is also the durable identity for the approved price basis that later becomes available for retrieval or export. A separate `PriceDelivery` domain concept is not required.
+
+Exports are derived representations of an Import Approval. Exported bytes do not need permanent storage when they can be regenerated deterministically from the approval plus versioned export configuration and export rules.
+
+Each successful retrieval is recorded separately as an immutable `PriceRetrieval` fact. Retrieval attempts that fail before successful export and handoff remain operational telemetry rather than domain facts.
 
 ## Context relationships
 
-Customer Approval consumes `CustomerPriceProjection` and `PriceChangeSet` from Customer Pricing. A successful approval authorizes creation of one Price Delivery in Delivery for the exact approved projection and Customer channel.
+Customer Approval consumes `CustomerPriceProjection` and `PriceChangeSet` from Customer Pricing. Integration Configuration may provide versioned Export Profile configuration when an approved price basis is exported. Successful retrievals belong to the retrieval/consumption responsibility and reference the exact `ImportApproval` that was retrieved.
