@@ -20,12 +20,19 @@ These are domain ownership and consistency seams, not deployment boundaries. Pri
 
 - Trading Relationships reference Organizations by `OrganizationId`; they do not own Organization identity or membership state.
 - Agreements reference the applicable Trading Relationship and Organizations rather than duplicating those concepts.
-- Price Agreement `ValidFrom` / `ValidTo` express Supplier intent and drive recommendations/warnings; Customer activation is authoritative for current use and may occur before or after those dates.
+- Price Agreement Versions and Price List Versions both use required `ValidFrom`, optional `ValidTo`, and immutable whole-version validity. Validity is expressed as business dates; current recommendation evaluation uses the UTC calendar date.
+- Validity represents source/Supplier intent and drives recommendations/warnings only. Customer activation remains authoritative for actual use before, during, or after the stated validity period.
+- Overlapping validity intervals are allowed. Recommendation chooses the eligible non-withdrawn version with the latest `ValidFrom`, breaking ties by latest `PublishedAt`; if none covers the evaluated date, there is no recommended version.
+- Recommendation is independent of Customer acceptance/activation state and can be reconstructed historically as-of a point in time. Later publications or withdrawals do not rewrite historical recommendation.
+- Published Agreement and Price List Versions are immutable including validity metadata; corrections require a new version.
+- A published Agreement or Price List Version may be permanently withdrawn with a required human-readable reason. Withdrawal is a separate immutable source fact, excludes the version from current recommendation, and produces a strong warning when used.
+- Withdrawal never changes Customer Active state and does not block acceptance, activation/reactivation, projection, or retrieval. A withdrawn version cannot be restored; a new immutable version must be published instead.
 - Agreement activation implies acceptance if necessary. Accepted versions may be activated, reactivated, or deactivated; Supplier publication never changes Customer Active state automatically.
 - Agreement activation is scoped per Price Agreement, not per Price List. One Active Agreement Version therefore applies consistently wherever that Price Agreement is used.
 - Price Publication owns General, Customer-Specific Net, and Customer-Managed External Net Price Lists. Customer-managed external lists use `ExternalSupplierReference` without creating a Trading Relationship or making the Customer a Supplier to itself.
+- Customer-Managed External Net Price Lists use the same validity semantics as other Price Lists. Their entered validity is interpreted as the external source's stated validity even though the Customer administers the publication in PriceSync.
 - Price Publication validates a Price List intrinsically. It does not iterate all Customers and Agreements to guarantee every possible projection before publishing.
-- A Price List has no separate Customer acceptance step. Any published Price List Version may be explicitly activated or reactivated, and no Active version is a valid state. Supplier publication never changes the Customer's Active Price List Version automatically.
+- A Price List has no separate Customer acceptance step. Any published Price List Version may be explicitly activated or reactivated, including a withdrawn version, and no Active version is a valid state. Supplier/source publication or withdrawal never changes the Customer's Active Price List Version automatically.
 - Price List activation is scoped per logical Price List.
 - Agreement and Price List activation/deactivation decisions are preserved as immutable Customer business history; current Active selections may be derived/materialized from that history.
 - Activation changes only Customer source selection. It does not synchronously validate or materialize a Customer Price Projection.
