@@ -22,6 +22,16 @@ At most one active Price Draft may exist for a logical Price List. The mechanism
 
 Each `PriceListVersion` is a separate immutable, complete canonical publication referencing `PriceListId`. Published versions are not modeled as a growing child collection of `PriceList`.
 
+### CustomerPriceListState
+
+Customer use of a published Price List is separate from Supplier publication. For each Customer and logical Price List, `CustomerPriceListState` records which published Price List Version is currently Active, if any, together with immutable activation/deactivation history.
+
+There is no separate Price List acceptance step. Activating a published Price List Version is the Customer decision to use that version.
+
+Any published Price List Version may be activated or reactivated. Publishing a newer version does not automatically replace the Customer's Active version. Having no Active Price List Version is a valid explicit Customer state.
+
+The transactional boundary around `CustomerPriceListState` exists to keep the single-Active-version invariant consistent for one Customer and logical Price List without coupling Customer choice to Supplier publication.
+
 ### ExternalSupplierReference
 
 `ExternalSupplierReference` belongs to Price Publication and identifies the real external source for Customer-Managed External Net Price Lists. It does not create a Trading Relationship and does not make the Customer Organization a Supplier to itself.
@@ -38,9 +48,12 @@ Each `PriceListVersion` is a separate immutable, complete canonical publication 
 - A Customer-Managed External Net Price List follows the same publication/versioning flow as a Customer-Specific Net Price List, but is administered by the consuming Customer Organization for its own use and identifies the actual source through an `ExternalSupplierReference`.
 - Customer-managed external prices do not require a Trading Relationship or Price Agreement.
 - General, Customer-Specific Net, and Customer-Managed External Net Price Lists share the same publication/versioning concepts while differing in source authority, scope, and pricing semantics.
+- At most one published Price List Version is Active for a Customer and logical Price List at a time.
+- No Active Price List Version is also a valid Customer state.
+- Supplier publication never changes Customer Active state automatically.
 
-Publication does not imply consumption approval. Customer-Specific Net and Customer-Managed External Net Price List Versions still flow through Customer Price Projection and Import Approval before they become available for retrieval.
+Publication and Customer activation are separate facts. A newly published Price List Version becomes available for Customer selection but is not used until explicitly activated.
 
 ## Context relationship
 
-Compatibility between a published Price List Version and a specific applicable Price Agreement Version belongs to Customer Pricing. A Price List Version may therefore be valid and publishable even if a later Customer projection from that source and a particular agreement is invalid.
+Compatibility between a published Price List Version and a specific Price Agreement Version belongs to Customer Pricing. A Price List Version may therefore be valid and publishable even if a later Customer projection from that source and a particular agreement is invalid.
