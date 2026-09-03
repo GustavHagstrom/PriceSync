@@ -13,7 +13,7 @@ Customer Pricing:
 - directly projects already-resolved Net Prices for Customer-Specific Net and Customer-Managed External Net Price Lists
 - validates whether the exact source combination can produce a complete Customer-facing projection
 - returns invalid projection results explicitly rather than treating expected incompatibility as an exception
-- calculates Price Change Sets between projections when requested
+- calculates Price Change Sets between a candidate projection and the Customer's current valid projection when requested
 - produces non-blocking Projection Warnings from fixed system rules in the initial model
 - materializes and caches projections lazily when they are requested or needed
 
@@ -41,15 +41,27 @@ The current projection is defined strictly from Customer-selected Active source 
 
 For a General Price List:
 
-`Active PriceListVersion + Active PriceAgreementVersion -> current CustomerPriceProjection`
+`Active PriceListVersion + Active PriceAgreementVersion -> current projection basis`
 
 For a Customer-Specific Net or Customer-Managed External Net Price List:
 
-`Active PriceListVersion -> current CustomerPriceProjection`
+`Active PriceListVersion -> current projection basis`
 
-If a required Active selection is missing, there is no current projection. PriceSync does not silently fall back to a latest, recommended, or previously Active version.
+The current projection exists semantically from that basis even when it has not yet been materialized. Materialization is lazy and does not create a separate lifecycle state.
+
+If a required Active selection is missing, there is no current projection basis. PriceSync does not silently fall back to a latest, recommended, or previously Active version.
+
+If evaluation of the current basis is invalid, there is no valid current Customer Price Projection. A previous valid projection remains historical and is never silently treated as current.
 
 Recommended source versions are advisory and separate from current state.
+
+## Activation and projection evaluation
+
+Activation and projection evaluation are separate domain actions.
+
+Activating or deactivating a Price List Version or Price Agreement Version changes only the Customer's selected source state. Activation does not synchronously validate the resulting projection combination and does not automatically materialize a projection.
+
+When a projection is requested, Customer Pricing evaluates the exact selected immutable inputs at that time. A source combination may therefore be Active even if evaluation later returns an invalid projection result.
 
 ## Explicit and historical projections
 
@@ -74,15 +86,21 @@ Projection Issues and valid/invalid evaluation status are rebuildable results of
 
 Warnings represent suspicious but still valid outcomes, such as unusually large price changes. They inform Customer decisions but do not create a separate projection-approval workflow.
 
+Only valid complete Customer Price Projections may flow into Customer Price export/retrieval. Invalid projection results may be inspected for diagnosis but are not consumable Customer Price outputs.
+
 ## Price Change Set
 
-`PriceChangeSet` is derived. It describes the difference between two explicitly identified projections, commonly the current projection and a recommended or candidate projection.
+`PriceChangeSet` is derived decision support for activation. Its primary meaning is the difference between a candidate projection and the Customer's current valid projection for the same logical Price List.
 
-A Customer UI may present that difference and Projection Warnings before the Customer activates a different Price List Version or Price Agreement Version. Review is therefore decision support for source activation rather than a separate Import Approval business fact.
+A Customer UI may present that difference and Projection Warnings before the Customer activates a different Price List Version or Price Agreement Version. Retrieval history does not determine the comparison basis.
+
+If there is no valid current projection, a comparison may instead be unavailable or use an explicitly selected historical basis as a separate user action; PriceSync does not silently substitute the most recently retrieved or previously valid projection as current.
 
 ## Source selection and orchestration
 
 Price Publication owns Customer Price List activation state and Agreements owns Customer Agreement acceptance/activation state.
+
+Price List activation is scoped per logical Price List. Agreement activation is scoped per Price Agreement, not per Price List. If one Price Agreement applies to multiple General Price Lists, the same Active Price Agreement Version is used for those lists unless the commercial model defines separate Price Agreements.
 
 A thin application/use-case orchestrator obtains the relevant Active selections and asks Customer Pricing to evaluate the resulting exact immutable tuple. The same projection capability may also be invoked with explicitly selected immutable versions for historical or exploratory reconstruction.
 
