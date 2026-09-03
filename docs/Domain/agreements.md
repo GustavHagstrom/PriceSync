@@ -8,7 +8,9 @@ Own Supplier-published Price Agreement facts and Customer-owned agreement accept
 
 ### PriceAgreement
 
-`PriceAgreement` is the stable identity and scope for Supplier-published commercial terms. It owns publication rules and the relationship to the applicable Trading Relationship.
+`PriceAgreement` is the aggregate root for the stable identity and scope of Supplier-published commercial terms. It references the applicable Trading Relationship by identity and owns the rules for creating new immutable Agreement Versions within that scope.
+
+Its transactional boundary exists because the stable agreement scope and one publication decision must remain consistent without loading historical versions or Customer selection state into the same aggregate.
 
 ### PriceAgreementVersion
 
@@ -32,9 +34,11 @@ A published Agreement Version is immutable including its validity dates. Correct
 
 A Supplier may permanently withdraw a published Agreement Version with a required human-readable `WithdrawalReason`. Withdrawal is a separate immutable Supplier fact; it does not mutate the published version. A withdrawn version is excluded from current recommendations and should produce a strong warning when used, but it remains available for Customer acceptance, activation/reactivation, projection, and retrieval. Withdrawal is permanent; restoring the same version to Published is not supported.
 
+Publication/withdrawal commands operate on the Supplier-owned agreement scope and produce immutable version/withdrawal facts. They do not participate in the Customer selection transaction.
+
 ### CustomerAgreementState
 
-`CustomerAgreementState` is a separate Customer-owned aggregate that records:
+`CustomerAgreementState` is a separate Customer-owned aggregate root that records:
 
 - which Agreement Versions have been accepted
 - which accepted Agreement Version is currently Active, if any
@@ -44,6 +48,16 @@ A Supplier may permanently withdraw a published Agreement Version with a require
 Agreement activation is scoped per `PriceAgreement`, not per Price List. One Active Agreement Version therefore applies consistently wherever that Price Agreement is used.
 
 Supplier publication/withdrawal and Customer selection do not share one aggregate or transaction boundary.
+
+## Commands / decisions
+
+This area owns decisions such as:
+
+- publish a new immutable Price Agreement Version
+- withdraw a published Agreement Version with reason
+- accept an Agreement Version
+- activate/reactivate an Agreement Version, implicitly accepting if necessary
+- deactivate the currently Active Agreement Version
 
 ## Core invariants
 
@@ -72,4 +86,4 @@ Publication and withdrawal are durable Supplier facts. Historical recommendation
 
 ## References
 
-The area references Organizations and the applicable Trading Relationship by identity. It does not own those concepts.
+The area references Organizations and the applicable Trading Relationship by identity. It does not own those concepts. Customer Pricing consumes exact immutable Agreement Version references but does not mutate Agreements state.
