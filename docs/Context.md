@@ -30,18 +30,21 @@ A directed Supplier–Customer business relationship established outside PriceSy
 _Avoid_: Price acceptance, contract
 
 **Price Agreement**:
-The Supplier-published commercial price terms that apply between a Supplier and Customer within a Trading Relationship. The Supplier controls and publishes the terms; the Customer may accept a published version to confirm that it has seen the agreement before that version may become active for projections.
+The Supplier-published commercial price terms that apply between a Supplier and Customer within a Trading Relationship. The Supplier controls and publishes the terms; the Customer may accept and activate published versions independently.
 _Avoid_: Trading Relationship, connection
 
 **Price Agreement Version**:
-An immutable, complete, published version of a Price Agreement. Each version carries its own commercial validity and may be accepted by the Customer independently. Older versions remain immutable history.
+An immutable, complete, published version of a Price Agreement. Each version has required `ValidFrom`, optional `ValidTo`, and immutable publication metadata. Validity applies to the complete version and expresses Supplier intent rather than a hard Customer-use constraint.
 
 **Agreement Acceptance**:
-The Customer's acknowledgement that it has seen a specific Price Agreement Version. Acceptance is required before that version may become active for Customer Price Projections. It is not bilateral contract formation in PriceSync and does not require Supplier acceptance.
+The Customer's acknowledgement that it has seen a specific Price Agreement Version. Acceptance is not bilateral contract formation in PriceSync. Activating an unaccepted version implicitly accepts it.
 _Avoid_: Supplier approval, contract signing
 
 **Active Price Agreement Version**:
-The accepted Price Agreement Version currently selected for Customer Price Projections within its scope. Normally PriceSync considers accepted versions whose validity includes the current date and selects the one with the latest Valid From; when a newer version expires, an older still-valid accepted version may therefore become active again. A Customer may explicitly activate an accepted future version earlier without changing the Supplier-defined Valid From.
+The accepted Price Agreement Version explicitly selected by the Customer for current Customer Price Projections within its Price Agreement scope. Customer activation is authoritative for current use; validity, recommendation, publication, and withdrawal never change Active state automatically.
+
+**Recommended Price Agreement Version**:
+The non-withdrawn published Price Agreement Version whose validity covers the evaluated UTC calendar date and whose `ValidFrom` is latest; ties are resolved by latest `PublishedAt`. Recommendation expresses Supplier intent and is independent of Customer acceptance or activation.
 
 **External Supplier Reference**:
 A customer's private identification of the actual supplier behind Customer-Managed External Prices when that supplier is not yet represented by a connected Organization in PriceSync. It may later be linked to the supplier's Organization.
@@ -82,6 +85,19 @@ _Avoid_: General Price List, discounted price list
 **Price List**:
 The stable logical identity and scope for a sequence of Price List Versions. A Price List is created before its first import or publication. Its Type, Currency, Market, and applicable Customer define its scope and are immutable after the first publication; its Name is display metadata and may change without creating a new version.
 
+**Price List Version**:
+An immutable, complete version of one logical Price List. Each version is a complete canonical snapshot, has required `ValidFrom` and optional `ValidTo` for the whole version, and is published atomically. Canonically identical content does not create a new version.
+_Avoid_: Partial price list, price patch, Customer Price Snapshot
+
+**Active Price List Version**:
+The published Price List Version explicitly selected by the Customer for current use for one logical Price List. The Customer may activate or reactivate any published version, including a withdrawn version with warning, or explicitly choose to have no Active version. There is no separate Price List acceptance step.
+
+**Recommended Price List Version**:
+The non-withdrawn published Price List Version whose validity covers the evaluated UTC calendar date and whose `ValidFrom` is latest; ties are resolved by latest `PublishedAt`. Recommendation is advisory and never changes Customer Active state automatically.
+
+**Version Withdrawal**:
+A permanent source-side fact that a published Price Agreement Version or Price List Version is no longer recommended. Withdrawal requires a human-readable reason, cannot be reversed, does not alter immutable version content, and does not prevent Customer activation, projection, or retrieval.
+
 **Customer Discount**:
 A customer-specific percentage reduction in a Price Agreement applied to a List Price. It may apply generally to the referenced General Price List or specifically to a Supplier Price Group; applicable discounts are alternatives and are never stacked.
 
@@ -105,17 +121,9 @@ _Avoid_: Supplier-published prices
 **Price Source**:
 The selected origin for one price-list context defined by Supplier, currency, and Market or commercial purpose: Supplier-Published Prices or Customer-Managed External Prices.
 
-**Price List Version**:
-An immutable, complete version of one logical General Price List or Customer-Specific Net Price List. Each version is a complete canonical snapshot and is published atomically. Canonically identical content does not create a new version.
-_Avoid_: Partial price list, price patch, Customer Price Snapshot
-
 **Customer Price Projection**:
-The complete Customer Price view calculated from exact Price List Versions and the Active Price Agreement Version. It may be materialized for performance but is rebuildable cache rather than an audit record. Changing the Active Price Agreement Version produces a new projection; every new projection must be manually approved by the Customer before a Price Delivery may be created in the initial model.
+The complete Customer Price view deterministically calculated from an exact `CustomerId + PriceListVersionId + optional PriceAgreementVersionId` tuple. The current projection is derived strictly from the Customer's Active source selections. Other immutable versions may be selected explicitly for historical or exploratory reconstruction. A projection is rebuildable derived state rather than an approval or audit record.
 _Avoid_: Customer Price Snapshot, published customer list
-
-**Price Delivery**:
-The permanent, immutable record of the exact Customer Price Projection a Customer authorized for retrieval or import. It retains its source versions, calculation-rule version, canonical result, content hash, exported representation, retrieval state, and provenance. A newer Price Delivery may become the current delivery for a Customer channel without rewriting or deleting earlier deliveries.
-_Avoid_: Cache, mutable export
 
 **Price Draft**:
 Mutable price-list work awaiting successful validation and publication as a Price List Version. At most one active Price Draft exists per logical Price List. Replaced or abandoned drafts are working material rather than permanent domain history.
@@ -125,13 +133,13 @@ _Avoid_: Price List Version
 An Organization-private, reusable onboarding mapping from an external Excel or CSV layout, field values, and identifiers to PriceSync's canonical price model. It is used for file imports, not for canonical API payloads.
 
 **Export Profile**:
-A Customer-private, reusable transformation from a canonical Customer Price Projection to the file or API layout required by a Customer system. It changes delivery format without changing the canonical prices.
+A Customer-private, reusable transformation from a canonical Customer Price Projection to the file or API layout required by a Customer system. It changes representation without changing the canonical prices.
 
 **Source File**:
-The original Excel or CSV file supplied for a manual import. It is private audit evidence owned by the uploading Organization and is not distributed with a Price Delivery.
+The original Excel or CSV file supplied for a manual import. It is private audit evidence owned by the uploading Organization and is not distributed to Customers.
 
 **Source Retention Policy**:
-An Organization's rule for how long its Source Files are retained. Expiry removes the file but not published Price List Versions, Price Deliveries, or their provenance metadata.
+An Organization's rule for how long its Source Files are retained. Expiry removes the file but not published Price List Versions or their provenance metadata.
 
 **Validation Error**:
 A violation of a required domain rule that prevents a Price Draft from being published.
@@ -142,16 +150,11 @@ A suspicious but domain-valid condition that requires explicit acknowledgement o
 **Publication Policy**:
 The Supplier's rules for acknowledging Validation Warnings before a Price Draft may be published.
 
-**Import Approval**:
-The Customer's atomic authorization to create a Price Delivery from the exact Customer Price Projection being approved. Every new projection requires manual Import Approval in the initial model. Approval is bound to that projection, cannot select individual entries, and is separate from Agreement Acceptance. Repeated or concurrent approval of the same projection for the same Customer channel does not create duplicate Price Deliveries.
-_Avoid_: Agreement Acceptance, price acceptance, publication approval
-
-**Retrieval Status**:
-The observable state of a Price Delivery at the PriceSync boundary. `Available` means the delivery can be retrieved; `Retrieved` means it has been successfully retrieved at least once. Later retrievals remain allowed and do not create a new Price Delivery.
-_Avoid_: Transfer Status, Application Status, Synchronization Status
+**Price Retrieval**:
+An immutable fact recording one successful retrieval or handoff of a valid Customer Price Projection. It identifies the exact immutable Price List Version and optional Price Agreement Version used, together with relevant export provenance. Repeated successful retrievals create separate facts; failed attempts before handoff are operational telemetry.
 
 **Archived Price List**:
-A logical Price List closed to future publication while its Price List Versions and related Price Deliveries remain available. Archiving does not itself change Price Validity.
+A logical Price List closed to future publication while its Price List Versions remain available. Archiving does not itself change version validity or Customer Active state.
 _Avoid_: Deleted price list
 
 **Market**:
@@ -159,17 +162,17 @@ The destination market or commercial context in which a logical Price List is in
 _Avoid_: Customer country
 
 **Publication Time**:
-The time at which a Price List Version or Price Agreement Version was published through PriceSync. It records when PriceSync knew the source information, not when each resulting price becomes commercially valid.
+The time at which a Price List Version or Price Agreement Version was published through PriceSync. It records when PriceSync knew the source information, not when the version becomes commercially valid.
 
 **Price Correction**:
-A new Price List Version or Price Agreement Version that corrects published source information without rewriting publication history. Its corrected Price Validity may begin before its own Publication Time.
+A new Price List Version or Price Agreement Version that corrects published source information without rewriting publication history. Its corrected validity may begin before its own Publication Time.
 _Avoid_: Edited snapshot, overwritten snapshot
 
 **Price Change Set**:
-The canonical difference between the current Customer Price Projection and the Customer's most recent Price Delivery, classifying entries as added, changed, or removed. The comparison is captured immutably when a new Price Delivery is created.
+The canonical difference between two explicitly identified Customer Price Projections, commonly the current valid projection and a recommended or candidate projection. It is a rebuildable derived result used as decision support for Customer activation.
 
-**Price Validity**:
-The period from a required Valid From to an optional Valid To during which a Customer Price applies commercially. Prices within the same Price List Version or Customer Price Projection may have different validity periods.
+**Version Validity**:
+The whole-version period from required `ValidFrom` to optional `ValidTo` expressing when a Price List Version or Price Agreement Version is intended by its source to apply. Validity drives recommendation and warnings but does not determine Customer Active state.
 
 **Article Reference**:
 The versioned, minimal article information captured in a Price List Version to associate a price with an entry: the Supplier, logical Price List, and Supplier Article ID. It may also carry external identifiers and a short Article Name but is not a product record.
