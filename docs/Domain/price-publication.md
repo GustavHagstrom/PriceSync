@@ -10,11 +10,13 @@ The area covers General Price Lists, Customer-Specific Net Price Lists, and Cust
 
 ### PriceList
 
-`PriceList` is the stable logical identity and scope across publications. Its type, currency, market, and applicable Customer scope are fixed after first publication, while display metadata such as Name may remain mutable according to the domain rules.
+`PriceList` is the aggregate root for the stable logical identity and scope across publications. Its type, currency, market, and applicable Customer scope are fixed after first publication, while display metadata such as Name may remain mutable according to the domain rules.
+
+Its transactional boundary exists because stable list scope and one publication decision must remain internally consistent without loading all drafts, published versions, or Customer activation state into the same aggregate.
 
 ### PriceDraft
 
-`PriceDraft` is a separate mutable aggregate referencing `PriceListId`. Draft mutation and validation do not require loading the long-lived Price List or published history as one aggregate.
+`PriceDraft` is a separate mutable aggregate root referencing `PriceListId`. Draft mutation and validation do not require loading the long-lived Price List or published history as one aggregate.
 
 At most one active Price Draft may exist for a logical Price List. The mechanism enforcing that uniqueness is an implementation concern; the domain invariant is not.
 
@@ -42,9 +44,11 @@ A source authority may permanently withdraw a published Price List Version with 
 
 For Supplier-managed Price Lists, the source authority is the Supplier. For Customer-Managed External Net Price Lists, the Customer administers the publication on behalf of an external source; `ValidFrom` / `ValidTo` are still interpreted as the external source's stated validity rather than the Customer's activation decision. PriceSync does not attempt to verify that intent beyond treating the entered values according to this domain meaning.
 
+Publication/withdrawal commands operate on source-owned publication state and produce immutable version/withdrawal facts. They do not participate in Customer activation transactions.
+
 ### CustomerPriceListState
 
-Customer use of a published Price List is separate from Supplier/source publication. For each Customer and logical Price List, `CustomerPriceListState` records which published Price List Version is currently Active, if any, together with immutable activation/deactivation history.
+`CustomerPriceListState` is a separate Customer-owned aggregate root. For each Customer and logical Price List, it records which published Price List Version is currently Active, if any, together with immutable activation/deactivation history.
 
 There is no separate Price List acceptance step. Activating a published Price List Version is the Customer decision to use that version.
 
@@ -55,6 +59,17 @@ The transactional boundary around `CustomerPriceListState` exists to keep the si
 ### ExternalSupplierReference
 
 `ExternalSupplierReference` belongs to Price Publication and identifies the real external source for Customer-Managed External Net Price Lists. It does not create a Trading Relationship and does not make the Customer Organization a Supplier to itself.
+
+## Commands / decisions
+
+This area owns decisions such as:
+
+- create/update a logical Price List within its allowed lifecycle
+- create/replace/mutate a Price Draft
+- validate and atomically publish a complete Price List Version
+- withdraw a published version with reason
+- activate/reactivate/deactivate a Customer's Price List Version selection
+- maintain the Customer-private External Supplier Reference for external lists
 
 ## Core invariants
 
@@ -83,3 +98,5 @@ Publication/withdrawal and Customer activation are separate facts. A newly publi
 ## Context relationship
 
 Compatibility between a published Price List Version and a specific Price Agreement Version belongs to Customer Pricing. A Price List Version may therefore be valid and publishable even if a later Customer projection from that source and a particular agreement is invalid.
+
+Agreements, Trading Relationships, Organizations, and Integration Configuration are referenced by identity/configuration where needed; Price Publication does not own their mutable state.
