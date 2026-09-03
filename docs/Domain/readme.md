@@ -1,6 +1,8 @@
 # Established Domain Areas
 
-This directory contains domain concepts and cohesive areas whose boundaries have been established through domain discovery. Ongoing discovery remains in [DOMAIN.md](../DOMAIN.md), while the concise canonical business vocabulary remains in [Context.md](../Context.md).
+This directory contains the established PriceSync domain model. The concise canonical business vocabulary remains in [Context.md](../Context.md).
+
+Unresolved domain discovery belongs in the issue or pull request where it is being explored. Once established, conclusions are documented here and in the canonical glossary rather than retained in a parallel discovery document.
 
 ## Domain map
 
@@ -51,8 +53,6 @@ These are domain ownership and consistency seams, not deployment boundaries. Pri
 - Retrieval & Consumption records each successful handoff as a separate immutable `PriceRetrieval` fact carrying the exact immutable source-version and export-configuration provenance used for that retrieval.
 - Integration Configuration transforms external formats to or from the canonical model and does not own pricing facts.
 
-The remaining Issue #7 discovery can now focus on whether any additional domain seams or collaboration details materially change these ownership rules.
-
 ## How to use these pages
 
-When a domain area is established, document its ownership, aggregates, invariants, and references here. Keep unresolved design questions in [DOMAIN.md](../DOMAIN.md) until they are decided. Keep purely technical components in the architecture documentation.
+Document established ownership, aggregates, invariants, references, and cross-context rules here. Explore unresolved domain questions in the relevant issue or pull request; when decided, update the relevant domain page and `Context.md`. Keep purely technical components in the architecture documentation.
