@@ -8,11 +8,10 @@ The current bounded-context candidates are:
 
 - [Organization & Access](./organization-access.md) — owns Organization identity, memberships, roles, and organization-scoped authorization concepts.
 - [Trading Relationships](./trading-relationships.md) — owns the directed Supplier–Customer relationship used to scope price access and distribution.
-- [Agreements](./agreements.md) — owns Supplier-published Price Agreements and Customer agreement acceptance/activation state.
-- [Price Publication](./price-publication.md) — owns logical Price Lists, mutable Price Drafts, intrinsic list validation/publication, immutable Price List Versions, and Customer-owned `ExternalSupplierReference` for Customer-managed external prices.
-- [Customer Pricing](./customer-pricing.md) — owns projection compatibility/validation, deterministic Customer Price Projections, Projection Warnings, and Price Change Sets as rebuildable derived results, one projection per Customer and logical Price List.
-- [Customer Approval](./customer-approval.md) — owns explicit Customer Import Approval of an exact valid projection and the durable identity of the approved price basis.
-- [Retrieval & Consumption](./delivery.md) — owns append-only `PriceRetrieval` facts and deterministic export/retrieval behavior for approved price bases. A separate `PriceDelivery` aggregate is not used.
+- [Agreements](./agreements.md) — owns Supplier-published Price Agreements plus Customer acceptance and activation state/history.
+- [Price Publication](./price-publication.md) — owns logical Price Lists, mutable Price Drafts, intrinsic validation/publication, immutable Price List Versions, Customer Price List activation state/history, and Customer-owned `ExternalSupplierReference` for Customer-managed external prices.
+- [Customer Pricing](./customer-pricing.md) — owns projection compatibility/validation, deterministic Customer Price Projections, Projection Warnings, and Price Change Sets as rebuildable derived results.
+- [Retrieval & Consumption](./delivery.md) — owns deterministic export/retrieval behavior and append-only `PriceRetrieval` facts for exact immutable projection inputs. Separate `ImportApproval` and `PriceDelivery` concepts are not used.
 - [Integration Configuration](./integration-configuration.md) — owns reusable Import and Export Profiles at the external-format boundary.
 
 These are domain ownership and consistency seams, not deployment boundaries. PriceSync remains free to implement them together, for example in a modular monolith.
@@ -21,22 +20,21 @@ These are domain ownership and consistency seams, not deployment boundaries. Pri
 
 - Trading Relationships reference Organizations by `OrganizationId`; they do not own Organization identity or membership state.
 - Agreements reference the applicable Trading Relationship and Organizations rather than duplicating those concepts.
+- Price Agreement `ValidFrom` / `ValidTo` express Supplier intent and drive recommendations/warnings; Customer activation is authoritative for current use and may occur before or after those dates.
+- Agreement activation implies acceptance if necessary. Accepted versions may be activated, reactivated, or deactivated; Supplier publication never changes Customer Active state automatically.
 - Price Publication owns General, Customer-Specific Net, and Customer-Managed External Net Price Lists. Customer-managed external lists use `ExternalSupplierReference` without creating a Trading Relationship or making the Customer a Supplier to itself.
 - Price Publication validates a Price List intrinsically. It does not iterate all Customers and Agreements to guarantee every possible projection before publishing.
-- Price Publication owns which `PriceListVersionId` is currently applicable for a logical Price List. Agreements owns which accepted `PriceAgreementVersionId` is Active for a General Price List relationship.
-- A thin application/use-case orchestrator combines those context-owned selections with `CustomerId` and asks Customer Pricing to evaluate the exact immutable tuple. No new domain context or distributed transaction is introduced for that orchestration.
-- Customer Pricing owns compatibility of those exact inputs. Projection evaluation returns either a complete valid projection (optionally with non-blocking warnings) or structured issues; partial projections are not approvable.
-- Projection Issues and valid/invalid evaluation status are rebuildable results rather than permanent domain facts. Technical caching and observability do not change domain meaning.
-- `CustomerPriceProjection` has no stable domain ID, calculation-rule version, or projection fingerprint. Its natural identity is `CustomerId + PriceListVersionId + optional PriceAgreementVersionId`.
-- The same exact immutable input tuple always denotes the same semantic projection. Time affects source-version selection, not evaluation of an already selected tuple.
-- Customer Approval records one immutable Import Approval for that exact natural projection identity. Invalid projections cannot be approved and Projection Warnings never block approval.
-- Each Customer has an independently derived current approved basis per logical Price List: the latest relevant Import Approval. New source data does not replace it until another projection for that list is explicitly approved.
-- A reviewed projection may still be approved after a newer source basis becomes current; approval is always for the exact projection the Customer actually reviewed.
-- Concurrent approvals of different valid projections for the same Customer and logical Price List may both succeed. A deterministic server-defined registration order determines which immutable Import Approval is the current approved basis.
-- Publication and consumption approval remain separate for all supported price-list forms, including Customer-managed external prices.
-- Import Approval, rather than a separate Price Delivery, is the durable identity of the approved price basis available for later export/retrieval.
-- Exported representations are deterministic derived results and may be cached rather than permanently stored when they can be regenerated from immutable approval provenance plus versioned export configuration.
-- Retrieval & Consumption records each successful handoff as a separate immutable `PriceRetrieval` fact; repeated retrievals therefore form an append-only log rather than mutable retrieval state.
+- A Price List has no separate Customer acceptance step. Any published Price List Version may be explicitly activated or reactivated, and no Active version is a valid state. Supplier publication never changes the Customer's Active Price List Version automatically.
+- Agreement and Price List activation/deactivation decisions are preserved as immutable Customer business history; current Active selections may be derived/materialized from that history.
+- A thin application/use-case orchestrator obtains Customer Active selections and asks Customer Pricing to evaluate the exact immutable tuple. No new domain context or distributed transaction is introduced for that orchestration.
+- The current Customer Price Projection is strictly derived from the Customer's Active selections. Missing required Active input means no current projection; PriceSync does not silently fall back to recommended or latest versions.
+- `CustomerPriceProjection` has no stable domain ID, calculation-rule version, projection fingerprint, or approval identity. Its natural identity is `CustomerId + PriceListVersionId + optional PriceAgreementVersionId`.
+- The same exact immutable input tuple always denotes the same semantic projection.
+- Any compatible immutable versions may be explicitly combined for historical or exploratory projection, even if that combination was never Active together. Whether a projection was actually Active historically is determined from activation history, not from projection existence.
+- Customer Pricing owns compatibility of exact inputs. Projection evaluation returns either a complete valid projection with optional warnings or structured issues; partial projections are not produced.
+- Projection review and Price Change Sets are decision support for Customer activation, not a separate Import Approval workflow.
+- Exported representations are deterministic derived results and may be cached rather than permanently stored when they can be regenerated from immutable source references plus versioned export configuration.
+- Retrieval & Consumption records each successful handoff as a separate immutable `PriceRetrieval` fact carrying the exact immutable source-version provenance used for that retrieval.
 - Integration Configuration transforms external formats to or from the canonical model and does not own pricing facts.
 
 The remaining Issue #7 discovery can now focus on whether any additional domain seams or collaboration details materially change these ownership rules.
