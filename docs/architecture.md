@@ -98,6 +98,20 @@ Each module owns its internal use cases, domain model, persistence mappings, val
 
 `PriceSync.Application` is a thin orchestration layer for workflows that genuinely cross module boundaries. It depends on module contracts and shared technical building blocks, not on module implementation projects. Use cases that belong wholly inside one bounded context stay inside that module.
 
+### Module implementation conventions
+
+Each module implementation project uses its root namespace, for example `PriceSync.Modules.Agreements`, only for the public composition surface that the API host needs to call. Initially that should be limited to the module service-registration extension, such as `AddAgreementsModule(...)`.
+
+Implementation types inside a module should be `internal` by default and placed under purpose-specific subnamespaces as they are introduced, for example:
+
+- `PriceSync.Modules.Agreements.Application`
+- `PriceSync.Modules.Agreements.Domain`
+- `PriceSync.Modules.Agreements.Infrastructure`
+
+Do not create parallel shared `Application`, `Domain`, or `Infrastructure` projects for all modules. A subnamespace should appear when a module has real implementation code that belongs there, not as empty structure.
+
+Types that must be consumed outside the module belong in the sibling `.Contracts` project. Promoting a type from a module implementation project to a contract is a boundary decision and should keep the type application-facing rather than turning it into shared domain state.
+
 ### Contracts and dependency rules
 
 Every module has a sibling `.Contracts` project. Contracts contain application-facing integration surfaces such as IDs, request/response DTOs, ports, query interfaces, or notifications needed by other modules or the application layer.
@@ -128,6 +142,8 @@ It must not contain PriceSync business concepts such as Organization, Supplier, 
 ### Boundary verification
 
 Architecture tests should enforce the dependency rules above. The initial skeleton for each module should compile, expose a registration extension, and avoid implementing aggregates or use cases that belong to later implementation issues.
+
+Architecture tests use xUnit as the repository's default .NET test framework. FluentAssertions is the default assertion library for tests where expressive failure messages make architectural or domain rules easier to read. Project-reference rules are tested directly from `.csproj` files; introduce a type-level architecture testing library such as NetArchTest or ArchUnitNET only when the rule being verified depends on assemblies, namespaces, or type visibility.
 
 ## Candidate domain model
 
