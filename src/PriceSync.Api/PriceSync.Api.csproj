@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <ItemGroup>
+    <ProjectReference Include="..\PriceSync.Application\PriceSync.Application.csproj" />
+    <ProjectReference Include="..\PriceSync.Modules.OrganizationAccess\PriceSync.Modules.OrganizationAccess.csproj" />
+    <ProjectReference Include="..\PriceSync.Modules.TradingRelationships\PriceSync.Modules.TradingRelationships.csproj" />
+    <ProjectReference Include="..\PriceSync.Modules.Agreements\PriceSync.Modules.Agreements.csproj" />
+    <ProjectReference Include="..\PriceSync.Modules.PricePublication\PriceSync.Modules.PricePublication.csproj" />
+    <ProjectReference Include="..\PriceSync.Modules.CustomerPricing\PriceSync.Modules.CustomerPricing.csproj" />
+    <ProjectReference Include="..\PriceSync.Modules.RetrievalConsumption\PriceSync.Modules.RetrievalConsumption.csproj" />
+    <ProjectReference Include="..\PriceSync.Modules.IntegrationConfiguration\PriceSync.Modules.IntegrationConfiguration.csproj" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+</Project>

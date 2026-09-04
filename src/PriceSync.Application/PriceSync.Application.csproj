@@ -1,0 +1,24 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\PriceSync.SharedKernel\PriceSync.SharedKernel.csproj" />
+    <ProjectReference Include="..\PriceSync.Modules.OrganizationAccess.Contracts\PriceSync.Modules.OrganizationAccess.Contracts.csproj" />
+    <ProjectReference Include="..\PriceSync.Modules.TradingRelationships.Contracts\PriceSync.Modules.TradingRelationships.Contracts.csproj" />
+    <ProjectReference Include="..\PriceSync.Modules.Agreements.Contracts\PriceSync.Modules.Agreements.Contracts.csproj" />
+    <ProjectReference Include="..\PriceSync.Modules.PricePublication.Contracts\PriceSync.Modules.PricePublication.Contracts.csproj" />
+    <ProjectReference Include="..\PriceSync.Modules.CustomerPricing.Contracts\PriceSync.Modules.CustomerPricing.Contracts.csproj" />
+    <ProjectReference Include="..\PriceSync.Modules.RetrievalConsumption.Contracts\PriceSync.Modules.RetrievalConsumption.Contracts.csproj" />
+    <ProjectReference Include="..\PriceSync.Modules.IntegrationConfiguration.Contracts\PriceSync.Modules.IntegrationConfiguration.Contracts.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+</Project>
