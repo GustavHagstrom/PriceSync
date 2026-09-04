@@ -60,6 +60,75 @@ External format -> Adapter -> Canonical model -> Adapter -> External format
 
 This allows an organization to change from Excel to SFTP or API without changing the semantics of its PriceSync relationship.
 
+## Modular monolith implementation
+
+PriceSync starts as a pragmatic modular monolith. The established bounded contexts are implemented as module boundaries inside one deployable system, not as independently deployed services.
+
+Initial solution structure:
+
+```text
+src/
+  PriceSync.Api/
+  PriceSync.Application/
+  PriceSync.SharedKernel/
+  PriceSync.Modules.OrganizationAccess/
+  PriceSync.Modules.OrganizationAccess.Contracts/
+  PriceSync.Modules.TradingRelationships/
+  PriceSync.Modules.TradingRelationships.Contracts/
+  PriceSync.Modules.Agreements/
+  PriceSync.Modules.Agreements.Contracts/
+  PriceSync.Modules.PricePublication/
+  PriceSync.Modules.PricePublication.Contracts/
+  PriceSync.Modules.CustomerPricing/
+  PriceSync.Modules.CustomerPricing.Contracts/
+  PriceSync.Modules.RetrievalConsumption/
+  PriceSync.Modules.RetrievalConsumption.Contracts/
+  PriceSync.Modules.IntegrationConfiguration/
+  PriceSync.Modules.IntegrationConfiguration.Contracts/
+
+tests/
+  PriceSync.ArchitectureTests/
+```
+
+### Host and module responsibilities
+
+`PriceSync.Api` is the executable host and composition root. It owns HTTP/API endpoints, host-level authentication integration, configuration, process startup, and calls each module's registration extension.
+
+Each module owns its internal use cases, domain model, persistence mappings, validation, and module-specific service registration. A module exposes a single registration surface such as `AddAgreementsModule(...)`; the host calls it, but does not compose the module's internals by hand.
+
+`PriceSync.Application` is a thin orchestration layer for workflows that genuinely cross module boundaries. It depends on module contracts and shared technical building blocks, not on module implementation projects. Use cases that belong wholly inside one bounded context stay inside that module.
+
+### Contracts and dependency rules
+
+Every module has a sibling `.Contracts` project. Contracts contain application-facing integration surfaces such as IDs, request/response DTOs, ports, query interfaces, or notifications needed by other modules or the application layer.
+
+Contracts must not contain aggregates, EF entities, persistence models, internal domain services, or a shared PriceSync domain model. Cross-context collaboration uses exact IDs and version references rather than direct object sharing.
+
+Allowed dependencies:
+
+- Module implementation projects may reference their own contracts, other module contracts, and `PriceSync.SharedKernel`.
+- Module implementation projects must not reference other module implementation projects.
+- Module contracts must not reference module implementation projects.
+- `PriceSync.SharedKernel` must not reference modules.
+- `PriceSync.Application` may reference module contracts and `PriceSync.SharedKernel`.
+- `PriceSync.Api` may reference `PriceSync.Application` and module implementation projects for composition.
+
+### Persistence ownership
+
+Each module owns its own persistence scope. The initial implementation may use one shared physical datastore, probably SQL, but that is not a domain boundary decision.
+
+Modules must not share persistence entities, EF navigation properties, or direct table/model access across module boundaries. Cross-module reads and orchestration go through contracts using explicit identifiers and immutable version references.
+
+### Shared kernel
+
+`PriceSync.SharedKernel` stays intentionally small and technical. It may contain generic building blocks such as result/error types, clock abstractions, and similar infrastructure-neutral primitives.
+
+It must not contain PriceSync business concepts such as Organization, Supplier, Customer, Price List, Agreement, Version Validity, or shared persistence entities. Domain concepts start in the module that owns their behavior and are lifted only if repeated use proves they are truly shared with the same semantics.
+
+### Boundary verification
+
+Architecture tests should enforce the dependency rules above. The initial skeleton for each module should compile, expose a registration extension, and avoid implementing aggregates or use cases that belong to later implementation issues.
+
 ## Candidate domain model
 
 ```text

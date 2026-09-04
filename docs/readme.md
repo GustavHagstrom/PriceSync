@@ -9,6 +9,7 @@ This directory contains the product, business, architecture, and domain document
 - [Product vision](./product-vision.md) — the problem, product boundaries, adoption principles, and intended end state.
 - [Business model](./business-model.md) — commercial hypotheses, pricing principles, and adoption risks.
 - [Architecture](./architecture.md) — architectural principles, boundaries, candidate model, and technical risks.
+- [Architecture decisions](./adr/) — accepted architectural decisions that explain important trade-offs.
 
 ## How to navigate
 
@@ -21,6 +22,7 @@ Unresolved domain discovery should be captured in the relevant issue or pull req
 - `Context.md` is a glossary only: short, business-focused definitions without implementation details.
 - `Domain/readme.md` is the entry point for the established domain map and cross-context relationships.
 - `Domain/` contains one Markdown file per established domain concept or cohesive module.
+- `adr/` contains short architecture decision records for decisions that are costly to reverse, surprising without context, and based on real trade-offs.
 - Domain pages describe purpose, ownership, aggregates, invariants, relationships, and materially unresolved questions.
 - Open hypotheses must be labelled as such and must not be presented as settled decisions.
 - When a canonical term changes, update `Context.md`, the relevant domain page, and incoming links together.
