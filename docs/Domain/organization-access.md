@@ -33,9 +33,25 @@ This area produces facts about Organization identity/state and membership/author
 ## Core invariants
 
 - A Legal Organization Identity is the combination of registration country and national organization number.
-- A person acts for an Organization through an Organization Membership.
+- A Legal Organization Identity identifies at most one Organization globally in PriceSync.
+- An Organization's Legal Organization Identity does not change after the Organization is created in the initial model.
+- An Organization is either Active or Archived in the initial model. Archiving closes the Organization for new use without deleting its identity, memberships, or history.
+- Archiving an Organization does not automatically end its Organization Memberships, but active memberships in an Archived Organization do not grant ordinary business authority while the Organization remains Archived.
+- Archived is terminal for Organization in the initial model.
+- A Person has a stable identity in PriceSync that may be linked to one or more external identity-provider accounts over time.
+- A Person acts for an Organization through an Organization Membership.
+- Organization Membership references a Person by that Person's PriceSync identity; this area does not initially own the full Person lifecycle or identity-provider linking flows.
+- Organization, Person, and Organization Membership identities are distinct concepts and must not be treated as interchangeable raw identifiers.
+- An Organization Membership is either Active or Ended in the initial model. Ending a membership removes current authority without deleting its history.
+- Ended is terminal for Organization Membership in the initial model; later re-entry creates a new Organization Membership.
+- A Person may have at most one active Organization Membership for the same Organization.
 - Roles and permissions are scoped to one membership and therefore one Organization.
-- The same person may have different roles in different Organizations.
+- The initial Organization Roles are Owner and Member.
+- An active Organization Membership has a non-empty set of Organization Roles.
+- Owner includes Member authority in the initial role model.
+- Every active Organization must have at least one active Owner after Organization creation completes.
+- Creating an Organization establishes its first active Owner membership as part of the same business operation.
+- The same Person may have different roles in different Organizations.
 - Authentication-provider details are outside this domain area's business model.
 
 ## References from other areas

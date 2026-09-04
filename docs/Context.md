@@ -15,9 +15,19 @@ _Avoid_: Organization name, display name
 **Organization Membership**:
 A person's association with one Organization, carrying the roles that authorize the person to act for that Organization. The same person may have different memberships and roles in different Organizations.
 
+**Person**:
+A human actor with a stable identity in PriceSync. External identity-provider accounts may be linked to a Person, but they do not define the Person.
+_Avoid_: User, identity-provider account
+
 **Organization Role**:
 A named set of permissions assigned through an Organization Membership. Roles are scoped to one Organization and never grant global authority over another Organization.
 _Avoid_: Global user role
+
+**Owner**:
+An Organization Role for a person who may administer an Organization and its Organization Memberships.
+
+**Member**:
+An Organization Role for a person who may act for an Organization without administering the Organization or its Organization Memberships.
 
 **Supplier**:
 The role of an Organization that provides prices to another Organization within a specific trading relationship. It is a contextual role, not a permanent organization type.
