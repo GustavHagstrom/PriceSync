@@ -53,6 +53,7 @@ The implementation plan will be sharpened through five focused grilling blocks:
 - Issue #11 exposes no generic Organization lookup or authorization interface. Purpose-built cross-context queries are added only when a concrete consuming use case defines the required semantics; direct access to Organization & Access persistence remains forbidden.
 - Issue #11 publishes no OrganizationCreated or other domain/integration events and introduces no outbox. Event contracts and delivery guarantees are added only for a concrete consumer; CreateOrganization coordinates its two aggregates directly.
 - OrganizationId and PersonId are independent Guid-backed record structs in OrganizationAccess.Contracts with no generic strongly typed ID base or Shared Kernel dependency. EF and JSON conversion are configured specifically at their boundaries.
+- Tests are split into PriceSync.Modules.OrganizationAccess.UnitTests for database-free domain and pure application logic, and PriceSync.Modules.OrganizationAccess.IntegrationTests for PostgreSQL, migrations, handlers, transactions, concurrency, authentication adapters, and full Minimal API slices through WebApplicationFactory. Existing ArchitectureTests remain separate; no generic API integration-test project is added yet.
 - OrganizationMembership references PersonId in issue #11, but the Person aggregate and identity-provider linking flows are out of scope.
 - PersonId, OrganizationId, and OrganizationMembershipId should be strongly typed IDs rather than raw Guid/string values.
 - OrganizationId and PersonId are boundary-relevant IDs; OrganizationMembershipId starts internal unless an external use case needs it.
@@ -219,3 +220,4 @@ All objects below are owned by Organization & Access and live in the `organizati
 - 2026-09-05: Kept OrganizationId and PersonId as independent Guid-backed record structs without a generic Shared Kernel ID abstraction.
 - 2026-09-05: Completed grilling block 4, covering Person ownership, public contracts, and cross-context exposure.
 - 2026-09-05: Started grilling block 5, covering test strategy and implementation sequencing.
+- 2026-09-05: Selected separate Organization & Access unit and integration test projects, with full HTTP slices tested through the real API host from the module integration project.
