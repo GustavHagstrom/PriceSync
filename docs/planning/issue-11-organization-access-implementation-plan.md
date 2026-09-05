@@ -26,7 +26,6 @@ The implementation plan will be sharpened through five focused grilling blocks:
 
 ## Open Decisions
 
-- Which types belong in `.Contracts` versus remaining internal to the module.
 
 ## Working Constraints
 
@@ -48,6 +47,7 @@ The implementation plan will be sharpened through five focused grilling blocks:
 - Ended is terminal for OrganizationMembership in issue #11; re-entry creates a new membership.
 - PriceSync has a stable Person identity, and external identity-provider accounts may be linked to that Person over time.
 - Organization & Access owns the canonical Person identity and PersonId. The API host owns protocol-level authentication integration and implements ICurrentPerson by reading a trusted internal Person claim; future external-account linking belongs to Organization & Access while token validation and issuance remain host/authentication infrastructure concerns.
+- PriceSync.Modules.OrganizationAccess.Contracts initially exposes only OrganizationId, PersonId, and ICurrentPerson. OrganizationMembershipId, domain types, roles/statuses, Legal Organization Identity, feature handlers, API DTOs, and persistence types remain internal until a concrete cross-context consumer requires a purpose-built contract.
 - OrganizationMembership references PersonId in issue #11, but the Person aggregate and identity-provider linking flows are out of scope.
 - PersonId, OrganizationId, and OrganizationMembershipId should be strongly typed IDs rather than raw Guid/string values.
 - OrganizationId and PersonId are boundary-relevant IDs; OrganizationMembershipId starts internal unless an external use case needs it.
@@ -208,3 +208,4 @@ All objects below are owned by Organization & Access and live in the `organizati
 - 2026-09-05: Completed grilling block 3, covering persistence ownership, schema, idempotency, transactions, and migration strategy.
 - 2026-09-05: Started grilling block 4, covering contracts and cross-context exposure.
 - 2026-09-05: Assigned ownership of stable Person identity and external-account links to Organization & Access, with protocol authentication in the API host; documented as ADR 0005.
+- 2026-09-05: Limited OrganizationAccess.Contracts in issue #11 to OrganizationId, PersonId, and ICurrentPerson; all other module and HTTP types remain internal.
