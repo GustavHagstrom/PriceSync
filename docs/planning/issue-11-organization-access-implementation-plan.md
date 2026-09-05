@@ -55,6 +55,7 @@ The implementation plan will be sharpened through five focused grilling blocks:
 - OrganizationId and PersonId are independent Guid-backed record structs in OrganizationAccess.Contracts with no generic strongly typed ID base or Shared Kernel dependency. EF and JSON conversion are configured specifically at their boundaries.
 - Tests are split into PriceSync.Modules.OrganizationAccess.UnitTests for database-free domain and pure application logic, and PriceSync.Modules.OrganizationAccess.IntegrationTests for PostgreSQL, migrations, handlers, transactions, concurrency, authentication adapters, and full Minimal API slices through WebApplicationFactory. Existing ArchitectureTests remain separate; no generic API integration-test project is added yet.
 - Every documented invariant within issue #11 maps explicitly to at least one test at the lowest level capable of proving it: unit tests for pure domain rules, PostgreSQL integration tests for constraints/transactions, API integration tests for external behavior, and architecture tests for boundaries. Rules are not duplicated mechanically across all layers.
+- OrganizationAccess integration tests share one PostgreSQL Testcontainer per non-parallel test collection, apply migrations once, and reset module tables between tests. Each test owns its data and assumes no execution order; explicit concurrency is created inside individual tests. Other test projects may retain parallel execution.
 - OrganizationMembership references PersonId in issue #11, but the Person aggregate and identity-provider linking flows are out of scope.
 - PersonId, OrganizationId, and OrganizationMembershipId should be strongly typed IDs rather than raw Guid/string values.
 - OrganizationId and PersonId are boundary-relevant IDs; OrganizationMembershipId starts internal unless an external use case needs it.
@@ -223,3 +224,4 @@ All objects below are owned by Organization & Access and live in the `organizati
 - 2026-09-05: Started grilling block 5, covering test strategy and implementation sequencing.
 - 2026-09-05: Selected separate Organization & Access unit and integration test projects, with full HTTP slices tested through the real API host from the module integration project.
 - 2026-09-05: Required explicit traceability from every issue #11 invariant to at least one test at the lowest sufficient test level, without routine duplication across layers.
+- 2026-09-05: Selected one shared PostgreSQL Testcontainer per non-parallel integration-test collection with migration-once and database reset between tests.
