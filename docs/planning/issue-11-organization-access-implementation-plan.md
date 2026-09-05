@@ -19,17 +19,13 @@ Implement the first domain foundation for Organization identity and Organization
 The implementation plan will be sharpened through five focused grilling blocks:
 
 1. Domain invariants and aggregate boundaries. Completed 2026-09-04.
-2. Application use cases and API slice.
+2. Application use cases and API slice. Completed 2026-09-05.
 3. Persistence ownership, schema, and migration strategy.
 4. Contracts and cross-context exposure.
 5. Test strategy and implementation sequencing.
 
 ## Open Decisions
 
-- Which legal identity formats and uniqueness rules are required in the first implementation slice?
-- Which Organization Membership states are needed initially?
-- Which Organization Roles and permissions are required now, and which should stay outside the first slice?
-- Which commands and queries are necessary to satisfy the vertical-slice acceptance criteria without widening the module too early?
 - Whether persistence should be implemented with EF Core mappings now or deferred behind an in-memory/test seam for the first domain pass.
 - Which types belong in `.Contracts` versus remaining internal to the module.
 
@@ -39,9 +35,9 @@ The implementation plan will be sharpened through five focused grilling blocks:
 - Legal Organization Identity is immutable after Organization creation in issue #11.
 - Issue #11 supports Swedish Legal Organization Identities only: registration country SE and a Swedish organization number accepted with or without a hyphen, validated including its check digit, and normalized to ten digits before storage and uniqueness comparison.
 - CreateOrganization fails with Conflict and a stable organization_legal_identity_conflict error code when the normalized Legal Organization Identity already exists. It does not disclose the existing Organization or grant membership; access recovery is a separate future use case.
-- POST /organizations requires an Idempotency-Key scoped to the current Person and CreateOrganization use case. Replaying the same key with the same request returns the original successful result; reusing it with a different request returns Conflict. Different keys remain subject to Legal Organization Identity uniqueness. Persistence and retention are resolved in grilling block 3.
+- POST /api/v1/organizations requires an Idempotency-Key scoped to the current Person and CreateOrganization use case. Replaying the same key with the same request returns the original successful result; reusing it with a different request returns Conflict. Different keys remain subject to Legal Organization Identity uniqueness. Persistence and retention are resolved in grilling block 3.
 - CreateOrganization accepts displayName, explicit registrationCountry, and organizationNumber. Success returns Created with a Location header and an Organization representation containing OrganizationId, displayName, registrationCountry, the normalized organizationNumber, Active status, and the current Person's Owner role. OrganizationMembershipId remains internal.
-- GET /organizations implements ListMyOrganizations as a caller-scoped collection, never a global administrative list. It is initially unpaginated, includes Active and Archived Organizations, sorts Active first and then by displayName, and returns each Organization's canonical identity, status, and the current Person's roles.
+- GET /api/v1/organizations implements ListMyOrganizations as a caller-scoped collection, never a global administrative list. It is initially unpaginated, includes Active and Archived Organizations, sorts Active first and then by displayName, and returns each Organization's canonical identity, status, and the current Person's roles.
 - API errors use RFC 9457 Problem Details with a stable code extension. Missing authentication maps to Unauthorized; missing or inaccessible Organizations to Not Found; Legal Organization Identity and idempotency payload conflicts to Conflict; missing idempotency keys, invalid fields, and unsupported countries to Bad Request; unexpected failures return Internal Server Error without internal details.
 - API role collections expose only roles explicitly assigned to the current Organization Membership. Role implication such as Owner including Member authority is evaluated for authorization and does not expand the returned or persisted role set.
 - Membership-based Organization access is enforced inside each application query using the PersonId from ICurrentPerson. API endpoints enforce coarse authentication, while queries scope retrieval to active membership so inaccessible and missing Organizations share the same Not Found result.
@@ -78,6 +74,7 @@ The implementation plan will be sharpened through five focused grilling blocks:
 - Authentication-provider tokens and sessions are outside the Organization & Access business model.
 - Issue #11 introduces ICurrentPerson as the trusted source of PersonId and requires authentication on Organization endpoints, but does not implement an external identity provider, token exchange, internal JWT issuance, Person lifecycle, or identity-account linking. Integration tests supply a fake authenticated Person; production must not fall back to an arbitrary identity when no real adapter is configured.
 - Validation is split by responsibility: HTTP/application validation handles request shape and Idempotency-Key requirements; domain value objects and aggregate factories enforce domain validity and normalization; application/persistence mechanisms enforce uniqueness, idempotency consistency, and atomic writes. Issue #11 does not introduce FluentValidation without demonstrated reuse.
+- Public HTTP routes use the /api/v1 prefix from the first endpoint. Versioning is expressed through route groups without introducing a versioning library in issue #11.
 
 - CreateOrganizationHandler creates Organization and the first Owner OrganizationMembership as separate aggregates, then persists both in one atomic operation. Each aggregate factory enforces its own invariants; the handler enforces the cross-aggregate use-case outcome without introducing a domain service.
 
@@ -112,7 +109,7 @@ The implementation plan will be sharpened through five focused grilling blocks:
 - 2026-09-05: Decided that duplicate Legal Organization Identity returns Conflict with a stable error code, without disclosing the existing Organization or creating a membership.
 - 2026-09-05: Decided that CreateOrganization requires an Idempotency-Key scoped to the current Person and use case, with deterministic replay and payload-mismatch conflict semantics.
 - 2026-09-05: Defined the CreateOrganization request and Created response, including explicit registration country, canonical legal identity, Location, current-person roles, and no OrganizationMembershipId exposure.
-- 2026-09-05: Defined GET /organizations as an initially unpaginated, caller-scoped ListMyOrganizations endpoint including Archived Organizations and current-person roles.
+- 2026-09-05: Defined GET /api/v1/organizations as an initially unpaginated, caller-scoped ListMyOrganizations endpoint including Archived Organizations and current-person roles.
 - 2026-09-05: Standardized API errors on RFC 9457 Problem Details with stable error codes and the initial HTTP status mapping.
 - 2026-09-05: Decided that API role collections expose explicit role assignments only; implied authority is not returned as additional roles.
 - 2026-09-05: Decided that membership-based access is enforced in application queries and included in the scoped data lookup rather than existing only at the API endpoint.
@@ -121,4 +118,6 @@ The implementation plan will be sharpened through five focused grilling blocks:
 - 2026-09-05: Decided that CreateOrganizationHandler coordinates creation of the separate Organization and first Owner OrganizationMembership aggregates and persists them atomically without a new domain service.
 - 2026-09-05: Limited authentication work in issue #11 to ICurrentPerson, authenticated endpoints, and a test authentication adapter; provider integration, tokens, Person lifecycle, and identity linking remain out of scope.
 - 2026-09-05: Split request, domain, and persistence validation by responsibility and deferred FluentValidation until repeated validation needs justify it.
+- 2026-09-05: Decided that public API routes use the /api/v1 prefix from the first endpoint without an API-versioning library.
+- 2026-09-05: Completed grilling block 2, covering application use cases and the API slice.
 - 2026-09-05: Selected feature-local endpoints, handlers, and DTOs with direct dependency-injected handler calls and no MediatR or generic command/query abstractions.
