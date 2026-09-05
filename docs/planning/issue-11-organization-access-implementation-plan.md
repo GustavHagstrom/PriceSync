@@ -39,6 +39,7 @@ The implementation plan will be sharpened through five focused grilling blocks:
 - Legal Organization Identity is immutable after Organization creation in issue #11.
 - Issue #11 supports Swedish Legal Organization Identities only: registration country SE and a Swedish organization number accepted with or without a hyphen, validated including its check digit, and normalized to ten digits before storage and uniqueness comparison.
 - CreateOrganization fails with Conflict and a stable organization_legal_identity_conflict error code when the normalized Legal Organization Identity already exists. It does not disclose the existing Organization or grant membership; access recovery is a separate future use case.
+- POST /organizations requires an Idempotency-Key scoped to the current Person and CreateOrganization use case. Replaying the same key with the same request returns the original successful result; reusing it with a different request returns Conflict. Different keys remain subject to Legal Organization Identity uniqueness. Persistence and retention are resolved in grilling block 3.
 - Organization lifecycle state starts with Active and Archived only.
 - Organization Membership lifecycle state starts with Active and Ended only.
 - Ended is terminal for OrganizationMembership in issue #11; re-entry creates a new membership.
@@ -97,3 +98,4 @@ The implementation plan will be sharpened through five focused grilling blocks:
 - 2026-09-05: Decided that GetOrganization returns Not Found rather than Forbidden when the current Person lacks an active membership.
 - 2026-09-05: Limited issue #11 to Swedish Legal Organization Identities, normalized to ten digits and validated including the check digit; other registration countries are rejected as unsupported.
 - 2026-09-05: Decided that duplicate Legal Organization Identity returns Conflict with a stable error code, without disclosing the existing Organization or creating a membership.
+- 2026-09-05: Decided that CreateOrganization requires an Idempotency-Key scoped to the current Person and use case, with deterministic replay and payload-mismatch conflict semantics.
