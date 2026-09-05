@@ -85,6 +85,7 @@ The implementation plan will be sharpened through five focused grilling blocks:
 - Organization & Access owns idempotency_records keyed uniquely by PersonId, operation, and Idempotency-Key. Each record stores a canonical request hash plus the original HTTP status and serialized jsonb response. The completed record is committed atomically with Organization and first Owner membership; matching replays return it, while payload mismatch returns Conflict.
 - Successful CreateOrganization idempotency records are retained permanently in the initial model and have no expires_at field. The operation is low-volume, so permanent replay semantics avoid cleanup and key-reuse complexity; future high-volume idempotent operations may define separate retention.
 - Feature handlers and queries use the internal OrganizationAccessDbContext directly. EF Core DbContext and a single SaveChangesAsync provide repository-like access and the atomic unit of work for CreateOrganization; issue #11 introduces no custom repository or Unit of Work abstractions. Database constraint names drive concurrency-safe conflict translation.
+- Organization & Access owns and generates its EF Core migrations and uses a module-local migrations history table in organization_access. Development startup and isolated Testcontainers tests may apply migrations automatically; production applies them as a separate deployment step and the running API does not require schema-change privileges.
 
 - CreateOrganizationHandler creates Organization and the first Owner OrganizationMembership as separate aggregates, then persists both in one atomic operation. Each aggregate factory enforces its own invariants; the handler enforces the cross-aggregate use-case outcome without introducing a domain service.
 
@@ -142,3 +143,4 @@ The implementation plan will be sharpened through five focused grilling blocks:
 - 2026-09-05: Defined module-owned idempotency records containing request hash and original response, committed atomically with CreateOrganization domain data.
 - 2026-09-05: Chose permanent retention for successful CreateOrganization idempotency records and removed expiry/cleanup from issue #11.
 - 2026-09-05: Chose direct DbContext use in feature handlers and queries, relying on SaveChangesAsync as the atomic unit of work without custom repository or Unit of Work abstractions.
+- 2026-09-05: Chose automatic migration application for development and Testcontainers tests, with module-owned migrations applied through a separate production deployment step.
