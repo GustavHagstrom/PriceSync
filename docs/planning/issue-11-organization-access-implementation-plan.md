@@ -81,6 +81,7 @@ The implementation plan will be sharpened through five focused grilling blocks:
 - OrganizationMembership persists its non-empty set of explicitly assigned roles in organization_access.organization_membership_roles, with one row per membership and role and a composite primary key preventing duplicates. Role implication such as Owner including Member authority is evaluated in domain authorization and does not require redundant persisted role rows; future independent roles may be combined.
 - A unique index on Organizations registration country plus normalized national organization number enforces global Legal Organization Identity uniqueness.
 - A PostgreSQL partial unique index on OrganizationMembership organization_id plus person_id where status is Active enforces at most one active membership while allowing multiple Ended historical memberships. Application checks provide expected errors; the index remains the concurrency-safe guarantee.
+- Organization status, OrganizationMembership status, and Organization Role values are stored as stable lowercase text with database check constraints. Role implication and hierarchy remain domain behavior rather than persisted numeric rank.
 
 - CreateOrganizationHandler creates Organization and the first Owner OrganizationMembership as separate aggregates, then persists both in one atomic operation. Each aggregate factory enforces its own invariants; the handler enforces the cross-aggregate use-case outcome without introducing a domain service.
 
@@ -134,3 +135,4 @@ The implementation plan will be sharpened through five focused grilling blocks:
 - 2026-09-05: Selected strongly typed Guid-backed IDs, application-generated UUIDv7 for new module-owned identities, and native PostgreSQL uuid storage; documented as ADR 0004.
 - 2026-09-05: Confirmed that an OrganizationMembership may have multiple explicitly assigned, potentially independent roles; selected a separate membership-role table with no redundant rows for implied roles.
 - 2026-09-05: Selected a partial unique PostgreSQL index for active membership per Organization and Person, alongside the ordinary unique index for normalized Legal Organization Identity.
+- 2026-09-05: Selected stable lowercase text storage with check constraints for Organization status, membership status, and roles; role hierarchy remains in domain code.
