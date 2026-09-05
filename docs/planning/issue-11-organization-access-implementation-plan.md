@@ -53,6 +53,7 @@ The implementation plan will be sharpened through five focused grilling blocks:
 - Active memberships in an Archived Organization do not grant ordinary business authority while the Organization remains Archived.
 - Archived is terminal for Organization in issue #11.
 - CreateOrganization creates the Organization and the first active Owner membership in the same use case.
+- CreateOrganization obtains the initiating PersonId through an application abstraction such as ICurrentPerson; clients must not supply the first Owner's PersonId.
 - Organization Membership must remain a separate aggregate root, not a child collection embedded inside Organization.
 - Persistence models, EF navigation properties, and domain objects must not leak across module boundaries.
 - Shared kernel must stay technical and must not receive Organization-specific concepts.
@@ -80,3 +81,4 @@ The implementation plan will be sharpened through five focused grilling blocks:
 - 2026-09-04: Decided that Archived is terminal for Organization in issue #11.
 - 2026-09-04: Decided that CreateOrganization creates the Organization and first active Owner membership in one use case.
 - 2026-09-04: Completed grilling block 1, covering domain invariants and aggregate boundaries.
+- 2026-09-05: Decided that CreateOrganization resolves the initiating PersonId through ICurrentPerson rather than accepting the first Owner's PersonId from the client.
