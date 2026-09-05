@@ -89,6 +89,7 @@ The implementation plan will be sharpened through five focused grilling blocks:
 - Issue #11 adds no generic optimistic-concurrency token because its exposed use cases only create and read. Uniqueness constraints and idempotency cover current races; the first updating slice must choose a concurrency strategy appropriate to its concrete row and cross-row invariants.
 - Organization persists CreatedAt and nullable ArchivedAt; OrganizationMembership persists StartedAt and nullable EndedAt. Domain creation/mutation obtains UTC instants through TimeProvider and PostgreSQL stores them as timestamptz. Database checks keep Active paired with a null terminal timestamp and Archived/Ended paired with a non-null timestamp. A generic UpdatedAt is not introduced.
 - Organization displayName is required, trimmed at its boundaries, and limited to 1-200 Unicode characters. Internal characters and casing are preserved; the value is mutable, non-unique presentation data and is stored as varchar(200), never used for Organization identity matching.
+- Legal Organization Identity is persisted as uppercase registration_country char(2) plus canonical national_organization_number varchar(32), with a composite unique index. Country-specific domain validation remains narrower; Sweden requires exactly ten normalized digits.
 
 - CreateOrganizationHandler creates Organization and the first Owner OrganizationMembership as separate aggregates, then persists both in one atomic operation. Each aggregate factory enforces its own invariants; the handler enforces the cross-aggregate use-case outcome without introducing a domain service.
 
@@ -150,3 +151,4 @@ The implementation plan will be sharpened through five focused grilling blocks:
 - 2026-09-05: Deferred a generic optimistic-concurrency token until the first updating use case can select a strategy against concrete invariants.
 - 2026-09-05: Added UTC lifecycle timestamps for Organization creation/archive and membership start/end, with status/timestamp consistency constraints and no generic UpdatedAt.
 - 2026-09-05: Defined Organization displayName as trimmed, 1-200-character, case-preserving, non-unique mutable presentation data stored as varchar(200).
+- 2026-09-05: Chose char(2) registration country and varchar(32) canonical national organization number columns to support future countries without weakening country-specific validation.
