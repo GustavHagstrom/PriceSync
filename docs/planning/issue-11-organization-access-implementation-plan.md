@@ -82,6 +82,7 @@ The implementation plan will be sharpened through five focused grilling blocks:
 - A unique index on Organizations registration country plus normalized national organization number enforces global Legal Organization Identity uniqueness.
 - A PostgreSQL partial unique index on OrganizationMembership organization_id plus person_id where status is Active enforces at most one active membership while allowing multiple Ended historical memberships. Application checks provide expected errors; the index remains the concurrency-safe guarantee.
 - Organization status, OrganizationMembership status, and Organization Role values are stored as stable lowercase text with database check constraints. Role implication and hierarchy remain domain behavior rather than persisted numeric rank.
+- Organization & Access owns idempotency_records keyed uniquely by PersonId, operation, and Idempotency-Key. Each record stores a canonical request hash plus the original HTTP status and serialized jsonb response. The completed record is committed atomically with Organization and first Owner membership; matching replays return it, while payload mismatch returns Conflict.
 
 - CreateOrganizationHandler creates Organization and the first Owner OrganizationMembership as separate aggregates, then persists both in one atomic operation. Each aggregate factory enforces its own invariants; the handler enforces the cross-aggregate use-case outcome without introducing a domain service.
 
@@ -136,3 +137,4 @@ The implementation plan will be sharpened through five focused grilling blocks:
 - 2026-09-05: Confirmed that an OrganizationMembership may have multiple explicitly assigned, potentially independent roles; selected a separate membership-role table with no redundant rows for implied roles.
 - 2026-09-05: Selected a partial unique PostgreSQL index for active membership per Organization and Person, alongside the ordinary unique index for normalized Legal Organization Identity.
 - 2026-09-05: Selected stable lowercase text storage with check constraints for Organization status, membership status, and roles; role hierarchy remains in domain code.
+- 2026-09-05: Defined module-owned idempotency records containing request hash and original response, committed atomically with CreateOrganization domain data.
