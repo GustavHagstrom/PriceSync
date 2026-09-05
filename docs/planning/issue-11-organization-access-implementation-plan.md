@@ -22,12 +22,11 @@ The implementation plan will be sharpened through five focused grilling blocks:
 2. Application use cases and API slice. Completed 2026-09-05.
 3. Persistence ownership, schema, and migration strategy. Completed 2026-09-05.
 4. Contracts and cross-context exposure. Completed 2026-09-05.
-5. Test strategy and implementation sequencing.
+5. Test strategy and implementation sequencing. Completed 2026-09-05.
 
 ## Open Decisions
 
-- Which domain, persistence, application, and API behaviors require tests in issue #11?
-- In which implementation order should the domain, persistence, application slices, and integration tests be delivered?
+None for the planned issue #11 implementation scope. New decisions should be opened only if implementation reveals a concrete contradiction or missing requirement.
 
 ## Working Constraints
 
@@ -59,6 +58,7 @@ The implementation plan will be sharpened through five focused grilling blocks:
 - Required idempotency/concurrency integration coverage includes sequential replay, semantically equivalent normalized replay, same-key payload mismatch, concurrent same-key replay with one persisted result, and concurrent different-key creation for one Legal Organization Identity with exactly one success and no partial data.
 - Required HTTP integration coverage verifies authentication and Problem Details; CreateOrganization success, validation, conflict, Owner, Location, and idempotency behavior; GetOrganization active/archived access and indistinguishable Not Found responses; and ListMyOrganizations membership scoping, archived inclusion, explicit roles, deterministic ordering, and an empty collection result.
 - Planning PR #20 is merged before implementation. Issue #11 remains the parent delivery scope and is implemented through four sequential PRs: (A) contracts/domain/unit tests, (B) DbContext/mappings/migration/PostgreSQL constraints, (C) CreateOrganization/auth fake/idempotency/API and concurrency tests, and (D) GetOrganization/ListMyOrganizations/remaining API tests. Each PR is based on main after its predecessor merges and keeps the solution green.
+- CI is gated by the explicit invariant, HTTP, concurrency, migration, and architecture test requirements rather than an arbitrary code-coverage percentage. Coverage may be reported informationally until a stable baseline justifies a threshold.
 - OrganizationMembership references PersonId in issue #11, but the Person aggregate and identity-provider linking flows are out of scope.
 - PersonId, OrganizationId, and OrganizationMembershipId should be strongly typed IDs rather than raw Guid/string values.
 - OrganizationId and PersonId are boundary-relevant IDs; OrganizationMembershipId starts internal unless an external use case needs it.
@@ -231,3 +231,5 @@ All objects below are owned by Organization & Access and live in the `organizati
 - 2026-09-05: Required five real-PostgreSQL idempotency/concurrency scenarios covering replay, normalization, payload mismatch, same-key races, and Legal Organization Identity races.
 - 2026-09-05: Required the initial HTTP contract matrix for authentication, Problem Details, CreateOrganization, GetOrganization, and ListMyOrganizations.
 - 2026-09-05: Split issue #11 implementation into four sequential PRs after planning PR #20: domain/contracts, persistence, CreateOrganization, and read slices.
+- 2026-09-05: Chose explicit behavior and invariant coverage without a percentage-based CI coverage gate.
+- 2026-09-05: Completed grilling block 5 and the full issue #11 planning grilling session.
