@@ -133,6 +133,8 @@ Allowed dependencies:
 
 Each module owns its own persistence scope. The initial implementation uses PostgreSQL through EF Core and Npgsql. Sharing one physical PostgreSQL database does not weaken module ownership or turn persistence into a shared domain boundary.
 
+Within the shared database, each module owns a separate PostgreSQL schema, including its tables, indexes, and EF migrations history. Modules do not create cross-schema EF navigations or foreign keys and do not query another module's schema directly.
+
 Modules must not share persistence entities, EF navigation properties, or direct table/model access across module boundaries. Cross-module reads and orchestration go through contracts using explicit identifiers and immutable version references.
 
 ### Shared kernel
