@@ -83,6 +83,7 @@ The implementation plan will be sharpened through five focused grilling blocks:
 - A PostgreSQL partial unique index on OrganizationMembership organization_id plus person_id where status is Active enforces at most one active membership while allowing multiple Ended historical memberships. Application checks provide expected errors; the index remains the concurrency-safe guarantee.
 - Organization status, OrganizationMembership status, and Organization Role values are stored as stable lowercase text with database check constraints. Role implication and hierarchy remain domain behavior rather than persisted numeric rank.
 - Organization & Access owns idempotency_records keyed uniquely by PersonId, operation, and Idempotency-Key. Each record stores a canonical request hash plus the original HTTP status and serialized jsonb response. The completed record is committed atomically with Organization and first Owner membership; matching replays return it, while payload mismatch returns Conflict.
+- Successful CreateOrganization idempotency records are retained permanently in the initial model and have no expires_at field. The operation is low-volume, so permanent replay semantics avoid cleanup and key-reuse complexity; future high-volume idempotent operations may define separate retention.
 
 - CreateOrganizationHandler creates Organization and the first Owner OrganizationMembership as separate aggregates, then persists both in one atomic operation. Each aggregate factory enforces its own invariants; the handler enforces the cross-aggregate use-case outcome without introducing a domain service.
 
@@ -138,3 +139,4 @@ The implementation plan will be sharpened through five focused grilling blocks:
 - 2026-09-05: Selected a partial unique PostgreSQL index for active membership per Organization and Person, alongside the ordinary unique index for normalized Legal Organization Identity.
 - 2026-09-05: Selected stable lowercase text storage with check constraints for Organization status, membership status, and roles; role hierarchy remains in domain code.
 - 2026-09-05: Defined module-owned idempotency records containing request hash and original response, committed atomically with CreateOrganization domain data.
+- 2026-09-05: Chose permanent retention for successful CreateOrganization idempotency records and removed expiry/cleanup from issue #11.
