@@ -48,7 +48,7 @@ This area produces facts about Organization identity/state and membership/author
 - A Person may have at most one active Organization Membership for the same Organization.
 - Roles and permissions are scoped to one membership and therefore one Organization.
 - The initial Organization Roles are Owner and Member.
-- An active Organization Membership has a non-empty set of Organization Roles.
+- An active Organization Membership has a non-empty set of explicitly assigned Organization Roles. Independent roles may be combined; authority implied by another role is not a redundant assignment.
 - Owner includes Member authority in the initial role model.
 - Every active Organization must have at least one active Owner after Organization creation completes.
 - Creating an Organization establishes its first active Owner membership as part of the same business operation.
