@@ -26,6 +26,8 @@ The implementation plan will be sharpened through five focused grilling blocks:
 
 ## Open Decisions
 
+- Which domain, persistence, application, and API behaviors require tests in issue #11?
+- In which implementation order should the domain, persistence, application slices, and integration tests be delivered?
 
 ## Working Constraints
 
