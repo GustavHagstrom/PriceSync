@@ -115,9 +115,9 @@ The implementation plan will be sharpened through five focused grilling blocks:
 - 2026-09-05: Decided that membership-based access is enforced in application queries and included in the scoped data lookup rather than existing only at the API endpoint.
 - 2026-09-05: Decided that read use cases project directly from module-owned persistence to DTOs rather than rehydrating aggregates.
 - 2026-09-05: Decided that modules own and map their Minimal API endpoints through a narrow Map{Module}Endpoints composition surface; documented as ADR 0002.
+- 2026-09-05: Selected feature-local endpoints, handlers, and DTOs with direct dependency-injected handler calls and no MediatR or generic command/query abstractions.
 - 2026-09-05: Decided that CreateOrganizationHandler coordinates creation of the separate Organization and first Owner OrganizationMembership aggregates and persists them atomically without a new domain service.
 - 2026-09-05: Limited authentication work in issue #11 to ICurrentPerson, authenticated endpoints, and a test authentication adapter; provider integration, tokens, Person lifecycle, and identity linking remain out of scope.
 - 2026-09-05: Split request, domain, and persistence validation by responsibility and deferred FluentValidation until repeated validation needs justify it.
 - 2026-09-05: Decided that public API routes use the /api/v1 prefix from the first endpoint without an API-versioning library.
 - 2026-09-05: Completed grilling block 2, covering application use cases and the API slice.
-- 2026-09-05: Selected feature-local endpoints, handlers, and DTOs with direct dependency-injected handler calls and no MediatR or generic command/query abstractions.
