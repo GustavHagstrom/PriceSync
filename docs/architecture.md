@@ -98,6 +98,8 @@ Each module owns its Minimal API endpoint definitions together with its internal
 
 `PriceSync.Application` is a thin orchestration layer for workflows that genuinely cross module boundaries. It depends on module contracts and shared technical building blocks, not on module implementation projects. Use cases that belong wholly inside one bounded context stay inside that module.
 
+Public HTTP endpoints use an `/api/v1` route prefix from the first exposed slice. Modules map endpoints beneath that host convention through route groups; a dedicated API-versioning library is introduced only when multiple live contract versions require it.
+
 ### Module implementation conventions
 
 Each module implementation project uses its root namespace, for example `PriceSync.Modules.Agreements`, only for the public composition surfaces that the API host needs to call. Initially these should be limited to service registration and endpoint mapping extensions, such as `AddAgreementsModule(...)` and `MapAgreementsEndpoints(...)`.
