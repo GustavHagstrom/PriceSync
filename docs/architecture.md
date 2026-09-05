@@ -187,10 +187,10 @@ Avoid adding descriptive product data unless it is strictly required for synchro
 Illustrative only:
 
 ```http
-POST /v1/price-sets
-GET  /v1/suppliers/{supplierId}/prices/current
-GET  /v1/suppliers/{supplierId}/prices/changes?since=...
-GET  /v1/suppliers/{supplierId}/prices/{articleId}
+POST /api/v1/price-sets
+GET  /api/v1/suppliers/{supplierId}/prices/current
+GET  /api/v1/suppliers/{supplierId}/prices/changes?since=...
+GET  /api/v1/suppliers/{supplierId}/prices/{articleId}
 ```
 
 Possible events:
