@@ -36,14 +36,14 @@ This area produces facts about Organization identity/state and membership/author
 - A Legal Organization Identity identifies at most one Organization globally in PriceSync.
 - The initial implementation supports Swedish Legal Organization Identities only. It accepts the national organization number with or without a hyphen, validates its format and check digit, and normalizes it to ten digits before storage and identity comparison.
 - An Organization's Legal Organization Identity does not change after the Organization is created in the initial model.
-- An Organization is either Active or Archived in the initial model. Archiving closes the Organization for new use without deleting its identity, memberships, or history.
+- An Organization is either Active or Archived in the initial model. It records when it was created; archiving records when it occurred and closes the Organization for new use without deleting its identity, memberships, or history.
 - Archiving an Organization does not automatically end its Organization Memberships, but active memberships in an Archived Organization do not grant ordinary business authority while the Organization remains Archived.
 - Archived is terminal for Organization in the initial model.
 - A Person has a stable identity in PriceSync that may be linked to one or more external identity-provider accounts over time.
 - A Person acts for an Organization through an Organization Membership.
 - Organization Membership references a Person by that Person's PriceSync identity; this area does not initially own the full Person lifecycle or identity-provider linking flows.
 - Organization, Person, and Organization Membership identities are distinct concepts and must not be treated as interchangeable raw identifiers.
-- An Organization Membership is either Active or Ended in the initial model. Ending a membership removes current authority without deleting its history.
+- An Organization Membership is either Active or Ended in the initial model. It records when it started; ending records when it occurred and removes current authority without deleting its history.
 - Ended is terminal for Organization Membership in the initial model; later re-entry creates a new Organization Membership.
 - A Person may have at most one active Organization Membership for the same Organization.
 - Roles and permissions are scoped to one membership and therefore one Organization.
