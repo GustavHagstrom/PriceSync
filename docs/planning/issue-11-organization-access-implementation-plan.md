@@ -47,6 +47,7 @@ The implementation plan will be sharpened through five focused grilling blocks:
 - Organization Membership lifecycle state starts with Active and Ended only.
 - Ended is terminal for OrganizationMembership in issue #11; re-entry creates a new membership.
 - PriceSync has a stable Person identity, and external identity-provider accounts may be linked to that Person over time.
+- Organization & Access owns the canonical Person identity and PersonId. The API host owns protocol-level authentication integration and implements ICurrentPerson by reading a trusted internal Person claim; future external-account linking belongs to Organization & Access while token validation and issuance remain host/authentication infrastructure concerns.
 - OrganizationMembership references PersonId in issue #11, but the Person aggregate and identity-provider linking flows are out of scope.
 - PersonId, OrganizationId, and OrganizationMembershipId should be strongly typed IDs rather than raw Guid/string values.
 - OrganizationId and PersonId are boundary-relevant IDs; OrganizationMembershipId starts internal unless an external use case needs it.
@@ -205,3 +206,5 @@ All objects below are owned by Organization & Access and live in the `organizati
 - 2026-09-05: Selected PostgreSQL Read Committed isolation with named unique constraints rather than Serializable isolation and transaction retries.
 - 2026-09-05: Confirmed the initial four-table organization_access schema, its foreign keys, checks, uniqueness guarantees, and query indexes.
 - 2026-09-05: Completed grilling block 3, covering persistence ownership, schema, idempotency, transactions, and migration strategy.
+- 2026-09-05: Started grilling block 4, covering contracts and cross-context exposure.
+- 2026-09-05: Assigned ownership of stable Person identity and external-account links to Organization & Access, with protocol authentication in the API host; documented as ADR 0005.
