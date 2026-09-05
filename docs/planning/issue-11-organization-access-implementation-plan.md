@@ -46,6 +46,7 @@ The implementation plan will be sharpened through five focused grilling blocks:
 - API role collections expose only roles explicitly assigned to the current Organization Membership. Role implication such as Owner including Member authority is evaluated for authorization and does not expand the returned or persisted role set.
 - Membership-based Organization access is enforced inside each application query using the PersonId from ICurrentPerson. API endpoints enforce coarse authentication, while queries scope retrieval to active membership so inaccessible and missing Organizations share the same Not Found result.
 - GetOrganization and ListMyOrganizations query module-owned persistence directly and project to response DTOs without rehydrating domain aggregates. Commands use aggregates when enforcing domain behavior; query projections must not leak persistence entities outside the module.
+- Organization & Access owns its Minimal API endpoint definitions and exposes MapOrganizationAccessEndpoints as a narrow public composition surface alongside AddOrganizationAccessModule. PriceSync.Api owns host-level HTTP concerns and invokes module endpoint mapping; endpoint handlers and API DTOs remain internal to the module.
 - Organization lifecycle state starts with Active and Archived only.
 - Organization Membership lifecycle state starts with Active and Ended only.
 - Ended is terminal for OrganizationMembership in issue #11; re-entry creates a new membership.
@@ -111,3 +112,4 @@ The implementation plan will be sharpened through five focused grilling blocks:
 - 2026-09-05: Decided that API role collections expose explicit role assignments only; implied authority is not returned as additional roles.
 - 2026-09-05: Decided that membership-based access is enforced in application queries and included in the scoped data lookup rather than existing only at the API endpoint.
 - 2026-09-05: Decided that read use cases project directly from module-owned persistence to DTOs rather than rehydrating aggregates.
+- 2026-09-05: Decided that modules own and map their Minimal API endpoints through a narrow Map{Module}Endpoints composition surface; documented as ADR 0002.
