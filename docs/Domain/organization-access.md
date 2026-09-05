@@ -36,6 +36,7 @@ This area produces facts about Organization identity/state and membership/author
 - A Legal Organization Identity identifies at most one Organization globally in PriceSync.
 - The initial implementation supports Swedish Legal Organization Identities only. It accepts the national organization number with or without a hyphen, validates its format and check digit, and normalizes it to ten digits before storage and identity comparison.
 - An Organization's Legal Organization Identity does not change after the Organization is created in the initial model.
+- An Organization has a required display name that is mutable, non-unique presentation data and must never be used to establish its identity.
 - An Organization is either Active or Archived in the initial model. It records when it was created; archiving records when it occurred and closes the Organization for new use without deleting its identity, memberships, or history.
 - Archiving an Organization does not automatically end its Organization Memberships, but active memberships in an Archived Organization do not grant ordinary business authority while the Organization remains Archived.
 - Archived is terminal for Organization in the initial model.
