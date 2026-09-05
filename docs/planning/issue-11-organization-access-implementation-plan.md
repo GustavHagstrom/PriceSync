@@ -75,6 +75,7 @@ The implementation plan will be sharpened through five focused grilling blocks:
 - Validation is split by responsibility: HTTP/application validation handles request shape and Idempotency-Key requirements; domain value objects and aggregate factories enforce domain validity and normalization; application/persistence mechanisms enforce uniqueness, idempotency consistency, and atomic writes. Issue #11 does not introduce FluentValidation without demonstrated reuse.
 - Public HTTP routes use the /api/v1 prefix from the first endpoint. Versioning is expressed through route groups without introducing a versioning library in issue #11.
 - Issue #11 implements persistence directly with EF Core and Npgsql against PostgreSQL. Organization & Access owns its DbContext and migrations; no temporary in-memory repository abstraction is introduced. Domain tests remain database-free, while persistence and API integration tests use real PostgreSQL through Testcontainers.
+- Modules initially share one physical PostgreSQL database but own separate schemas. Organization & Access uses the organization_access schema for its tables, indexes, migrations history, and other persistence artifacts. Other modules must not query it directly or create cross-schema EF navigations or foreign keys.
 
 - CreateOrganizationHandler creates Organization and the first Owner OrganizationMembership as separate aggregates, then persists both in one atomic operation. Each aggregate factory enforces its own invariants; the handler enforces the cross-aggregate use-case outcome without introducing a domain service.
 
@@ -123,3 +124,4 @@ The implementation plan will be sharpened through five focused grilling blocks:
 - 2026-09-05: Completed grilling block 2, covering application use cases and the API slice.
 - 2026-09-05: Started grilling block 3, covering persistence ownership, schema, and migrations.
 - 2026-09-05: Selected EF Core with Npgsql/PostgreSQL, a module-owned DbContext and migrations, and PostgreSQL integration tests through Testcontainers; documented as ADR 0003.
+- 2026-09-05: Selected one shared PostgreSQL database with an organization_access schema owned exclusively by Organization & Access, including its own migrations history.
