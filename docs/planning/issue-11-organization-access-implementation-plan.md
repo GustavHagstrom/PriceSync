@@ -92,6 +92,7 @@ The implementation plan will be sharpened through five focused grilling blocks:
 - Legal Organization Identity is persisted as uppercase registration_country char(2) plus canonical national_organization_number varchar(32), with a composite unique index. Country-specific domain validation remains narrower; Sweden requires exactly ten normalized digits.
 - CreateOrganization request_hash is SHA-256 over a deterministic serialization of normalized semantic inputs (trimmed displayName, uppercase registration country, canonical organization number), stored as bytea. Idempotency-Key is a separate case-sensitive opaque value of 1-200 characters stored exactly as received.
 - CreateOrganization uses an explicit transaction and first persists the complete precomputed idempotency response to reserve its unique PersonId + operation + key scope. It then persists Organization, first Owner membership, and role before committing. Concurrent duplicate-key requests wait on the unique constraint and, after the winner commits, reload and validate the stored request hash for replay; rollback removes both reservation and domain writes.
+- The CreateOrganization transaction uses PostgreSQL Read Committed isolation. Named unique constraints provide serialization for idempotency and Legal Organization Identity conflicts; issue #11 does not use Serializable isolation or whole-operation retries.
 
 - CreateOrganizationHandler creates Organization and the first Owner OrganizationMembership as separate aggregates, then persists both in one atomic operation. Each aggregate factory enforces its own invariants; the handler enforces the cross-aggregate use-case outcome without introducing a domain service.
 
@@ -156,3 +157,4 @@ The implementation plan will be sharpened through five focused grilling blocks:
 - 2026-09-05: Chose char(2) registration country and varchar(32) canonical national organization number columns to support future countries without weakening country-specific validation.
 - 2026-09-05: Defined request_hash as SHA-256 over deterministically ordered normalized request values, with an exact case-sensitive 1-200-character Idempotency-Key.
 - 2026-09-05: Selected an explicit reservation-first transaction for CreateOrganization so concurrent requests with the same idempotency key deterministically replay the committed winner.
+- 2026-09-05: Selected PostgreSQL Read Committed isolation with named unique constraints rather than Serializable isolation and transaction retries.
