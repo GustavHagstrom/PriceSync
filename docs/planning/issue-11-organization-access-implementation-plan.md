@@ -218,3 +218,4 @@ All objects below are owned by Organization & Access and live in the `organizati
 - 2026-09-05: Deferred OrganizationCreated and other integration/domain events, outbox, and event versioning until a real cross-context consumer exists.
 - 2026-09-05: Kept OrganizationId and PersonId as independent Guid-backed record structs without a generic Shared Kernel ID abstraction.
 - 2026-09-05: Completed grilling block 4, covering Person ownership, public contracts, and cross-context exposure.
+- 2026-09-05: Started grilling block 5, covering test strategy and implementation sequencing.
