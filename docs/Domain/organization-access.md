@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Own the identity of business parties in PriceSync and the rules for who may act for them.
+Own the identity of business parties and people in PriceSync and the rules for who may act for each Organization. Protocol-level authentication remains outside the domain area.
 
 ## Aggregate model
 
@@ -40,7 +40,7 @@ This area produces facts about Organization identity/state and membership/author
 - An Organization is either Active or Archived in the initial model. It records when it was created; archiving records when it occurred and closes the Organization for new use without deleting its identity, memberships, or history.
 - Archiving an Organization does not automatically end its Organization Memberships, but active memberships in an Archived Organization do not grant ordinary business authority while the Organization remains Archived.
 - Archived is terminal for Organization in the initial model.
-- A Person has a stable identity in PriceSync that may be linked to one or more external identity-provider accounts over time.
+- Organization & Access owns each Person's stable PriceSync identity. A Person may be linked to one or more external identity-provider accounts over time without those accounts defining the Person.
 - A Person acts for an Organization through an Organization Membership.
 - Organization Membership references a Person by that Person's PriceSync identity; this area does not initially own the full Person lifecycle or identity-provider linking flows.
 - Organization, Person, and Organization Membership identities are distinct concepts and must not be treated as interchangeable raw identifiers.
