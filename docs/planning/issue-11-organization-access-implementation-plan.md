@@ -26,7 +26,6 @@ The implementation plan will be sharpened through five focused grilling blocks:
 
 ## Open Decisions
 
-- Whether persistence should be implemented with EF Core mappings now or deferred behind an in-memory/test seam for the first domain pass.
 - Which types belong in `.Contracts` versus remaining internal to the module.
 
 ## Working Constraints
@@ -75,6 +74,7 @@ The implementation plan will be sharpened through five focused grilling blocks:
 - Issue #11 introduces ICurrentPerson as the trusted source of PersonId and requires authentication on Organization endpoints, but does not implement an external identity provider, token exchange, internal JWT issuance, Person lifecycle, or identity-account linking. Integration tests supply a fake authenticated Person; production must not fall back to an arbitrary identity when no real adapter is configured.
 - Validation is split by responsibility: HTTP/application validation handles request shape and Idempotency-Key requirements; domain value objects and aggregate factories enforce domain validity and normalization; application/persistence mechanisms enforce uniqueness, idempotency consistency, and atomic writes. Issue #11 does not introduce FluentValidation without demonstrated reuse.
 - Public HTTP routes use the /api/v1 prefix from the first endpoint. Versioning is expressed through route groups without introducing a versioning library in issue #11.
+- Issue #11 implements persistence directly with EF Core and Npgsql against PostgreSQL. Organization & Access owns its DbContext and migrations; no temporary in-memory repository abstraction is introduced. Domain tests remain database-free, while persistence and API integration tests use real PostgreSQL through Testcontainers.
 
 - CreateOrganizationHandler creates Organization and the first Owner OrganizationMembership as separate aggregates, then persists both in one atomic operation. Each aggregate factory enforces its own invariants; the handler enforces the cross-aggregate use-case outcome without introducing a domain service.
 
@@ -121,3 +121,5 @@ The implementation plan will be sharpened through five focused grilling blocks:
 - 2026-09-05: Split request, domain, and persistence validation by responsibility and deferred FluentValidation until repeated validation needs justify it.
 - 2026-09-05: Decided that public API routes use the /api/v1 prefix from the first endpoint without an API-versioning library.
 - 2026-09-05: Completed grilling block 2, covering application use cases and the API slice.
+- 2026-09-05: Started grilling block 3, covering persistence ownership, schema, and migrations.
+- 2026-09-05: Selected EF Core with Npgsql/PostgreSQL, a module-owned DbContext and migrations, and PostgreSQL integration tests through Testcontainers; documented as ADR 0003.
