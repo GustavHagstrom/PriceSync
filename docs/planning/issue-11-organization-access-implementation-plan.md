@@ -20,7 +20,7 @@ The implementation plan will be sharpened through five focused grilling blocks:
 
 1. Domain invariants and aggregate boundaries. Completed 2026-09-04.
 2. Application use cases and API slice. Completed 2026-09-05.
-3. Persistence ownership, schema, and migration strategy.
+3. Persistence ownership, schema, and migration strategy. Completed 2026-09-05.
 4. Contracts and cross-context exposure.
 5. Test strategy and implementation sequencing.
 
@@ -96,6 +96,51 @@ The implementation plan will be sharpened through five focused grilling blocks:
 
 - CreateOrganizationHandler creates Organization and the first Owner OrganizationMembership as separate aggregates, then persists both in one atomic operation. Each aggregate factory enforces its own invariants; the handler enforces the cross-aggregate use-case outcome without introducing a domain service.
 
+## Initial Persistence Schema
+
+All objects below are owned by Organization & Access and live in the `organization_access` PostgreSQL schema.
+
+### organizations
+
+- `id uuid` primary key
+- `display_name varchar(200)` not null
+- `registration_country char(2)` not null
+- `national_organization_number varchar(32)` not null
+- `status text` not null, constrained to `active | archived`
+- `created_at timestamptz` not null
+- `archived_at timestamptz` nullable, constrained consistently with status
+- unique index on `registration_country + national_organization_number`
+
+### organization_memberships
+
+- `id uuid` primary key
+- `organization_id uuid` not null, foreign key to module-owned `organizations`
+- `person_id uuid` not null, without a cross-module database foreign key
+- `status text` not null, constrained to `active | ended`
+- `started_at timestamptz` not null
+- `ended_at timestamptz` nullable, constrained consistently with status
+- partial unique index on `organization_id + person_id` where status is `active`
+- partial lookup index on `person_id` where status is `active`
+
+### organization_membership_roles
+
+- `organization_membership_id uuid` foreign key to `organization_memberships`
+- `role text` constrained initially to `owner | member`
+- composite primary key on `organization_membership_id + role`
+- cascading technical delete with the membership; normal domain behavior does not delete memberships
+
+### idempotency_records
+
+- `person_id uuid` not null
+- `operation varchar(64)` not null
+- `idempotency_key varchar(200)` not null
+- `request_hash bytea` not null
+- `response_status smallint` not null
+- `response_body jsonb` not null
+- `created_at timestamptz` not null
+- composite primary key on `person_id + operation + idempotency_key`
+- successful CreateOrganization records are retained permanently
+
 ## Session Log
 
 - 2026-09-04: Created planning branch and initial PR base for issue #11.
@@ -158,3 +203,5 @@ The implementation plan will be sharpened through five focused grilling blocks:
 - 2026-09-05: Defined request_hash as SHA-256 over deterministically ordered normalized request values, with an exact case-sensitive 1-200-character Idempotency-Key.
 - 2026-09-05: Selected an explicit reservation-first transaction for CreateOrganization so concurrent requests with the same idempotency key deterministically replay the committed winner.
 - 2026-09-05: Selected PostgreSQL Read Committed isolation with named unique constraints rather than Serializable isolation and transaction retries.
+- 2026-09-05: Confirmed the initial four-table organization_access schema, its foreign keys, checks, uniqueness guarantees, and query indexes.
+- 2026-09-05: Completed grilling block 3, covering persistence ownership, schema, idempotency, transactions, and migration strategy.
