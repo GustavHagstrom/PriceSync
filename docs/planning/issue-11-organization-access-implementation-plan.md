@@ -1,5 +1,9 @@
 # Issue 11: Organization & Access Implementation Plan
 
+**Status:** Ready for implementation
+
+**Authority:** This document preserves the planning process, issue-specific delivery decisions, and implementation sequencing. Current authoritative behavior belongs in the domain documentation, ADRs, tests, and implemented code. After implementation, this plan remains as history and records outcomes, deviations, superseded decisions, and implementation PRs.
+
 Planning base for [issue #11](https://github.com/GustavHagstrom/PriceSync/issues/11).
 
 ## Goal
@@ -47,7 +51,7 @@ None for the planned issue #11 implementation scope. New decisions should be ope
 - Organization Membership lifecycle state starts with Active and Ended only.
 - Ended is terminal for OrganizationMembership in issue #11; re-entry creates a new membership.
 - PriceSync has a stable Person identity, and external identity-provider accounts may be linked to that Person over time.
-- Organization & Access owns the canonical Person identity and PersonId. The API host owns protocol-level authentication integration and implements ICurrentPerson by reading a trusted internal Person claim; future external-account linking belongs to Organization & Access while token validation and issuance remain host/authentication infrastructure concerns.
+- Organization & Access is the system of record for the canonical Person identity and PersonId once Person provisioning and external-account linking are implemented. In issue #11, the API host implements ICurrentPerson by reading an already provisioned, trusted internal Person claim; the Organization endpoints do not create or persist a Person record. Token validation and issuance remain host/authentication infrastructure concerns.
 - PriceSync.Modules.OrganizationAccess.Contracts initially exposes only OrganizationId, PersonId, and ICurrentPerson. OrganizationMembershipId, domain types, roles/statuses, Legal Organization Identity, feature handlers, API DTOs, and persistence types remain internal until a concrete cross-context consumer requires a purpose-built contract.
 - Issue #11 exposes no generic Organization lookup or authorization interface. Purpose-built cross-context queries are added only when a concrete consuming use case defines the required semantics; direct access to Organization & Access persistence remains forbidden.
 - Issue #11 publishes no OrganizationCreated or other domain/integration events and introduces no outbox. Event contracts and delivery guarantees are added only for a concrete consumer; CreateOrganization coordinates its two aggregates directly.
@@ -59,16 +63,16 @@ None for the planned issue #11 implementation scope. New decisions should be ope
 - Required HTTP integration coverage verifies authentication and Problem Details; CreateOrganization success, validation, conflict, Owner, Location, and idempotency behavior; GetOrganization active/archived access and indistinguishable Not Found responses; and ListMyOrganizations membership scoping, archived inclusion, explicit roles, deterministic ordering, and an empty collection result.
 - Planning PR #20 is merged before implementation. Issue #11 remains the parent delivery scope and is implemented through four sequential PRs: (A) contracts/domain/unit tests, (B) DbContext/mappings/migration/PostgreSQL constraints, (C) CreateOrganization/auth fake/idempotency/API and concurrency tests, and (D) GetOrganization/ListMyOrganizations/remaining API tests. Each PR is based on main after its predecessor merges and keeps the solution green.
 - CI is gated by the explicit invariant, HTTP, concurrency, migration, and architecture test requirements rather than an arbitrary code-coverage percentage. Coverage may be reported informationally until a stable baseline justifies a threshold.
-- OrganizationMembership references PersonId in issue #11, but the Person aggregate and identity-provider linking flows are out of scope.
+- OrganizationMembership references PersonId in issue #11, but the Person aggregate, provisioning, and identity-provider linking flows are out of scope. The missing Person foreign key is intentional and temporary. Integration tests use a synthetic but stable PersonId; production authentication must not expose these endpoints until it can supply a provisioned canonical PersonId.
 - PersonId, OrganizationId, and OrganizationMembershipId should be strongly typed IDs rather than raw Guid/string values.
 - OrganizationId and PersonId are boundary-relevant IDs; OrganizationMembershipId starts internal unless an external use case needs it.
 - A Person may have at most one active Organization Membership per Organization.
 - Initial Organization Roles are Owner and Member.
 - An active OrganizationMembership has a non-empty set of Organization Roles.
 - Owner semantically includes Member authority.
-- Every active Organization must have at least one active Owner after the creation use case completes.
+- Every active Organization must have at least one active Owner after the creation use case completes. Issue #11 enforces this through CreateOrganization because it exposes no membership or role mutations. Future use cases that end memberships or remove Owner roles must coordinate the affected aggregates, prevent removal of the last active Owner, and select a database concurrency strategy for that cross-aggregate invariant.
 - Archiving an Organization does not automatically end its Organization Memberships.
-- Active memberships in an Archived Organization do not grant ordinary business authority while the Organization remains Archived.
+- An active member may read an Archived Organization's basic details through GetOrganization and see it in ListMyOrganizations. All commands and other Organization-scoped business operations are denied while it remains Archived; administrative recovery or support operations require separately defined authority.
 - Archived is terminal for Organization in issue #11.
 - CreateOrganization creates the Organization and the first active Owner membership in the same use case.
 - CreateOrganization obtains the initiating PersonId through an application abstraction such as ICurrentPerson; clients must not supply the first Owner's PersonId.
@@ -77,7 +81,7 @@ None for the planned issue #11 implementation scope. New decisions should be ope
 - GetOrganization requires the current Person to have an active membership in the requested Organization.
 - ListMyOrganizations returns Organizations where the current Person has an active membership, including that Person's Organization Roles for each result.
 - Listing all memberships of an Organization is deferred until a membership-administration slice defines its authorization and exposure rules.
-- Active members may read an Archived Organization and ListMyOrganizations includes Archived Organizations with their status; archival blocks ordinary business authority rather than historical visibility.
+- Active members may read an Archived Organization through GetOrganization, and ListMyOrganizations includes Archived Organizations with their status. Historical membership reads may be added later. All commands and other Organization-scoped business operations are denied while the Organization remains Archived.
 - GetOrganization returns Not Found both when the Organization does not exist and when the current Person lacks an active membership, avoiding disclosure of inaccessible Organization identities. Missing authentication/current Person remains Unauthorized.
 - Organization Membership must remain a separate aggregate root, not a child collection embedded inside Organization.
 - Persistence models, EF navigation properties, and domain objects must not leak across module boundaries.
@@ -94,7 +98,7 @@ None for the planned issue #11 implementation scope. New decisions should be ope
 - A unique index on Organizations registration country plus normalized national organization number enforces global Legal Organization Identity uniqueness.
 - A PostgreSQL partial unique index on OrganizationMembership organization_id plus person_id where status is Active enforces at most one active membership while allowing multiple Ended historical memberships. Application checks provide expected errors; the index remains the concurrency-safe guarantee.
 - Organization status, OrganizationMembership status, and Organization Role values are stored as stable lowercase text with database check constraints. Role implication and hierarchy remain domain behavior rather than persisted numeric rank.
-- Organization & Access owns idempotency_records keyed uniquely by PersonId, operation, and Idempotency-Key. Each record stores a canonical request hash plus the original HTTP status and serialized jsonb response. The completed record is committed atomically with Organization and first Owner membership; matching replays return it, while payload mismatch returns Conflict.
+- Organization & Access owns CreateOrganization-specific idempotency_records keyed uniquely by PersonId, operation, and Idempotency-Key. Each record stores a canonical request hash plus the original HTTP status and serialized jsonb response. The completed record is committed atomically with Organization and first Owner membership; matching replays return it, while payload mismatch returns Conflict. Issue #11 introduces no generic idempotency middleware or cross-module platform abstraction.
 - Successful CreateOrganization idempotency records are retained permanently in the initial model and have no expires_at field. The operation is low-volume, so permanent replay semantics avoid cleanup and key-reuse complexity; future high-volume idempotent operations may define separate retention.
 - Feature handlers and queries use the internal OrganizationAccessDbContext directly; issue #11 introduces no custom repository or Unit of Work abstractions. A single SaveChangesAsync is the normal atomic unit of work, except CreateOrganization uses the explicit reservation-first idempotency transaction described below. Database constraint names drive concurrency-safe conflict translation.
 - Organization & Access owns and generates its EF Core migrations and uses a module-local migrations history table in organization_access. Development startup and isolated Testcontainers tests may apply migrations automatically; production applies them as a separate deployment step and the running API does not require schema-change privileges.
@@ -103,7 +107,7 @@ None for the planned issue #11 implementation scope. New decisions should be ope
 - Organization displayName is required, trimmed at its boundaries, and limited to 1-200 Unicode characters. Internal characters and casing are preserved; the value is mutable, non-unique presentation data and is stored as varchar(200), never used for Organization identity matching.
 - Legal Organization Identity is persisted as uppercase registration_country char(2) plus canonical national_organization_number varchar(32), with a composite unique index. Country-specific domain validation remains narrower; Sweden requires exactly ten normalized digits.
 - CreateOrganization request_hash is SHA-256 over a deterministic serialization of normalized semantic inputs (trimmed displayName, uppercase registration country, canonical organization number), stored as bytea. Idempotency-Key is a separate case-sensitive opaque value of 1-200 characters stored exactly as received.
-- CreateOrganization uses an explicit transaction and first persists the complete precomputed idempotency response to reserve its unique PersonId + operation + key scope. It then persists Organization, first Owner membership, and role before committing. Concurrent duplicate-key requests wait on the unique constraint and, after the winner commits, reload and validate the stored request hash for replay; rollback removes both reservation and domain writes.
+- CreateOrganization uses an explicit transaction and first attempts to persist the complete precomputed idempotency response with PostgreSQL INSERT ... ON CONFLICT DO NOTHING, reserving its unique PersonId + operation + key scope without aborting the transaction on conflict. The request that inserts the reservation persists Organization, first Owner membership, and role before committing. A concurrent request with the same key waits for the winning transaction, observes that no row was inserted, then loads the committed record and validates its request hash for replay. Rolling back the winning transaction removes both reservation and domain writes.
 - The CreateOrganization transaction uses PostgreSQL Read Committed isolation. Named unique constraints provide serialization for idempotency and Legal Organization Identity conflicts; issue #11 does not use Serializable isolation or whole-operation retries.
 
 - CreateOrganizationHandler creates Organization and the first Owner OrganizationMembership as separate aggregates, then persists both in one atomic operation. Each aggregate factory enforces its own invariants; the handler enforces the cross-aggregate use-case outcome without introducing a domain service.
@@ -233,3 +237,7 @@ All objects below are owned by Organization & Access and live in the `organizati
 - 2026-09-05: Split issue #11 implementation into four sequential PRs after planning PR #20: domain/contracts, persistence, CreateOrganization, and read slices.
 - 2026-09-05: Chose explicit behavior and invariant coverage without a percentage-based CI coverage gate.
 - 2026-09-05: Completed grilling block 5 and the full issue #11 planning grilling session.
+
+## Implementation Outcome
+
+Not implemented yet. After issue #11 is delivered, record completion date, implementation PRs, deviations from this plan, and superseded decisions here without rewriting the historical plan.
