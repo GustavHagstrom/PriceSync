@@ -49,6 +49,7 @@ The implementation plan will be sharpened through five focused grilling blocks:
 - Organization & Access owns the canonical Person identity and PersonId. The API host owns protocol-level authentication integration and implements ICurrentPerson by reading a trusted internal Person claim; future external-account linking belongs to Organization & Access while token validation and issuance remain host/authentication infrastructure concerns.
 - PriceSync.Modules.OrganizationAccess.Contracts initially exposes only OrganizationId, PersonId, and ICurrentPerson. OrganizationMembershipId, domain types, roles/statuses, Legal Organization Identity, feature handlers, API DTOs, and persistence types remain internal until a concrete cross-context consumer requires a purpose-built contract.
 - Issue #11 exposes no generic Organization lookup or authorization interface. Purpose-built cross-context queries are added only when a concrete consuming use case defines the required semantics; direct access to Organization & Access persistence remains forbidden.
+- Issue #11 publishes no OrganizationCreated or other domain/integration events and introduces no outbox. Event contracts and delivery guarantees are added only for a concrete consumer; CreateOrganization coordinates its two aggregates directly.
 - OrganizationMembership references PersonId in issue #11, but the Person aggregate and identity-provider linking flows are out of scope.
 - PersonId, OrganizationId, and OrganizationMembershipId should be strongly typed IDs rather than raw Guid/string values.
 - OrganizationId and PersonId are boundary-relevant IDs; OrganizationMembershipId starts internal unless an external use case needs it.
@@ -211,3 +212,4 @@ All objects below are owned by Organization & Access and live in the `organizati
 - 2026-09-05: Assigned ownership of stable Person identity and external-account links to Organization & Access, with protocol authentication in the API host; documented as ADR 0005.
 - 2026-09-05: Limited OrganizationAccess.Contracts in issue #11 to OrganizationId, PersonId, and ICurrentPerson; all other module and HTTP types remain internal.
 - 2026-09-05: Deferred cross-context Organization lookup and authorization ports until a concrete consumer can define a precise contract.
+- 2026-09-05: Deferred OrganizationCreated and other integration/domain events, outbox, and event versioning until a real cross-context consumer exists.
