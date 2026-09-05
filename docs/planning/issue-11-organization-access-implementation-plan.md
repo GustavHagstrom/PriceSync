@@ -77,6 +77,7 @@ The implementation plan will be sharpened through five focused grilling blocks:
 - Shared kernel must stay technical and must not receive Organization-specific concepts.
 - Authentication-provider tokens and sessions are outside the Organization & Access business model.
 - Issue #11 introduces ICurrentPerson as the trusted source of PersonId and requires authentication on Organization endpoints, but does not implement an external identity provider, token exchange, internal JWT issuance, Person lifecycle, or identity-account linking. Integration tests supply a fake authenticated Person; production must not fall back to an arbitrary identity when no real adapter is configured.
+- Validation is split by responsibility: HTTP/application validation handles request shape and Idempotency-Key requirements; domain value objects and aggregate factories enforce domain validity and normalization; application/persistence mechanisms enforce uniqueness, idempotency consistency, and atomic writes. Issue #11 does not introduce FluentValidation without demonstrated reuse.
 
 - CreateOrganizationHandler creates Organization and the first Owner OrganizationMembership as separate aggregates, then persists both in one atomic operation. Each aggregate factory enforces its own invariants; the handler enforces the cross-aggregate use-case outcome without introducing a domain service.
 
@@ -119,4 +120,5 @@ The implementation plan will be sharpened through five focused grilling blocks:
 - 2026-09-05: Decided that modules own and map their Minimal API endpoints through a narrow Map{Module}Endpoints composition surface; documented as ADR 0002.
 - 2026-09-05: Decided that CreateOrganizationHandler coordinates creation of the separate Organization and first Owner OrganizationMembership aggregates and persists them atomically without a new domain service.
 - 2026-09-05: Limited authentication work in issue #11 to ICurrentPerson, authenticated endpoints, and a test authentication adapter; provider integration, tokens, Person lifecycle, and identity linking remain out of scope.
+- 2026-09-05: Split request, domain, and persistence validation by responsibility and deferred FluentValidation until repeated validation needs justify it.
 - 2026-09-05: Selected feature-local endpoints, handlers, and DTOs with direct dependency-injected handler calls and no MediatR or generic command/query abstractions.
