@@ -55,6 +55,10 @@ The implementation plan will be sharpened through five focused grilling blocks:
 - CreateOrganization creates the Organization and the first active Owner membership in the same use case.
 - CreateOrganization obtains the initiating PersonId through an application abstraction such as ICurrentPerson; clients must not supply the first Owner's PersonId.
 - CreateOrganization is the only mutating application use case in issue #11. Other lifecycle operations remain domain behaviors covered by invariant tests until later application slices require them.
+- The initial read use cases are GetOrganization and ListMyOrganizations.
+- GetOrganization requires the current Person to have an active membership in the requested Organization.
+- ListMyOrganizations returns Organizations where the current Person has an active membership, including that Person's Organization Roles for each result.
+- Listing all memberships of an Organization is deferred until a membership-administration slice defines its authorization and exposure rules.
 - Organization Membership must remain a separate aggregate root, not a child collection embedded inside Organization.
 - Persistence models, EF navigation properties, and domain objects must not leak across module boundaries.
 - Shared kernel must stay technical and must not receive Organization-specific concepts.
@@ -84,3 +88,4 @@ The implementation plan will be sharpened through five focused grilling blocks:
 - 2026-09-04: Completed grilling block 1, covering domain invariants and aggregate boundaries.
 - 2026-09-05: Decided that CreateOrganization resolves the initiating PersonId through ICurrentPerson rather than accepting the first Owner's PersonId from the client.
 - 2026-09-05: Limited issue #11 to CreateOrganization as its only mutating application use case; archive, membership-management, and role-management endpoints are deferred.
+- 2026-09-05: Selected GetOrganization and ListMyOrganizations as the initial read use cases; listing all Organization Memberships is deferred.
