@@ -92,15 +92,15 @@ tests/
 
 ### Host and module responsibilities
 
-`PriceSync.Api` is the executable host and composition root. It owns HTTP/API endpoints, host-level authentication integration, configuration, process startup, and calls each module's registration extension.
+`PriceSync.Api` is the executable host and composition root. It owns host-level HTTP concerns, authentication integration, configuration, process startup, and route composition.
 
-Each module owns its internal use cases, domain model, persistence mappings, validation, and module-specific service registration. A module exposes a single registration surface such as `AddAgreementsModule(...)`; the host calls it, but does not compose the module's internals by hand.
+Each module owns its Minimal API endpoint definitions together with its internal use cases, domain model, persistence mappings, validation, and module-specific service registration. A module exposes narrow composition surfaces such as `AddAgreementsModule(...)` and `MapAgreementsEndpoints(...)`; the host calls them but does not compose the module's internals by hand.
 
 `PriceSync.Application` is a thin orchestration layer for workflows that genuinely cross module boundaries. It depends on module contracts and shared technical building blocks, not on module implementation projects. Use cases that belong wholly inside one bounded context stay inside that module.
 
 ### Module implementation conventions
 
-Each module implementation project uses its root namespace, for example `PriceSync.Modules.Agreements`, only for the public composition surface that the API host needs to call. Initially that should be limited to the module service-registration extension, such as `AddAgreementsModule(...)`.
+Each module implementation project uses its root namespace, for example `PriceSync.Modules.Agreements`, only for the public composition surfaces that the API host needs to call. Initially these should be limited to service registration and endpoint mapping extensions, such as `AddAgreementsModule(...)` and `MapAgreementsEndpoints(...)`.
 
 Implementation types inside a module should be `internal` by default and placed under purpose-specific subnamespaces as they are introduced, for example:
 
