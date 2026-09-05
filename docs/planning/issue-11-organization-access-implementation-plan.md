@@ -44,6 +44,7 @@ The implementation plan will be sharpened through five focused grilling blocks:
 - GET /organizations implements ListMyOrganizations as a caller-scoped collection, never a global administrative list. It is initially unpaginated, includes Active and Archived Organizations, sorts Active first and then by displayName, and returns each Organization's canonical identity, status, and the current Person's roles.
 - API errors use RFC 9457 Problem Details with a stable code extension. Missing authentication maps to Unauthorized; missing or inaccessible Organizations to Not Found; Legal Organization Identity and idempotency payload conflicts to Conflict; missing idempotency keys, invalid fields, and unsupported countries to Bad Request; unexpected failures return Internal Server Error without internal details.
 - API role collections expose only roles explicitly assigned to the current Organization Membership. Role implication such as Owner including Member authority is evaluated for authorization and does not expand the returned or persisted role set.
+- Membership-based Organization access is enforced inside each application query using the PersonId from ICurrentPerson. API endpoints enforce coarse authentication, while queries scope retrieval to active membership so inaccessible and missing Organizations share the same Not Found result.
 - Organization lifecycle state starts with Active and Archived only.
 - Organization Membership lifecycle state starts with Active and Ended only.
 - Ended is terminal for OrganizationMembership in issue #11; re-entry creates a new membership.
@@ -107,3 +108,4 @@ The implementation plan will be sharpened through five focused grilling blocks:
 - 2026-09-05: Defined GET /organizations as an initially unpaginated, caller-scoped ListMyOrganizations endpoint including Archived Organizations and current-person roles.
 - 2026-09-05: Standardized API errors on RFC 9457 Problem Details with stable error codes and the initial HTTP status mapping.
 - 2026-09-05: Decided that API role collections expose explicit role assignments only; implied authority is not returned as additional roles.
+- 2026-09-05: Decided that membership-based access is enforced in application queries and included in the scoped data lookup rather than existing only at the API endpoint.
