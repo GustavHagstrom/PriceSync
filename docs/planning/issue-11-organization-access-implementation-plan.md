@@ -112,6 +112,86 @@ None for the planned issue #11 implementation scope. New decisions should be ope
 
 - CreateOrganizationHandler creates Organization and the first Owner OrganizationMembership as separate aggregates, then persists both in one atomic operation. Each aggregate factory enforces its own invariants; the handler enforces the cross-aggregate use-case outcome without introducing a domain service.
 
+## Implementation Slices
+
+Issue #11 is delivered through four sequential pull requests. Each pull request starts from `main` after its predecessor has merged, remains independently reviewable, and leaves the complete solution green.
+
+### PR A — Contracts, domain model, and unit tests
+
+**Scope**
+
+- Add `OrganizationId`, `PersonId`, and `ICurrentPerson` to `PriceSync.Modules.OrganizationAccess.Contracts`.
+- Implement the Organization, OrganizationMembership, Legal Organization Identity, lifecycle states, roles, strongly typed internal identifiers, and their domain behavior.
+- Use `TimeProvider` for lifecycle timestamps.
+- Add database-free unit tests that map the issue #11 domain invariants to the lowest sufficient test seam.
+- Extend architecture tests where needed to protect contract and visibility boundaries.
+
+**Exit criteria**
+
+- Domain invariants for creation, lifecycle transitions, role assignment, Swedish Legal Organization Identity normalization/validation, and first-Owner creation are executable and covered.
+- OrganizationMembership remains a separate aggregate.
+- No persistence or HTTP implementation is introduced.
+- The solution builds and all tests pass.
+
+### PR B — PostgreSQL persistence and migrations
+
+**Depends on:** PR A.
+
+**Scope**
+
+- Add the module-owned `OrganizationAccessDbContext`, EF Core mappings, and migrations.
+- Create the `organization_access` schema and module-local migrations history.
+- Add the organizations, organization_memberships, organization_membership_roles, and CreateOrganization-specific idempotency_records tables with the documented constraints and indexes.
+- Map strongly typed IDs and UUIDv7 values to PostgreSQL `uuid`.
+- Add PostgreSQL Testcontainers infrastructure and integration tests for mappings, migrations, constraints, normalization, and transaction rollback.
+
+**Exit criteria**
+
+- A clean PostgreSQL database can be migrated from zero.
+- Database constraints enforce Legal Organization Identity uniqueness, active-membership uniqueness, status/timestamp consistency, valid role/status values, and idempotency-key uniqueness.
+- Persistence types remain internal to Organization & Access.
+- The solution builds and all tests pass.
+
+### PR C — CreateOrganization API and idempotency
+
+**Depends on:** PR B.
+
+**Scope**
+
+- Add the test authentication adapter and resolve the initiating `PersonId` through `ICurrentPerson`.
+- Implement the CreateOrganization feature folder, handler, request/response DTOs, endpoint mapping, validation, and RFC 9457 Problem Details responses.
+- Create Organization and its first active Owner membership atomically.
+- Implement operation-scoped idempotency using `INSERT ... ON CONFLICT DO NOTHING`, canonical request hashing, exact successful-response replay, and payload-mismatch conflict handling.
+- Add handler, PostgreSQL concurrency, and full Minimal API tests for CreateOrganization.
+
+**Exit criteria**
+
+- The required authentication, validation, Created/Location, conflict, first-Owner, idempotency, normalization, rollback, and concurrency scenarios pass against real PostgreSQL.
+- Concurrent same-key requests converge on one committed result without an aborted transaction.
+- Concurrent different-key requests for the same Legal Organization Identity yield exactly one success and no partial data.
+- No generic idempotency middleware or cross-module abstraction is introduced.
+- The solution builds and all tests pass.
+
+### PR D — Organization read API
+
+**Depends on:** PR C.
+
+**Scope**
+
+- Implement GetOrganization and ListMyOrganizations as caller-scoped persistence projections.
+- Enforce membership access inside each application query.
+- Include archived Organizations according to the documented read policy.
+- Return only explicitly assigned roles and preserve deterministic list ordering.
+- Add the remaining Minimal API integration tests.
+
+**Exit criteria**
+
+- Missing and inaccessible Organizations both return Not Found.
+- Active members can read archived Organization basics, while no additional archived-Organization authority is introduced.
+- ListMyOrganizations covers membership scoping, archived inclusion, explicit roles, deterministic ordering, and the empty result.
+- Persistence entities do not escape the module.
+- All issue #11 acceptance criteria are covered and the complete solution is green.
+
 ## Initial Persistence Schema
 
 All objects below are owned by Organization & Access and live in the `organization_access` PostgreSQL schema.
