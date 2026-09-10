@@ -93,6 +93,15 @@ public sealed class ArchitectureBoundaryTests
     }
 
     [Fact]
+    public void Organization_membership_identity_remains_internal_to_organization_access()
+    {
+        typeof(OrganizationId).Assembly.ExportedTypes
+            .Select(type => type.FullName)
+            .Should()
+            .NotContain("PriceSync.Modules.OrganizationAccess.Contracts.OrganizationMembershipId");
+    }
+
+    [Fact]
     public void Organization_access_contracts_has_no_project_references()
     {
         _projects["PriceSync.Modules.OrganizationAccess.Contracts"].ProjectReferences
