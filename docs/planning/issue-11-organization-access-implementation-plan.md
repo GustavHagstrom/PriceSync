@@ -112,6 +112,10 @@ None for the planned issue #11 implementation scope. New decisions should be ope
 
 - CreateOrganizationHandler creates Organization and the first Owner OrganizationMembership as separate aggregates, then persists both in one atomic operation. Each aggregate factory enforces its own invariants; the handler enforces the cross-aggregate use-case outcome without introducing a domain service.
 
+## Superseded Decisions
+
+- 2026-09-10: Issue #27 superseded the handler-only wording for proving the first-owner cross-aggregate outcome in PR A. PR A now includes an internal `InitialOrganizationState` domain creation path that returns the new `Organization` and separate first Owner `OrganizationMembership`. The later `CreateOrganizationHandler` still owns application orchestration and persistence, but it should consume this domain creation path rather than re-deciding the first-owner outcome.
+
 ## Implementation Slices
 
 Issue #11 is delivered through four sequential pull requests. Each pull request starts from `main` after its predecessor has merged, remains independently reviewable, and leaves the complete solution green.

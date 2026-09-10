@@ -102,6 +102,24 @@ public sealed class ArchitectureBoundaryTests
     }
 
     [Fact]
+    public void Organization_access_contracts_do_not_export_domain_creation_types()
+    {
+        typeof(OrganizationId).Assembly.ExportedTypes
+            .Select(type => type.FullName)
+            .Should()
+            .NotContain(
+                [
+                    "PriceSync.Modules.OrganizationAccess.Contracts.Organization",
+                    "PriceSync.Modules.OrganizationAccess.Contracts.OrganizationMembership",
+                    "PriceSync.Modules.OrganizationAccess.Contracts.InitialOrganizationState",
+                    "PriceSync.Modules.OrganizationAccess.Contracts.OrganizationRole",
+                    "PriceSync.Modules.OrganizationAccess.Contracts.OrganizationStatus",
+                    "PriceSync.Modules.OrganizationAccess.Contracts.OrganizationMembershipStatus",
+                    "PriceSync.Modules.OrganizationAccess.Contracts.LegalOrganizationIdentity",
+                ]);
+    }
+
+    [Fact]
     public void Organization_access_contracts_has_no_project_references()
     {
         _projects["PriceSync.Modules.OrganizationAccess.Contracts"].ProjectReferences
