@@ -37,6 +37,11 @@ internal sealed class Organization
         LegalOrganizationIdentity legalIdentity,
         TimeProvider timeProvider)
     {
+        if (id.Value == Guid.Empty)
+        {
+            throw new ArgumentException("OrganizationId cannot be empty.", nameof(id));
+        }
+
         ArgumentNullException.ThrowIfNull(legalIdentity);
         ArgumentNullException.ThrowIfNull(timeProvider);
 

@@ -60,6 +60,48 @@ public sealed class InitialOrganizationTests
     }
 
     [Fact]
+    public void Create_rejects_default_organization_id()
+    {
+        var create = () => InitialOrganizationState.Create(
+            default,
+            NewMembershipId(),
+            "Acme AB",
+            NewLegalIdentity(),
+            new StubCurrentPerson(NewPersonId()),
+            NewFrozenTimeProvider());
+
+        create.Should().Throw<ArgumentException>();
+    }
+
+    [Fact]
+    public void Create_rejects_default_first_owner_membership_id()
+    {
+        var create = () => InitialOrganizationState.Create(
+            NewOrganizationId(),
+            default,
+            "Acme AB",
+            NewLegalIdentity(),
+            new StubCurrentPerson(NewPersonId()),
+            NewFrozenTimeProvider());
+
+        create.Should().Throw<ArgumentException>();
+    }
+
+    [Fact]
+    public void Create_rejects_default_current_person_id()
+    {
+        var create = () => InitialOrganizationState.Create(
+            NewOrganizationId(),
+            NewMembershipId(),
+            "Acme AB",
+            NewLegalIdentity(),
+            new StubCurrentPerson(default),
+            NewFrozenTimeProvider());
+
+        create.Should().Throw<ArgumentException>();
+    }
+
+    [Fact]
     public void Create_rejects_missing_time_provider()
     {
         var create = () => InitialOrganizationState.Create(

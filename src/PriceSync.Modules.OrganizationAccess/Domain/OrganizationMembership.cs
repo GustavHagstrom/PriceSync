@@ -42,6 +42,21 @@ internal sealed class OrganizationMembership
         IEnumerable<OrganizationRole> roles,
         TimeProvider timeProvider)
     {
+        if (id.Value == Guid.Empty)
+        {
+            throw new ArgumentException("OrganizationMembershipId cannot be empty.", nameof(id));
+        }
+
+        if (organizationId.Value == Guid.Empty)
+        {
+            throw new ArgumentException("OrganizationId cannot be empty.", nameof(organizationId));
+        }
+
+        if (personId.Value == Guid.Empty)
+        {
+            throw new ArgumentException("PersonId cannot be empty.", nameof(personId));
+        }
+
         ArgumentNullException.ThrowIfNull(roles);
         ArgumentNullException.ThrowIfNull(timeProvider);
 
@@ -49,6 +64,11 @@ internal sealed class OrganizationMembership
         if (explicitRoles.Count == 0)
         {
             throw new ArgumentException("Active Organization Membership must have at least one role.", nameof(roles));
+        }
+
+        if (explicitRoles.Any(role => !Enum.IsDefined(role)))
+        {
+            throw new ArgumentException("Organization Membership roles must be defined Organization Roles.", nameof(roles));
         }
 
         return new OrganizationMembership(id, organizationId, personId, explicitRoles, timeProvider.GetUtcNow());

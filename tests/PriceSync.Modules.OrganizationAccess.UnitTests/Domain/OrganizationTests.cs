@@ -37,6 +37,14 @@ public sealed class OrganizationTests
     }
 
     [Fact]
+    public void Create_rejects_default_organization_id()
+    {
+        var create = () => Organization.Create(default, "Acme AB", NewLegalIdentity(), NewFrozenTimeProvider());
+
+        create.Should().Throw<ArgumentException>();
+    }
+
+    [Fact]
     public void Create_accepts_display_names_up_to_two_hundred_characters_after_trimming()
     {
         var displayName = $" {new string('A', 200)} ";

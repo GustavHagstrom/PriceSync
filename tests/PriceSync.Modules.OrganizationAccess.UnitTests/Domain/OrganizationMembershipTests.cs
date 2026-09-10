@@ -53,6 +53,45 @@ public sealed class OrganizationMembershipTests
     }
 
     [Fact]
+    public void Create_rejects_default_membership_id()
+    {
+        var create = () => OrganizationMembership.Create(
+            default,
+            NewOrganizationId(),
+            NewPersonId(),
+            [OrganizationRole.Member],
+            NewFrozenTimeProvider());
+
+        create.Should().Throw<ArgumentException>();
+    }
+
+    [Fact]
+    public void Create_rejects_default_organization_id()
+    {
+        var create = () => OrganizationMembership.Create(
+            NewMembershipId(),
+            default,
+            NewPersonId(),
+            [OrganizationRole.Member],
+            NewFrozenTimeProvider());
+
+        create.Should().Throw<ArgumentException>();
+    }
+
+    [Fact]
+    public void Create_rejects_default_person_id()
+    {
+        var create = () => OrganizationMembership.Create(
+            NewMembershipId(),
+            NewOrganizationId(),
+            default,
+            [OrganizationRole.Member],
+            NewFrozenTimeProvider());
+
+        create.Should().Throw<ArgumentException>();
+    }
+
+    [Fact]
     public void Create_rejects_empty_explicit_roles()
     {
         var create = () => OrganizationMembership.Create(
@@ -60,6 +99,19 @@ public sealed class OrganizationMembershipTests
             NewOrganizationId(),
             NewPersonId(),
             [],
+            NewFrozenTimeProvider());
+
+        create.Should().Throw<ArgumentException>();
+    }
+
+    [Fact]
+    public void Create_rejects_undefined_roles()
+    {
+        var create = () => OrganizationMembership.Create(
+            NewMembershipId(),
+            NewOrganizationId(),
+            NewPersonId(),
+            [(OrganizationRole)999],
             NewFrozenTimeProvider());
 
         create.Should().Throw<ArgumentException>();
