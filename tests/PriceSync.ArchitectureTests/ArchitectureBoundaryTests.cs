@@ -1,5 +1,6 @@
 using System.Xml.Linq;
 using FluentAssertions;
+using PriceSync.Modules.OrganizationAccess.Contracts;
 using Xunit;
 
 namespace PriceSync.ArchitectureTests;
@@ -75,6 +76,65 @@ public sealed class ArchitectureBoundaryTests
                     reference => moduleImplementations.Contains(reference),
                     $"{projectName} must stay independent from module implementation projects");
         }
+    }
+
+    [Fact]
+    public void Organization_access_contracts_exports_only_the_initial_boundary_types()
+    {
+        typeof(OrganizationId).Assembly.ExportedTypes
+            .Select(type => type.FullName)
+            .Should()
+            .BeEquivalentTo(
+                [
+                    "PriceSync.Modules.OrganizationAccess.Contracts.OrganizationId",
+                    "PriceSync.Modules.OrganizationAccess.Contracts.PersonId",
+                    "PriceSync.Modules.OrganizationAccess.Contracts.ICurrentPerson",
+                ]);
+    }
+
+    [Fact]
+    public void Organization_membership_identity_remains_internal_to_organization_access()
+    {
+        typeof(OrganizationId).Assembly.ExportedTypes
+            .Select(type => type.FullName)
+            .Should()
+            .NotContain("PriceSync.Modules.OrganizationAccess.Contracts.OrganizationMembershipId");
+    }
+
+    [Fact]
+    public void Organization_access_contracts_do_not_export_domain_creation_types()
+    {
+        typeof(OrganizationId).Assembly.ExportedTypes
+            .Select(type => type.FullName)
+            .Should()
+            .NotContain(
+                [
+                    "PriceSync.Modules.OrganizationAccess.Contracts.Organization",
+                    "PriceSync.Modules.OrganizationAccess.Contracts.OrganizationMembership",
+                    "PriceSync.Modules.OrganizationAccess.Contracts.InitialOrganizationState",
+                    "PriceSync.Modules.OrganizationAccess.Contracts.OrganizationRole",
+                    "PriceSync.Modules.OrganizationAccess.Contracts.OrganizationStatus",
+                    "PriceSync.Modules.OrganizationAccess.Contracts.OrganizationMembershipStatus",
+                    "PriceSync.Modules.OrganizationAccess.Contracts.LegalOrganizationIdentity",
+                ]);
+    }
+
+    [Fact]
+    public void Organization_access_contracts_has_no_project_references()
+    {
+        _projects["PriceSync.Modules.OrganizationAccess.Contracts"].ProjectReferences
+            .Should()
+            .BeEmpty("the initial Organization & Access contracts must not depend on shared kernel, module implementations, or helper abstractions");
+    }
+
+    [Fact]
+    public void Organization_access_contract_identifiers_reject_empty_guids()
+    {
+        var createOrganizationId = () => new OrganizationId(Guid.Empty);
+        var createPersonId = () => new PersonId(Guid.Empty);
+
+        createOrganizationId.Should().Throw<ArgumentException>();
+        createPersonId.Should().Throw<ArgumentException>();
     }
 
     [Fact]
