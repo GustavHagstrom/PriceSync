@@ -331,6 +331,93 @@ public sealed class OrganizationAccessPersistenceTests(OrganizationAccessPostgre
     }
 
     [Fact]
+    public async Task Idempotency_records_round_trip_with_storage_fields_intact()
+    {
+        var personId = NewPersonId();
+        var requestHash = Enumerable.Range(0, 32).Select(Convert.ToByte).ToArray();
+        var createdAt = new DateTimeOffset(2026, 9, 11, 8, 15, 0, TimeSpan.Zero);
+        var record = new IdempotencyRecord(
+            personId,
+            "create-organization",
+            "Case-Sensitive-Key",
+            requestHash,
+            201,
+            """{"id":"01994aca-a1c3-7d23-9803-2d3e8fb705a1","status":"active"}""",
+            createdAt);
+
+        await using (var context = NewContext())
+        {
+            context.IdempotencyRecords.Add(record);
+            await context.SaveChangesAsync();
+        }
+
+        await using (var context = NewContext())
+        {
+            var loaded = await context.IdempotencyRecords.SingleAsync(entity =>
+                entity.PersonId == personId
+                && entity.Operation == "create-organization"
+                && entity.IdempotencyKey == "Case-Sensitive-Key");
+
+            loaded.PersonId.Should().Be(personId);
+            loaded.Operation.Should().Be("create-organization");
+            loaded.IdempotencyKey.Should().Be("Case-Sensitive-Key");
+            loaded.RequestHash.Should().Equal(requestHash);
+            loaded.ResponseStatus.Should().Be(201);
+            using var responseBody = System.Text.Json.JsonDocument.Parse(loaded.ResponseBody);
+            responseBody.RootElement.GetProperty("id").GetString().Should().Be("01994aca-a1c3-7d23-9803-2d3e8fb705a1");
+            responseBody.RootElement.GetProperty("status").GetString().Should().Be("active");
+            loaded.CreatedAt.Should().Be(createdAt);
+        }
+    }
+
+    [Fact]
+    public async Task Idempotency_keys_are_stored_as_case_sensitive_opaque_values()
+    {
+        var personId = NewPersonId();
+
+        await using (var context = NewContext())
+        {
+            context.IdempotencyRecords.Add(NewIdempotencyRecord(personId, "create-organization", "Same-Key"));
+            context.IdempotencyRecords.Add(NewIdempotencyRecord(personId, "create-organization", "same-key"));
+            await context.SaveChangesAsync();
+        }
+
+        var keys = await QueryStringsAsync(
+            fixture.ConnectionString,
+            $"""
+            select idempotency_key
+            from organization_access.idempotency_records
+            where person_id = '{personId.Value}'
+            order by idempotency_key;
+            """);
+
+        keys.Should().Equal("Same-Key", "same-key");
+    }
+
+    [Fact]
+    public async Task Idempotency_record_schema_matches_storage_only_contract()
+    {
+        var columns = await QueryStringsAsync(
+            fixture.ConnectionString,
+            """
+            select column_name || ':' || data_type || ':' || coalesce(character_maximum_length::text, '') || ':' || is_nullable
+            from information_schema.columns
+            where table_schema = 'organization_access'
+                and table_name = 'idempotency_records'
+            order by ordinal_position;
+            """);
+
+        columns.Should().Equal(
+            "person_id:uuid::NO",
+            "operation:character varying:64:NO",
+            "idempotency_key:character varying:200:NO",
+            "request_hash:bytea::NO",
+            "response_status:smallint::NO",
+            "response_body:jsonb::NO",
+            "created_at:timestamp with time zone::NO");
+    }
+
+    [Fact]
     public async Task Transaction_rollback_leaves_no_partial_organization_access_data()
     {
         await using (var context = NewContext())
