@@ -89,6 +89,31 @@ public sealed class OrganizationAccessPersistenceTests(OrganizationAccessPostgre
     }
 
     [Fact]
+    public async Task Organizations_preserve_application_generated_uuidv7_identifiers()
+    {
+        var organization = NewOrganization();
+
+        organization.Id.Value.Version.Should().Be(7);
+
+        await using (var context = NewContext())
+        {
+            context.Organizations.Add(organization);
+            await context.SaveChangesAsync();
+        }
+
+        await using (var context = NewContext())
+        {
+            var persistedId = await context.Organizations
+                .Where(entity => entity.Id == organization.Id)
+                .Select(entity => entity.Id)
+                .SingleAsync();
+
+            persistedId.Should().Be(organization.Id);
+            persistedId.Value.Version.Should().Be(7);
+        }
+    }
+
+    [Fact]
     public async Task Organization_memberships_round_trip_with_person_status_timestamps_and_explicit_roles()
     {
         var organization = NewOrganization();
@@ -371,9 +396,9 @@ public sealed class OrganizationAccessPersistenceTests(OrganizationAccessPostgre
             new DateTimeOffset(2026, 9, 10, 12, 30, 0, TimeSpan.Zero));
     }
 
-    private static OrganizationId NewOrganizationId() => new(Guid.NewGuid());
+    private static OrganizationId NewOrganizationId() => new(Guid.CreateVersion7());
 
-    private static OrganizationMembershipId NewMembershipId() => new(Guid.NewGuid());
+    private static OrganizationMembershipId NewMembershipId() => new(Guid.CreateVersion7());
 
     private static PersonId NewPersonId() => new(Guid.NewGuid());
 
