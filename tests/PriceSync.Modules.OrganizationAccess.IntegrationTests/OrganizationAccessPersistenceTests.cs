@@ -141,6 +141,59 @@ public sealed class OrganizationAccessPersistenceTests(OrganizationAccessPostgre
     }
 
     [Fact]
+    public async Task Organization_memberships_preserve_application_generated_uuidv7_identifiers()
+    {
+        var organization = NewOrganization();
+        var membership = NewMembership(organization.Id);
+
+        membership.Id.Value.Version.Should().Be(7);
+
+        await using (var context = NewContext())
+        {
+            context.Organizations.Add(organization);
+            context.OrganizationMemberships.Add(membership);
+            await context.SaveChangesAsync();
+        }
+
+        await using (var context = NewContext())
+        {
+            var persistedId = await context.OrganizationMemberships
+                .Where(entity => entity.Id == membership.Id)
+                .Select(entity => entity.Id)
+                .SingleAsync();
+
+            persistedId.Should().Be(membership.Id);
+            persistedId.Value.Version.Should().Be(7);
+        }
+    }
+
+    [Fact]
+    public async Task Owner_membership_persists_only_the_explicit_owner_role()
+    {
+        var organization = NewOrganization();
+        var membership = NewMembership(organization.Id, roles: [OrganizationRole.Owner]);
+
+        await using (var context = NewContext())
+        {
+            context.Organizations.Add(organization);
+            context.OrganizationMemberships.Add(membership);
+            await context.SaveChangesAsync();
+        }
+
+        var persistedRoles = await QueryStringsAsync(
+            fixture.ConnectionString,
+            $"""
+            select role
+            from organization_access.organization_membership_roles
+            where organization_membership_id = '{membership.Id.Value}'
+            order by role;
+            """);
+
+        persistedRoles.Should().Equal("owner");
+        membership.HasAuthority(OrganizationRole.Member).Should().BeTrue();
+    }
+
+    [Fact]
     public async Task Legal_organization_identity_uniqueness_is_enforced()
     {
         await using var context = NewContext();
