@@ -20,6 +20,7 @@
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/PriceSync.ArchitectureTests/PriceSync.ArchitectureTests.csproj" />
+    <Project Path="tests/PriceSync.Modules.OrganizationAccess.IntegrationTests/PriceSync.Modules.OrganizationAccess.IntegrationTests.csproj" />
     <Project Path="tests/PriceSync.Modules.OrganizationAccess.UnitTests/PriceSync.Modules.OrganizationAccess.UnitTests.csproj" />
   </Folder>
 </Solution>

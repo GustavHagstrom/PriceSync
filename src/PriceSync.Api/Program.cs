@@ -10,7 +10,7 @@ using PriceSync.Modules.TradingRelationships;
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddPriceSyncApplication();
-builder.Services.AddOrganizationAccessModule();
+builder.Services.AddOrganizationAccessModule(builder.Configuration);
 builder.Services.AddTradingRelationshipsModule();
 builder.Services.AddAgreementsModule();
 builder.Services.AddPricePublicationModule();

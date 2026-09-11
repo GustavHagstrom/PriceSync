@@ -19,15 +19,21 @@ internal sealed class Organization
         Status = OrganizationStatus.Active;
     }
 
-    public OrganizationId Id { get; }
+    private Organization()
+    {
+        DisplayName = null!;
+        LegalIdentity = null!;
+    }
+
+    public OrganizationId Id { get; private set; }
 
     public string DisplayName { get; private set; }
 
-    public LegalOrganizationIdentity LegalIdentity { get; }
+    public LegalOrganizationIdentity LegalIdentity { get; private set; }
 
     public OrganizationStatus Status { get; private set; }
 
-    public DateTimeOffset CreatedAt { get; }
+    public DateTimeOffset CreatedAt { get; private set; }
 
     public DateTimeOffset? ArchivedAt { get; private set; }
 

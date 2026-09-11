@@ -4,13 +4,13 @@ namespace PriceSync.Modules.OrganizationAccess.Domain;
 
 internal sealed class OrganizationMembership
 {
-    private readonly HashSet<OrganizationRole> _roles;
+    private readonly HashSet<OrganizationMembershipRoleAssignment> _roles;
 
     private OrganizationMembership(
         OrganizationMembershipId id,
         OrganizationId organizationId,
         PersonId personId,
-        HashSet<OrganizationRole> roles,
+        HashSet<OrganizationMembershipRoleAssignment> roles,
         DateTimeOffset startedAt)
     {
         Id = id;
@@ -21,19 +21,24 @@ internal sealed class OrganizationMembership
         Status = OrganizationMembershipStatus.Active;
     }
 
-    public OrganizationMembershipId Id { get; }
+    private OrganizationMembership()
+    {
+        _roles = [];
+    }
 
-    public OrganizationId OrganizationId { get; }
+    public OrganizationMembershipId Id { get; private set; }
 
-    public PersonId PersonId { get; }
+    public OrganizationId OrganizationId { get; private set; }
+
+    public PersonId PersonId { get; private set; }
 
     public OrganizationMembershipStatus Status { get; private set; }
 
-    public DateTimeOffset StartedAt { get; }
+    public DateTimeOffset StartedAt { get; private set; }
 
     public DateTimeOffset? EndedAt { get; private set; }
 
-    public IReadOnlyCollection<OrganizationRole> Roles => _roles.ToArray();
+    public IReadOnlyCollection<OrganizationRole> Roles => _roles.Select(assignment => assignment.Role).ToArray();
 
     public static OrganizationMembership Create(
         OrganizationMembershipId id,
@@ -71,13 +76,18 @@ internal sealed class OrganizationMembership
             throw new ArgumentException("Organization Membership roles must be defined Organization Roles.", nameof(roles));
         }
 
-        return new OrganizationMembership(id, organizationId, personId, explicitRoles, timeProvider.GetUtcNow());
+        return new OrganizationMembership(
+            id,
+            organizationId,
+            personId,
+            explicitRoles.Select(role => new OrganizationMembershipRoleAssignment(role)).ToHashSet(),
+            timeProvider.GetUtcNow());
     }
 
     public bool HasAuthority(OrganizationRole role)
     {
-        return _roles.Contains(role)
-            || role == OrganizationRole.Member && _roles.Contains(OrganizationRole.Owner);
+        return _roles.Any(assignment => assignment.Role == role)
+            || role == OrganizationRole.Member && _roles.Any(assignment => assignment.Role == OrganizationRole.Owner);
     }
 
     public void End(TimeProvider timeProvider)
