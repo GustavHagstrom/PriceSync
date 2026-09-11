@@ -171,6 +171,43 @@ public sealed class ArchitectureBoundaryTests
             .Contain(expectedReferences);
     }
 
+    [Fact]
+    public void Only_organization_access_references_its_persistence_schema_and_db_context()
+    {
+        var repositoryRoot = FindRepositoryRoot(AppContext.BaseDirectory);
+        var sourceRoot = Path.Combine(repositoryRoot, "src");
+        var organizationAccessRoot = Path.Combine(sourceRoot, "PriceSync.Modules.OrganizationAccess");
+        var forbiddenReferences = new[]
+        {
+            "organization_access",
+            "OrganizationAccessDbContext",
+            "PriceSync.Modules.OrganizationAccess.Persistence",
+        };
+
+        var violations = Directory
+            .EnumerateFiles(sourceRoot, "*.cs", SearchOption.AllDirectories)
+            .Where(path => !Path.GetRelativePath(organizationAccessRoot, path).StartsWith("..", StringComparison.Ordinal))
+            .ToArray();
+
+        violations.Should().NotBeEmpty("the Organization & Access module should own the persistence implementation being protected");
+
+        var crossModuleViolations = Directory
+            .EnumerateFiles(sourceRoot, "*.cs", SearchOption.AllDirectories)
+            .Where(path => Path.GetRelativePath(organizationAccessRoot, path).StartsWith("..", StringComparison.Ordinal))
+            .SelectMany(path =>
+            {
+                var contents = File.ReadAllText(path);
+                return forbiddenReferences
+                    .Where(contents.Contains)
+                    .Select(forbiddenReference => $"{Path.GetRelativePath(repositoryRoot, path)} contains {forbiddenReference}");
+            })
+            .ToArray();
+
+        crossModuleViolations
+            .Should()
+            .BeEmpty("other modules and hosts must not query the organization_access schema or couple to Organization & Access persistence internals");
+    }
+
     private static string FindRepositoryRoot(string startDirectory)
     {
         var directory = new DirectoryInfo(startDirectory);
