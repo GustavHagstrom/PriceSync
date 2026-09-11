@@ -8,9 +8,15 @@ internal sealed record LegalOrganizationIdentity
         NationalOrganizationNumber = organizationNumber.Value;
     }
 
-    public string RegistrationCountry { get; }
+    private LegalOrganizationIdentity()
+    {
+        RegistrationCountry = null!;
+        NationalOrganizationNumber = null!;
+    }
 
-    public string NationalOrganizationNumber { get; }
+    public string RegistrationCountry { get; private set; }
+
+    public string NationalOrganizationNumber { get; private set; }
 
     public static LegalOrganizationIdentity Create(string? registrationCountry, string? nationalOrganizationNumber)
     {
