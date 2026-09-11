@@ -8,7 +8,15 @@ internal sealed class IdempotencyRecordConfiguration : IEntityTypeConfiguration<
 {
     public void Configure(EntityTypeBuilder<IdempotencyRecord> builder)
     {
-        builder.ToTable("idempotency_records", OrganizationAccessDbContext.SchemaName);
+        builder.ToTable(
+            "idempotency_records",
+            OrganizationAccessDbContext.SchemaName,
+            table =>
+            {
+                table.HasCheckConstraint(
+                    "ck_idempotency_records_request_hash_length",
+                    "octet_length(request_hash) = 32");
+            });
 
         builder.HasKey(record => new { record.PersonId, record.Operation, record.IdempotencyKey })
             .HasName("pk_idempotency_records");

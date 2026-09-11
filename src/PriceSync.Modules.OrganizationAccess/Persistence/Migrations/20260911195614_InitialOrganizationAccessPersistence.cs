@@ -30,6 +30,7 @@ namespace PriceSync.Modules.OrganizationAccess.Persistence.Migrations
                 constraints: table =>
                 {
                     table.PrimaryKey("pk_idempotency_records", x => new { x.person_id, x.operation, x.idempotency_key });
+                    table.CheckConstraint("ck_idempotency_records_request_hash_length", "octet_length(request_hash) = 32");
                 });
 
             migrationBuilder.CreateTable(

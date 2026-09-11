@@ -146,7 +146,10 @@ namespace PriceSync.Modules.OrganizationAccess.Persistence.Migrations
                     b.HasKey("PersonId", "Operation", "IdempotencyKey")
                         .HasName("pk_idempotency_records");
 
-                    b.ToTable("idempotency_records", "organization_access");
+                    b.ToTable("idempotency_records", "organization_access", t =>
+                        {
+                            t.HasCheckConstraint("ck_idempotency_records_request_hash_length", "octet_length(request_hash) = 32");
+                        });
                 });
 
             modelBuilder.Entity("PriceSync.Modules.OrganizationAccess.Domain.Organization", b =>

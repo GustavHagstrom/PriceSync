@@ -418,6 +418,20 @@ public sealed class OrganizationAccessPersistenceTests(OrganizationAccessPostgre
     }
 
     [Fact]
+    public async Task Idempotency_request_hash_must_be_sha256_length()
+    {
+        var insertInvalidHash = () => ExecuteAsync(
+            $$"""
+            insert into organization_access.idempotency_records
+                (person_id, operation, idempotency_key, request_hash, response_status, response_body, created_at)
+            values
+                ('{{Guid.NewGuid()}}', 'create-organization', 'invalid-hash', decode('010203', 'hex'), 201, '{"id":"created"}'::jsonb, now());
+            """);
+
+        await insertInvalidHash.Should().ThrowAsync<PostgresException>();
+    }
+
+    [Fact]
     public async Task Transaction_rollback_leaves_no_partial_organization_access_data()
     {
         await using (var context = NewContext())
@@ -530,7 +544,7 @@ public sealed class OrganizationAccessPersistenceTests(OrganizationAccessPostgre
             personId,
             operation,
             key,
-            [1, 2, 3],
+            Enumerable.Range(0, 32).Select(Convert.ToByte).ToArray(),
             201,
             """{"id":"created"}""",
             new DateTimeOffset(2026, 9, 10, 12, 30, 0, TimeSpan.Zero));
