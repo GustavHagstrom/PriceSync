@@ -1,6 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Configuration;
 using Microsoft.EntityFrameworkCore;
+using PriceSync.Modules.OrganizationAccess.Features.GetOrganization;
 using PriceSync.Modules.OrganizationAccess.Persistence;
 
 namespace PriceSync.Modules.OrganizationAccess;
@@ -27,6 +28,8 @@ public static class OrganizationAccessModuleServiceCollectionExtensions
                     OrganizationAccessDbContext.MigrationsHistoryTableName,
                     OrganizationAccessDbContext.SchemaName));
         });
+
+        services.AddScoped<GetOrganizationHandler>();
 
         return services;
     }
