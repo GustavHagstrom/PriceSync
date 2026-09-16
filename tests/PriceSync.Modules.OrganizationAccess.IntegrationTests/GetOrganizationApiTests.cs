@@ -1,18 +1,8 @@
 using System.Net;
 using System.Net.Http.Json;
-using System.Security.Claims;
-using System.Text.Encodings.Web;
 using System.Text.Json;
 using FluentAssertions;
-using Microsoft.AspNetCore.Authentication;
-using Microsoft.AspNetCore.Hosting;
-using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.DependencyInjection.Extensions;
-using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 using PriceSync.Modules.OrganizationAccess.Contracts;
 using PriceSync.Modules.OrganizationAccess.Domain;
 using PriceSync.Modules.OrganizationAccess.Persistence;
@@ -205,64 +195,5 @@ public sealed class GetOrganizationApiTests(OrganizationAccessPostgreSqlFixture 
     private sealed class FrozenTimeProvider(DateTimeOffset utcNow) : TimeProvider
     {
         public override DateTimeOffset GetUtcNow() => utcNow;
-    }
-
-    private sealed class OrganizationAccessApiApplication(
-        string connectionString,
-        PersonId? personId) : WebApplicationFactory<Program>
-    {
-        protected override void ConfigureWebHost(IWebHostBuilder builder)
-        {
-            builder.ConfigureAppConfiguration((_, configuration) =>
-            {
-                configuration.AddInMemoryCollection(new Dictionary<string, string?>
-                {
-                    ["ConnectionStrings:OrganizationAccess"] = connectionString,
-                });
-            });
-
-            builder.ConfigureServices(services =>
-            {
-                services.RemoveAll<DbContextOptions<OrganizationAccessDbContext>>();
-                services.AddDbContext<OrganizationAccessDbContext>(options =>
-                    options.UseNpgsql(connectionString));
-
-                services.AddAuthentication(TestAuthenticationHandler.SchemeName)
-                    .AddScheme<TestAuthenticationOptions, TestAuthenticationHandler>(
-                        TestAuthenticationHandler.SchemeName,
-                        options => options.PersonId = personId);
-            });
-        }
-    }
-
-    private sealed class TestAuthenticationOptions : AuthenticationSchemeOptions
-    {
-        public PersonId? PersonId { get; set; }
-    }
-
-    private sealed class TestAuthenticationHandler(
-        IOptionsMonitor<TestAuthenticationOptions> options,
-        ILoggerFactory logger,
-        UrlEncoder encoder) : AuthenticationHandler<TestAuthenticationOptions>(options, logger, encoder)
-    {
-        public const string SchemeName = "Test";
-
-        protected override Task<AuthenticateResult> HandleAuthenticateAsync()
-        {
-            if (Options.PersonId is not { } personId)
-            {
-                return Task.FromResult(AuthenticateResult.NoResult());
-            }
-
-            var claims = new[]
-            {
-                new Claim("pricesync/person_id", personId.Value.ToString()),
-            };
-            var identity = new ClaimsIdentity(claims, SchemeName);
-            var principal = new ClaimsPrincipal(identity);
-            var ticket = new AuthenticationTicket(principal, SchemeName);
-
-            return Task.FromResult(AuthenticateResult.Success(ticket));
-        }
     }
 }

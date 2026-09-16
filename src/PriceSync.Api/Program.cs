@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authentication;
 using PriceSync.Application;
 using PriceSync.Api.Authentication;
 using PriceSync.Modules.Agreements;
@@ -14,6 +15,10 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddPriceSyncApplication();
 builder.Services.AddProblemDetails();
 builder.Services.AddHttpContextAccessor();
+builder.Services.AddAuthentication(UnavailableAuthenticationHandler.SchemeName)
+    .AddScheme<AuthenticationSchemeOptions, UnavailableAuthenticationHandler>(
+        UnavailableAuthenticationHandler.SchemeName,
+        options => { });
 builder.Services.AddAuthorization();
 builder.Services.AddScoped<ICurrentPerson, ClaimsCurrentPerson>();
 builder.Services.AddOrganizationAccessModule(builder.Configuration);
@@ -55,7 +60,7 @@ app.UseStatusCodePages(async statusCodeContext =>
             .ExecuteAsync(statusCodeContext.HttpContext);
     }
 });
-
+app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapGet("/", () => Results.Ok(new { service = "PriceSync.Api" }));
