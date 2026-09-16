@@ -56,6 +56,8 @@ app.UseStatusCodePages(async statusCodeContext =>
     }
 });
 
+app.UseAuthorization();
+
 app.MapGet("/", () => Results.Ok(new { service = "PriceSync.Api" }));
 app.MapOrganizationAccessEndpoints();
 

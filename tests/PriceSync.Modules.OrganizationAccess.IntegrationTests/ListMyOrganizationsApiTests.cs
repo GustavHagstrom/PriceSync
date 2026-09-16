@@ -9,6 +9,8 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using PriceSync.Modules.OrganizationAccess.Contracts;
@@ -224,15 +226,14 @@ public sealed class ListMyOrganizationsApiTests(OrganizationAccessPostgreSqlFixt
 
             builder.ConfigureServices(services =>
             {
+                services.RemoveAll<DbContextOptions<OrganizationAccessDbContext>>();
+                services.AddDbContext<OrganizationAccessDbContext>(options =>
+                    options.UseNpgsql(connectionString));
+
                 services.AddAuthentication(TestAuthenticationHandler.SchemeName)
                     .AddScheme<TestAuthenticationOptions, TestAuthenticationHandler>(
                         TestAuthenticationHandler.SchemeName,
-                        options => { });
-
-                services.PostConfigure<TestAuthenticationOptions>(options =>
-                {
-                    options.PersonId = personId;
-                });
+                        options => options.PersonId = personId);
             });
         }
     }
