@@ -24,9 +24,7 @@ internal static class GetOrganizationEndpoint
             return Results.Unauthorized();
         }
 
-        return organization is null
-            ? OrganizationNotFound()
-            : Results.Ok(organization);
+        return organization is null ? OrganizationNotFound() : Results.Ok(organization);
     }
 
     private static IResult OrganizationNotFound()
