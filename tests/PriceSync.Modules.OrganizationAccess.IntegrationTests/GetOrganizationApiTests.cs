@@ -35,6 +35,11 @@ public sealed class GetOrganizationApiTests(OrganizationAccessPostgreSqlFixture 
         var response = await client.GetAsync($"/api/v1/organizations/{Guid.NewGuid()}");
 
         response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+        response.Content.Headers.ContentType?.MediaType.Should().Be("application/problem+json");
+
+        var problem = await response.Content.ReadFromJsonAsync<JsonElement>();
+        problem.GetProperty("status").GetInt32().Should().Be(401);
+        problem.GetProperty("code").GetString().Should().Be("authentication_required");
     }
 
     [Fact]
@@ -95,11 +100,17 @@ public sealed class GetOrganizationApiTests(OrganizationAccessPostgreSqlFixture 
         using var client = application.CreateClient();
 
         var response = await client.GetAsync($"/api/v1/organizations/{organization.Id.Value}");
+        var missingResponse = await client.GetAsync($"/api/v1/organizations/{Guid.NewGuid()}");
 
         response.StatusCode.Should().Be(HttpStatusCode.NotFound);
+        response.Content.Headers.ContentType?.MediaType.Should().Be("application/problem+json");
+        missingResponse.StatusCode.Should().Be(response.StatusCode);
+        missingResponse.Content.Headers.ContentType?.MediaType
+            .Should().Be(response.Content.Headers.ContentType?.MediaType);
 
         var problem = await response.Content.ReadFromJsonAsync<JsonElement>();
-        problem.GetProperty("code").GetString().Should().Be("organization_not_found");
+        var missingProblem = await missingResponse.Content.ReadFromJsonAsync<JsonElement>();
+        ProblemDetailsContract(problem).Should().BeEquivalentTo(ProblemDetailsContract(missingProblem));
     }
 
     [Fact]
@@ -114,6 +125,23 @@ public sealed class GetOrganizationApiTests(OrganizationAccessPostgreSqlFixture 
         var response = await client.GetAsync($"/api/v1/organizations/{organization.Id.Value}");
 
         response.StatusCode.Should().Be(HttpStatusCode.NotFound);
+    }
+
+    [Fact]
+    public async Task Archived_organization_does_not_grant_read_access_without_active_membership()
+    {
+        var organization = await SeedOrganizationAsync(NewPersonId(), archived: true);
+
+        await using var application = CreateApplication(NewPersonId());
+        using var client = application.CreateClient();
+
+        var response = await client.GetAsync($"/api/v1/organizations/{organization.Id.Value}");
+
+        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
+        response.Content.Headers.ContentType?.MediaType.Should().Be("application/problem+json");
+
+        var problem = await response.Content.ReadFromJsonAsync<JsonElement>();
+        problem.GetProperty("code").GetString().Should().Be("organization_not_found");
     }
 
     private OrganizationAccessApiApplication CreateApplication(PersonId? personId = null)
@@ -164,6 +192,14 @@ public sealed class GetOrganizationApiTests(OrganizationAccessPostgreSqlFixture 
     private static OrganizationMembershipId NewMembershipId() => new(Guid.CreateVersion7());
 
     private static PersonId NewPersonId() => new(Guid.NewGuid());
+
+    private static (string? Title, int Status, string? Code) ProblemDetailsContract(JsonElement problem)
+    {
+        return (
+            problem.GetProperty("title").GetString(),
+            problem.GetProperty("status").GetInt32(),
+            problem.GetProperty("code").GetString());
+    }
 
     private sealed class FrozenTimeProvider(DateTimeOffset utcNow) : TimeProvider
     {

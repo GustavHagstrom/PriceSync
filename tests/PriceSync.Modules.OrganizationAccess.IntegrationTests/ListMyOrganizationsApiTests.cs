@@ -34,6 +34,11 @@ public sealed class ListMyOrganizationsApiTests(OrganizationAccessPostgreSqlFixt
         var response = await client.GetAsync("/api/v1/organizations");
 
         response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+        response.Content.Headers.ContentType?.MediaType.Should().Be("application/problem+json");
+
+        var problem = await response.Content.ReadFromJsonAsync<JsonElement>();
+        problem.GetProperty("status").GetInt32().Should().Be(401);
+        problem.GetProperty("code").GetString().Should().Be("authentication_required");
     }
 
     [Fact]
@@ -127,6 +132,25 @@ public sealed class ListMyOrganizationsApiTests(OrganizationAccessPostgreSqlFixt
             .Should().Equal("Alpha AB", "Zeta AB", "Beta AB");
     }
 
+    [Fact]
+    public async Task List_my_organizations_uses_organization_id_as_a_stable_ordering_tiebreaker()
+    {
+        var personId = NewPersonId();
+        var firstId = new OrganizationId(Guid.Parse("01990000-0000-7000-8000-000000000001"));
+        var secondId = new OrganizationId(Guid.Parse("01990000-0000-7000-8000-000000000002"));
+        await SeedOrganizationAsync("Acme AB", "556016-0680", personId, organizationId: secondId);
+        await SeedOrganizationAsync("Acme AB", "556000-4615", personId, organizationId: firstId);
+
+        await using var application = CreateApplication(personId);
+        using var client = application.CreateClient();
+
+        var response = await client.GetFromJsonAsync<JsonElement>("/api/v1/organizations");
+
+        response.EnumerateArray()
+            .Select(item => item.GetProperty("organizationId").GetGuid())
+            .Should().Equal(firstId.Value, secondId.Value);
+    }
+
     private OrganizationAccessApiApplication CreateApplication(PersonId? personId = null)
     {
         return new OrganizationAccessApiApplication(fixture.ConnectionString, personId);
@@ -138,11 +162,12 @@ public sealed class ListMyOrganizationsApiTests(OrganizationAccessPostgreSqlFixt
         PersonId personId,
         OrganizationRole[]? roles = null,
         bool archived = false,
-        bool activeMembership = true)
+        bool activeMembership = true,
+        OrganizationId? organizationId = null)
     {
         var timeProvider = new FrozenTimeProvider(new DateTimeOffset(2026, 9, 16, 8, 30, 0, TimeSpan.Zero));
         var organization = Organization.Create(
-            NewOrganizationId(),
+            organizationId ?? NewOrganizationId(),
             displayName,
             LegalOrganizationIdentity.Create("SE", organizationNumber),
             timeProvider);

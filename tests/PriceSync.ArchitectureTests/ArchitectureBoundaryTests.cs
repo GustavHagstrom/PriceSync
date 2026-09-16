@@ -1,5 +1,6 @@
 using System.Xml.Linq;
 using FluentAssertions;
+using PriceSync.Modules.OrganizationAccess;
 using PriceSync.Modules.OrganizationAccess.Contracts;
 using Xunit;
 
@@ -89,6 +90,19 @@ public sealed class ArchitectureBoundaryTests
                     "PriceSync.Modules.OrganizationAccess.Contracts.OrganizationId",
                     "PriceSync.Modules.OrganizationAccess.Contracts.PersonId",
                     "PriceSync.Modules.OrganizationAccess.Contracts.ICurrentPerson",
+                ]);
+    }
+
+    [Fact]
+    public void Organization_access_implementation_exports_only_composition_surfaces()
+    {
+        typeof(OrganizationAccessEndpointRouteBuilderExtensions).Assembly.ExportedTypes
+            .Select(type => type.FullName)
+            .Should()
+            .BeEquivalentTo(
+                [
+                    "PriceSync.Modules.OrganizationAccess.OrganizationAccessEndpointRouteBuilderExtensions",
+                    "PriceSync.Modules.OrganizationAccess.OrganizationAccessModuleServiceCollectionExtensions",
                 ]);
     }
 

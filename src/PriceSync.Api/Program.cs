@@ -12,6 +12,7 @@ using PriceSync.Modules.TradingRelationships;
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddPriceSyncApplication();
+builder.Services.AddProblemDetails();
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddAuthorization();
 builder.Services.AddScoped<ICurrentPerson, ClaimsCurrentPerson>();
@@ -24,6 +25,36 @@ builder.Services.AddRetrievalConsumptionModule();
 builder.Services.AddIntegrationConfigurationModule();
 
 var app = builder.Build();
+
+app.UseExceptionHandler(exceptionHandler =>
+{
+    exceptionHandler.Run(async httpContext =>
+    {
+        await Results.Problem(
+                title: "An unexpected error occurred.",
+                statusCode: StatusCodes.Status500InternalServerError,
+                extensions: new Dictionary<string, object?>
+                {
+                    ["code"] = "internal_server_error",
+                })
+            .ExecuteAsync(httpContext);
+    });
+});
+
+app.UseStatusCodePages(async statusCodeContext =>
+{
+    if (statusCodeContext.HttpContext.Response.StatusCode == StatusCodes.Status401Unauthorized)
+    {
+        await Results.Problem(
+                title: "Authentication is required.",
+                statusCode: StatusCodes.Status401Unauthorized,
+                extensions: new Dictionary<string, object?>
+                {
+                    ["code"] = "authentication_required",
+                })
+            .ExecuteAsync(statusCodeContext.HttpContext);
+    }
+});
 
 app.MapGet("/", () => Results.Ok(new { service = "PriceSync.Api" }));
 app.MapOrganizationAccessEndpoints();
