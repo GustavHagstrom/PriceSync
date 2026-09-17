@@ -33,6 +33,8 @@ Its transactional boundary exists because the parties and lifecycle state of one
 
 PriceSync represents an externally established Supplier–Customer relationship, so a new `TradingRelationship` starts as `Active`. The only lifecycle transition is `Active → Ended`; `Ended` is terminal. There is no `Pending` state because negotiation or acceptance is outside this boundary, and no separate paused/suspended state is currently part of the domain.
 
+Ending retains the complete aggregate. The transition only changes the lifecycle status to `Ended` and records `EndedAt`; it does not delete or clear relationship state. Existing historical references continue to identify the same relationship.
+
 If the same directed Supplier–Customer relationship is established again after ending, it is represented by a new `TradingRelationship` with a new `TradingRelationshipId`. The ended relationship remains unchanged as historical fact.
 
 ## Commands / decisions
@@ -55,7 +57,7 @@ The area produces facts that a Trading Relationship exists or has ended. Downstr
 - Supplier and Customer Organization IDs are immutable for the lifetime of the relationship.
 - Direction is significant: `A → B` and `B → A` are separate relationships and may coexist.
 - At most one active Trading Relationship may exist for the same directed Supplier/Customer pair at a time.
-- Ended relationships are retained as history; later re-establishment creates a new relationship rather than reactivating an ended one.
+- Ended relationships are retained in full as history; later re-establishment creates a new relationship rather than reactivating an ended one.
 - The relationship establishes access for price distribution but contains no Price Agreement terms.
 - Ending the relationship stops future Supplier-backed distribution without deleting prior activation or retrieval history.
 
