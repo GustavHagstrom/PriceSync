@@ -77,24 +77,28 @@ The block map is complete. `/grill-planning-block` should resolve the blocks in 
     - Accepted: Ending an unknown `TradingRelationshipId` returns `404 Not Found`; idempotent success applies only when the identified relationship exists and is already Ended.
     - Rationale: Both parties participate in the relationship and neither creator nor Supplier receives permanent unilateral lifecycle ownership. Idempotent End supports safe retries without rewriting historical facts, while an unknown identity must not falsely imply that a relationship was successfully ended.
   - Required read/query use cases and query semantics
-    - Status: In progress
+    - Status: Complete
     - Accepted: Expose direction-specific list queries from the acting Organization perspective: relationships where it is Supplier and relationships where it is Customer.
     - Accepted: List queries return Active relationships by default and allow callers to explicitly request Ended/all relationships.
+    - Accepted: List queries are paginated and deterministically ordered newest first by `CreatedAt DESC`, with `TradingRelationshipId` as stable tie-breaker.
+    - Accepted: No free-text/Organization-name search is introduced; the list surface remains limited to direction, status and pagination.
     - Accepted: Expose lookup of a specific Trading Relationship by TradingRelationshipId.
     - Accepted: A specific relationship may be read only when the Organization the actor is currently acting as is either Supplier or Customer in that relationship.
     - Accepted: Lookup of an unknown `TradingRelationshipId` returns `404 Not Found`.
     - Accepted: Lookup of a relationship outside the acting Organization's scope also returns `404 Not Found`, avoiding disclosure that another Organization's relationship exists.
-    - Rationale: Direction is core domain semantics and should be explicit in the query surface. Operational reads default to current relationships while retaining access to history. Organization-scoped access prevents memberships in unrelated Organizations from implicitly widening the active request context, and out-of-scope identities are not disclosed.
+    - Rationale: Direction is core domain semantics and should be explicit in the query surface. Operational reads default to current relationships while retaining access to history. Pagination has a stable operationally useful order without expanding TradingRelationships into Organization search/read-model ownership.
   - Request/response contracts and error semantics
-    - Status: In progress
-    - Accepted: Create returns a basic relationship representation containing `TradingRelationshipId`, `SupplierOrganizationId`, `CustomerOrganizationId`, `Status`, `CreatedAt`, and applicable lifecycle timestamps.
+    - Status: Complete
+    - Accepted: Create, End, GetById and list items use the same compact relationship representation containing `TradingRelationshipId`, `SupplierOrganizationId`, `CustomerOrganizationId`, `Status`, `CreatedAt`, and applicable `EndedAt`.
     - Accepted: Create does not externally distinguish a newly created relationship from an already-existing Active relationship; both have the same success semantics and representation. `CreatedAt` still communicates the resource's actual age.
     - Accepted: End returns the same basic relationship representation in its Ended state, including `EndedAt`; repeated End returns the same final state.
     - Accepted: Missing Supplier or Customer Organization during Create returns `404 Not Found`.
     - Accepted: An Archived Supplier or Customer Organization during Create returns `409 Conflict`.
     - Accepted: Create errors identify both the reason and the contextual party, allowing distinct `SupplierNotFound`, `CustomerNotFound`, `SupplierArchived`, and `CustomerArchived` semantics.
+    - Accepted: A self-relationship request returns `400 Bad Request` with a machine-readable `SupplierAndCustomerMustDiffer` error.
+    - Accepted: Expected API failures use stable machine-readable error codes in addition to HTTP status; clients need not parse human-readable error text.
     - Accepted: Unknown relationship identity on lookup or End returns `404 Not Found`. A relationship outside the acting Organization's scope is exposed as `404 Not Found`, while an authenticated actor inside the correct Organization scope who lacks the required administrative command permission receives `403 Forbidden`.
-    - Rationale: API errors distinguish absent resources, lifecycle conflicts, authorization failures inside a valid scope, and hidden out-of-scope resources. Contextual Supplier/Customer errors preserve the domain meaning of the directed relationship.
+    - Rationale: API errors distinguish invalid requests, absent resources, lifecycle conflicts, authorization failures inside a valid scope, and hidden out-of-scope resources. Stable error codes preserve concrete semantics independently of human-readable messages.
   - Actor/organization authorization requirements for each operation
     - Status: In progress
     - Accepted: Create and End require an administrative Organization permission in the Organization the actor is acting as. Ordinary relationship reads may be available to regular members of the acting Organization, provided that Organization is a party to the relationship/query.
@@ -102,11 +106,16 @@ The block map is complete. `/grill-planning-block` should resolve the blocks in 
     - Accepted: When the acting Organization is a valid party but the authenticated actor lacks the administrative permission required for Create/End, the API returns `403 Forbidden`.
     - Rationale: Create and End alter the Organization's external relationship/access scope and therefore require stronger authority than read-only access. Scope hiding and permission denial remain distinct concerns.
   - Idempotency and repeated-operation behaviour
-    - Status: In progress
+    - Status: Complete
     - Accepted: Repeated Create against an already-active directed pair and repeated End against an already-ended relationship are idempotent successes. No separate idempotency-key mechanism is required by these cases at this stage.
     - Accepted: Idempotent End does not extend to unknown relationship IDs; those return `404 Not Found`.
   - Domain-specific audit/observability requirements, without choosing the application-wide logging strategy
-    - Status: Open
+    - Status: Complete
+    - Accepted: Successful and failed/denied Create and End attempts must be auditable with actor, acting Organization, relationship identity/context, operation, timestamp and outcome/error semantics as applicable.
+    - Accepted: Read operations do not receive a TradingRelationships-specific audit requirement; read-access auditing remains a cross-cutting observability concern.
+    - Accepted: This block defines required auditability only; storage mechanism, logging library, telemetry conventions and application-wide implementation strategy remain separate architecture work.
+- Verification:
+  - Focused integration/API tests cover the main externally observable behaviours for Create, End, GetById and directional lists, including authorization/scope, idempotency, status filtering/pagination and important error paths. Avoid a mechanical exhaustive matrix when behaviour is already protected at a more focused layer.
 - Depends on:
   - Block 1
   - Block 2
@@ -167,6 +176,15 @@ No independent cross-cutting test-strategy decision has been identified at block
 - Define PriceSync-wide logging/observability strategy and library choices separately from issue #12. This should cover cross-cutting concerns such as structured logging, correlation, telemetry, and shared conventions rather than being decided opportunistically inside one module.
 
 ## Session Log
+
+### 2026-09-17 — Block 3 grilling, third batch
+
+- Create and End require explicit auditability for both successful and failed/denied attempts, including actor, acting Organization, operation, relationship context, timestamp and outcome; the technical observability mechanism remains separate architecture work.
+- Reads do not receive a module-specific audit requirement.
+- Directional list queries are paginated, ordered by `CreatedAt DESC` plus `TradingRelationshipId` tie-breaker, and do not add free-text/Organization-name search.
+- Create, End, GetById and list items use the same compact relationship representation.
+- Self-relationship is `400 Bad Request` with a machine-readable error, and expected API failures generally expose stable machine-readable error codes.
+- Focused integration/API tests verify the main external behaviours without requiring an exhaustive combinatorial matrix.
 
 ### 2026-09-17 — Block 3 grilling, second batch
 
