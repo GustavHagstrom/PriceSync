@@ -61,11 +61,12 @@ The block map is complete. `/grill-planning-block` should resolve the blocks in 
 
 #### Block 3 — Use cases and external API surface
 
-- Status: In progress
+- Status: Complete
+- Completed: 2026-09-17
 - Purpose: Define the vertical slices and externally observable behaviour exposed by the TradingRelationships module, including authorization at the use-case boundary.
 - Decisions:
   - Create relationship command semantics
-    - Status: In progress
+    - Status: Complete
     - Accepted: Either the Supplier-side or Customer-side Organization may initiate creation. The acting Organization must itself be the Supplier or Customer in the requested relationship.
     - Accepted: Create requires administrative capability in the acting Organization. Under the current OrganizationAccess role model this maps to `Owner`; TradingRelationships does not interpret `Owner`/`Member` directly.
     - Accepted: An Archived acting Organization cannot Create a relationship.
@@ -76,7 +77,7 @@ The block map is complete. `/grill-planning-block` should resolve the blocks in 
     - Accepted: Successful Create always returns `200 OK` with the relationship representation, whether a new relationship was created or an existing Active relationship satisfied the request.
     - Rationale: PriceSync records an externally established relationship rather than negotiating it. Either party may register it, but an Organization cannot create relationships on behalf of unrelated Organizations. The command is externally an idempotent ensure operation, so it does not claim resource creation through distinct success semantics.
   - End relationship command semantics
-    - Status: In progress
+    - Status: Complete
     - Accepted: Either Supplier or Customer may end the relationship when the actor has administrative capability in the Organization they are acting as.
     - Accepted: An Archived acting Organization cannot End a relationship. This is authorization at the use-case boundary, not revalidation of the relationship parties; the other active party can still End it.
     - Accepted: End input requires only `TradingRelationshipId`; acting Organization/person come from request context and party membership is checked against authoritative relationship data.
@@ -109,21 +110,27 @@ The block map is complete. `/grill-planning-block` should resolve the blocks in 
     - Accepted: Create errors identify both the reason and the contextual party, allowing distinct `SupplierNotFound`, `CustomerNotFound`, `SupplierArchived`, and `CustomerArchived` semantics.
     - Accepted: A self-relationship request returns `400 Bad Request` with a machine-readable `SupplierAndCustomerMustDiffer` error.
     - Accepted: Expected API failures use stable machine-readable error codes in addition to HTTP status; clients need not parse human-readable error text.
+    - Accepted: Missing acting Organization context returns `400 Bad Request` with stable machine-readable `ActingOrganizationRequired` semantics.
+    - Accepted: Authorization denials in a supplied acting Organization context return `403 Forbidden` with a single public forbidden semantic; internal causes such as not-member, insufficient role, or archived acting Organization are retained for authorization/audit purposes but are not exposed as distinct public API error codes.
     - Accepted: Unknown relationship identity on lookup or End returns `404 Not Found`. An existing relationship outside the acting Organization's scope is exposed as `404 Not Found`, while an authenticated actor inside the correct Organization scope who lacks the required command capability receives `403 Forbidden`.
-    - Rationale: API errors distinguish invalid requests, absent resources, lifecycle conflicts, authorization failures inside a valid scope, and hidden out-of-scope resources. Stable error codes preserve concrete semantics independently of human-readable messages.
+    - Accepted: Authentication/`401 Unauthorized` is a cross-cutting API/infrastructure concern and is not modeled as a TradingRelationships use-case error.
+    - Rationale: API errors distinguish invalid requests, absent resources, lifecycle conflicts, authorization failures inside a valid scope, and hidden out-of-scope resources. Stable error codes preserve concrete semantics independently of human-readable messages without leaking internal authorization reasons.
   - Actor/organization authorization requirements for each operation
-    - Status: In progress
+    - Status: Complete
     - Accepted: OrganizationAccess owns membership, roles and permission interpretation. TradingRelationships depends on a purpose-built OrganizationAccess authorization contract rather than reading OrganizationAccess persistence or interpreting its role enum.
     - Accepted: Authorization is capability-based. TradingRelationships asks whether the current person may perform the relevant capability in the acting Organization (for example read relationship scope versus manage Trading Relationships); OrganizationAccess maps its current `Owner`/`Member` model to that answer.
-    - Accepted: The authorization result preserves expected denial reasons needed by the use case, such as Allowed, NotMember, InsufficientRole and OrganizationArchived, without exposing the underlying membership model.
-    - Accepted: The same OrganizationAccess authorization boundary is used for reads and commands. TradingRelationships separately owns the relationship-specific rule that the acting Organization must be a party to the relationship/query.
+    - Accepted: The authorization result may preserve expected internal denial reasons such as Allowed, NotMember, InsufficientRole and OrganizationArchived for use-case/audit handling, without exposing the underlying membership model or distinct public error codes.
+    - Accepted: The same OrganizationAccess authorization boundary is used for reads and commands. Every List/GetById verifies read capability; Create/End verify management capability. `ICurrentOrganization` identifies the selected Organization but does not itself imply that the current person is authorized to act for it.
     - Accepted: Under the current policy, Create and End management capability maps to `Owner`; ordinary relationship reads are available to active `Owner` or `Member` memberships, subject to relationship scope.
-    - Accepted: Archived acting Organizations cannot perform Create or End, while reads remain available according to the established OrganizationAccess lifecycle semantics.
-    - Accepted: Acting Organization is security/request context, not ordinary business input. Infrastructure supplies it through a current-Organization context abstraction (for example `ICurrentOrganization` or equivalent), alongside the current person; individual endpoints do not accept `ActingOrganizationId` as request data.
+    - Accepted: Archived acting Organizations cannot perform Create or End, while reads remain available according to the established OrganizationAccess lifecycle semantics. Denied Create/End due to archived acting Organization maps externally to the same `403 Forbidden` semantic as other authorization denials.
+    - Accepted: Acting Organization is security/request context, not ordinary business input. The current-Organization abstraction belongs to `OrganizationAccess.Contracts`; infrastructure supplies it alongside the current person, and individual endpoints do not accept `ActingOrganizationId` as request data.
+    - Accepted: The current-Organization abstraction is deliberately thin: it supplies the selected Organization identity, while capability authorization is explicitly performed through OrganizationAccess by each relevant use case.
+    - Accepted: Authorization in the acting Organization is checked before TradingRelationships data access/relationship lookup. For Create, acting-party scope is also checked before counterparty existence/status validation to avoid information disclosure.
     - Accepted: Create requires the acting Organization to be one of the requested Supplier/Customer parties; otherwise it returns `403 Forbidden` before counterparty validation.
     - Accepted: When the acting Organization is not a party to an existing specific relationship, GetById/End expose it as `404 Not Found` rather than revealing it through `403 Forbidden`.
     - Accepted: When the acting Organization is a valid party but the authenticated actor lacks the management capability required for Create/End, the API returns `403 Forbidden`.
-    - Rationale: OrganizationAccess remains the sole owner of whether a person may act for an Organization and how roles map to capabilities. TradingRelationships consumes only contextual authorization outcomes and owns only relationship-specific scope. Acting Organization is treated as trusted request context rather than caller-supplied business data.
+    - Accepted: Concrete authorization interface/type names and implementation structure are intentionally left to implementation; the planning boundary ends at ownership, capabilities, context and observable semantics.
+    - Rationale: OrganizationAccess remains the sole owner of whether a person may act for an Organization and how roles map to capabilities. TradingRelationships consumes only contextual authorization outcomes and owns only relationship-specific scope. Acting Organization is request/security context, while authorization remains explicit rather than hidden in that context abstraction.
   - Idempotency and repeated-operation behaviour
     - Status: Complete
     - Accepted: Repeated Create against an already-active directed pair and repeated End against an already-ended relationship are idempotent successes. No separate idempotency-key mechanism is required by these cases at this stage.
@@ -195,6 +202,15 @@ No independent cross-cutting test-strategy decision has been identified at block
 - Define PriceSync-wide logging/observability strategy and library choices separately from issue #12. This should cover cross-cutting concerns such as structured logging, correlation, telemetry, and shared conventions rather than being decided opportunistically inside one module.
 
 ## Session Log
+
+### 2026-09-17 — Block 3 grilling completed, sixth batch
+
+- `ICurrentOrganization`/current-Organization context belongs to `OrganizationAccess.Contracts`; it supplies selected Organization identity but does not itself authorize the current person.
+- All TradingRelationships reads and commands explicitly authorize the relevant capability through OrganizationAccess. Authorization precedes relationship lookup/data access.
+- Archived acting Organization and other authorization denials collapse to the same public `403 Forbidden` semantic; internal denial reasons remain available for audit/authorization handling.
+- Missing acting Organization is `400 Bad Request` with stable `ActingOrganizationRequired` error semantics. Authentication/`401` remains a cross-cutting API concern.
+- Authorization design stops at ownership, capabilities, context and observable semantics; concrete interface/type design is intentionally deferred to implementation.
+- Block 3 completed on 2026-09-17.
 
 ### 2026-09-17 — Block 3 grilling, fifth batch
 
