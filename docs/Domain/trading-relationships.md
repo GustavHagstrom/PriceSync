@@ -15,7 +15,7 @@ It owns:
 - `TradingRelationshipId`
 - `SupplierOrganizationId`
 - `CustomerOrganizationId`
-- relationship lifecycle/status
+- lifecycle status: `Active` or `Ended`
 - `CreatedAt`
 - nullable `EndedAt`
 
@@ -25,6 +25,12 @@ It does not own Organization identity, memberships, permissions, or commercial p
 
 Its transactional boundary exists because the parties and lifecycle state of one directed relationship must remain internally consistent, while Agreements, Price Publication, and retrieval history remain independently owned and must not participate in the same transaction.
 
+## Lifecycle
+
+PriceSync represents an externally established Supplier–Customer relationship, so a new `TradingRelationship` starts as `Active`. The only lifecycle transition is `Active → Ended`; `Ended` is terminal. There is no `Pending` state because negotiation or acceptance is outside this boundary, and no separate paused/suspended state is currently part of the domain.
+
+If the same directed Supplier–Customer relationship is established again after ending, it is represented by a new `TradingRelationship` with a new `TradingRelationshipId`. The ended relationship remains unchanged as historical fact.
+
 ## Commands / decisions
 
 This area is responsible for decisions such as:
@@ -33,8 +39,6 @@ This area is responsible for decisions such as:
 - end the relationship
 
 PriceSync does not negotiate, request, or commercially accept the relationship.
-
-If the same directed Supplier–Customer relationship is established again after ending, it is represented by a new `TradingRelationship` with a new `TradingRelationshipId`. The ended relationship remains unchanged as historical fact.
 
 ## Business facts
 
