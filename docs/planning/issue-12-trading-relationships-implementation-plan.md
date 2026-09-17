@@ -28,7 +28,8 @@ The block map is complete. `/grill-planning-block` should resolve the blocks in 
 
 #### Block 1 — Aggregate model and lifecycle
 
-- Status: In progress
+- Status: Complete
+- Completed: 2026-09-17
 - Purpose: Define the complete domain semantics of Trading Relationships, including rules that may span multiple relationship instances.
 - Decisions:
   - Aggregate identity and required state
@@ -62,6 +63,10 @@ The block map is complete. `/grill-planning-block` should resolve the blocks in 
     - Accepted: `CreatedAt` is the timestamp when the Trading Relationship is registered/created in PriceSync, not an externally supplied date for when the real-world commercial relationship originally began.
     - Accepted: `EndedAt` is the timestamp when PriceSync performs the `Active → Ended` transition. It is set once when the relationship ends and never changed afterwards; it is not an externally supplied or backdated commercial end date.
     - Rationale: PriceSync owns and can state its own lifecycle facts reliably. No current requirement establishes separate externally effective relationship start/end dates or responsibility for supplying them.
+- Verification:
+  - Focused domain tests should cover meaningful aggregate invariants and lifecycle behaviour, including rejecting a self-directed relationship, creation as `Active`, ending as `Ended` with `EndedAt`, and `Ended` being terminal.
+  - Do not require a unit test for every documented invariant when the behaviour is structurally trivial.
+  - Cross-aggregate active uniqueness and concurrent enforcement are verified in Block 4 after the enforcement mechanism is defined.
 - Depends on:
   - None
 - Completion: Aggregate state, invariants, lifecycle transitions, cross-aggregate domain rules, and historical semantics are precise enough for later blocks to determine enforcement.
@@ -185,6 +190,8 @@ No independent cross-cutting test-strategy decision has been identified at block
 - Creation time: `CreatedAt` records when PriceSync registers the relationship, not when the external commercial relationship originally began.
 - Ending time: `EndedAt` records the PriceSync end transition, is set once, and is not externally supplied/backdated.
 - Historical retention: ending retains the complete aggregate and only records `Status = Ended` plus `EndedAt`; historical references remain valid.
+- Verification: focused domain tests cover meaningful aggregate invariants/lifecycle; cross-aggregate uniqueness/concurrency verification is deferred to Block 4 where enforcement is designed.
+- Block 1 completed on 2026-09-17.
 
 ### 2026-09-17 — Block-map correction
 
