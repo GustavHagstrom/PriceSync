@@ -32,9 +32,10 @@ The block map is complete. `/grill-planning-block` should resolve the blocks in 
 - Purpose: Define the complete domain semantics of Trading Relationships, including rules that may span multiple relationship instances.
 - Decisions:
   - Aggregate identity and required state
-    - Status: In progress
+    - Status: Complete
     - Accepted: `TradingRelationship` has its own stable `TradingRelationshipId`. The directed `(SupplierOrganizationId, CustomerOrganizationId)` pair is also a domain-significant natural key used when defining uniqueness and re-establishment semantics, but is not the aggregate identity.
-    - Rationale: Other bounded contexts need a stable relationship reference independent of party-key mechanics, while the Supplier/Customer pair still carries domain meaning for cross-aggregate rules.
+    - Accepted: Required aggregate state is `TradingRelationshipId`, `SupplierOrganizationId`, `CustomerOrganizationId`, lifecycle `Status`, `CreatedAt`, and nullable `EndedAt`. Generic update metadata such as `UpdatedAt` is not part of the domain state unless a later concrete requirement establishes domain meaning for it.
+    - Rationale: Other bounded contexts need a stable relationship reference independent of party-key mechanics, while the Supplier/Customer pair still carries domain meaning for cross-aggregate rules. Creation and ending timestamps are lifecycle facts owned by the relationship rather than generic persistence audit metadata.
   - Supplier/Customer relationship invariants
     - Status: Open
   - Cross-aggregate relationship rules such as uniqueness or re-establishment semantics
@@ -158,6 +159,7 @@ No independent cross-cutting test-strategy decision has been identified at block
 
 - Block 1 marked `In progress`.
 - Aggregate identity: accepted hybrid identity semantics — stable `TradingRelationshipId` plus domain-significant directed Supplier/Customer natural key for uniqueness/re-establishment rules.
+- Required state: accepted `TradingRelationshipId`, Supplier/Customer Organization IDs, lifecycle status, `CreatedAt`, and nullable `EndedAt`; generic `UpdatedAt` is excluded from domain state.
 
 ### 2026-09-17 — Block-map correction
 
