@@ -77,7 +77,9 @@ The block map is complete. `/grill-planning-block` should resolve the blocks in 
 - Purpose: Define how TradingRelationships depends on OrganizationAccess while preserving module ownership and contextual Supplier/Customer roles.
 - Decisions:
   - Organization reference and existence-validation semantics
-    - Status: Open
+    - Status: In progress
+    - Accepted: Creating a Trading Relationship requires both `SupplierOrganizationId` and `CustomerOrganizationId` to reference Organizations that exist in OrganizationAccess. TradingRelationships must validate both references through the OrganizationAccess module boundary before creating the relationship.
+    - Rationale: A Trading Relationship must not be created against Organization identities that have never existed. OrganizationAccess remains the owner of Organization identity; TradingRelationships consumes only the validation semantics it needs and does not query OrganizationAccess persistence directly.
   - Contract required by TradingRelationships from OrganizationAccess
     - Status: Open
   - Ownership boundary between relationship access scope and Organization identity/membership/permissions
@@ -182,6 +184,7 @@ No independent cross-cutting test-strategy decision has been identified at block
 - Existing OrganizationAccess planning establishes that `OrganizationId` is already a boundary-relevant strongly typed ID in `OrganizationAccess.Contracts`.
 - Existing OrganizationAccess planning deliberately exposes no generic Organization lookup/authorization interface; purpose-built cross-context queries should be added only for a concrete consuming use case such as TradingRelationships.
 - Direct access from TradingRelationships to OrganizationAccess persistence remains forbidden.
+- Organization existence: creating a Trading Relationship requires both Supplier and Customer Organization IDs to exist in OrganizationAccess, validated through its module boundary.
 
 ### 2026-09-17 — Block 1 grilling started
 
