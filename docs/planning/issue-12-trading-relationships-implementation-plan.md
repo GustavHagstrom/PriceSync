@@ -52,10 +52,11 @@ The block map is complete. `/grill-planning-block` should resolve the blocks in 
     - Accepted: The lifecycle contains only `Active` and `Ended`. A newly represented externally established relationship starts as `Active`; the only lifecycle transition is `Active → Ended`; `Ended` is terminal.
     - Rationale: PriceSync represents an already established external relationship rather than negotiating or approving it, so `Pending` has no domain meaning here. No current requirement establishes a separate suspended/paused state.
   - Creation, ending, re-establishment, and historical semantics
-    - Status: In progress
+    - Status: Complete
     - Accepted: Re-establishment after an ended relationship is a new relationship instance rather than a state transition on the ended aggregate.
     - Accepted: Ending is terminal for that aggregate; it cannot return to `Active`.
-    - Rationale: An ended aggregate represents one completed historical relationship period; later commercial re-establishment is a new period with its own identity and lifecycle.
+    - Accepted: Ending never deletes or clears relationship state. The aggregate is retained in full as historical data; ending only changes lifecycle status to `Ended` and records `EndedAt`. Existing historical references continue to identify the same relationship.
+    - Rationale: An ended aggregate represents one completed historical relationship period; later commercial re-establishment is a new period with its own identity and lifecycle. Retaining the complete ended aggregate preserves stable historical meaning for downstream references and avoids rewriting past facts.
   - Temporal facts owned by the aggregate
     - Status: Complete
     - Accepted: `CreatedAt` is the timestamp when the Trading Relationship is registered/created in PriceSync, not an externally supplied date for when the real-world commercial relationship originally began.
@@ -183,6 +184,7 @@ No independent cross-cutting test-strategy decision has been identified at block
 - Lifecycle: only `Active` and `Ended`; creation starts `Active`, `Active → Ended` is the only transition, and `Ended` is terminal.
 - Creation time: `CreatedAt` records when PriceSync registers the relationship, not when the external commercial relationship originally began.
 - Ending time: `EndedAt` records the PriceSync end transition, is set once, and is not externally supplied/backdated.
+- Historical retention: ending retains the complete aggregate and only records `Status = Ended` plus `EndedAt`; historical references remain valid.
 
 ### 2026-09-17 — Block-map correction
 
