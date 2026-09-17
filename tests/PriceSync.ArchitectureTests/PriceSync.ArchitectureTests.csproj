@@ -19,6 +19,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\PriceSync.Modules.OrganizationAccess.Contracts\PriceSync.Modules.OrganizationAccess.Contracts.csproj" />
+    <ProjectReference Include="..\..\src\PriceSync.Modules.OrganizationAccess\PriceSync.Modules.OrganizationAccess.csproj" />
   </ItemGroup>
 
 </Project>
