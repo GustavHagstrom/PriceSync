@@ -19,7 +19,7 @@ It owns:
 - `CreatedAt`
 - nullable `EndedAt`
 
-The directed `(SupplierOrganizationId, CustomerOrganizationId)` pair is domain-significant for uniqueness and re-establishment rules, but is not the aggregate identity. Generic update metadata such as `UpdatedAt` is not domain state.
+`CreatedAt` records when PriceSync registers the relationship. It does not represent an externally supplied date for when the real-world commercial relationship originally began. The directed `(SupplierOrganizationId, CustomerOrganizationId)` pair is domain-significant for uniqueness and re-establishment rules, but is not the aggregate identity. Generic update metadata such as `UpdatedAt` is not domain state.
 
 It does not own Organization identity, memberships, permissions, or commercial pricing terms.
 
