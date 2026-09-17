@@ -65,81 +65,13 @@ The block map is complete. `/grill-planning-block` should resolve the blocks in 
 - Completed: 2026-09-17
 - Purpose: Define the vertical slices and externally observable behaviour exposed by the TradingRelationships module, including authorization at the use-case boundary.
 - Decisions:
-  - Create relationship command semantics
-    - Status: Complete
-    - Accepted: Either the Supplier-side or Customer-side Organization may initiate creation. The acting Organization must itself be the Supplier or Customer in the requested relationship.
-    - Accepted: Create requires administrative capability in the acting Organization. Under the current OrganizationAccess role model this maps to `Owner`; TradingRelationships does not interpret `Owner`/`Member` directly.
-    - Accepted: An Archived acting Organization cannot Create a relationship.
-    - Accepted: If the acting Organization is neither requested party, Create returns `403 Forbidden` before Organization existence/status validation, avoiding information disclosure to an unrelated Organization.
-    - Accepted: Create request explicitly contains both `SupplierOrganizationId` and `CustomerOrganizationId`; request context supplies the acting Organization separately.
-    - Accepted: No counterparty approval, invitation, or opt-in is modeled. Successful creation immediately represents the already externally established relationship as Active.
-    - Accepted: Repeating create for a directed pair that already has an Active relationship is idempotent success and returns the existing active relationship/identity rather than creating another aggregate or reporting a conflict.
-    - Accepted: Successful Create always returns `200 OK` with the relationship representation, whether a new relationship was created or an existing Active relationship satisfied the request.
-    - Rationale: PriceSync records an externally established relationship rather than negotiating it. Either party may register it, but an Organization cannot create relationships on behalf of unrelated Organizations. The command is externally an idempotent ensure operation, so it does not claim resource creation through distinct success semantics.
-  - End relationship command semantics
-    - Status: Complete
-    - Accepted: Either Supplier or Customer may end the relationship when the actor has administrative capability in the Organization they are acting as.
-    - Accepted: An Archived acting Organization cannot End a relationship. This is authorization at the use-case boundary, not revalidation of the relationship parties; the other active party can still End it.
-    - Accepted: End input requires only `TradingRelationshipId`; acting Organization/person come from request context and party membership is checked against authoritative relationship data.
-    - Accepted: When an existing relationship is outside the acting Organization's scope, End returns `404 Not Found`, matching GetById and avoiding disclosure of the relationship.
-    - Accepted: Ending an already Ended relationship is idempotent success. The existing EndedAt is preserved and no new lifecycle change occurs.
-    - Accepted: Ending an unknown `TradingRelationshipId` returns `404 Not Found`; idempotent success applies only when the identified relationship exists and is already Ended.
-    - Accepted: Successful End always returns `200 OK` with the final relationship representation, both for a new Active → Ended transition and an idempotent retry against an already Ended relationship.
-    - Rationale: Both parties participate in the relationship and neither creator nor Supplier receives permanent unilateral lifecycle ownership. Idempotent End supports safe retries without rewriting historical facts. Request context supplies authorization scope rather than duplicating party data in the command.
-  - Required read/query use cases and query semantics
-    - Status: Complete
-    - Accepted: Expose direction-specific list queries from the acting Organization perspective: relationships where it is Supplier and relationships where it is Customer.
-    - Accepted: List endpoints do not accept an OrganizationId parameter; Organization scope comes from the current acting Organization context.
-    - Accepted: List queries return Active relationships by default and allow callers to explicitly request Ended/all relationships.
-    - Accepted: List queries use cursor/keyset pagination and are deterministically ordered newest first by `CreatedAt DESC`, with `TradingRelationshipId` as stable tie-breaker.
-    - Accepted: The cursor is opaque to clients. Responses contain `items` plus `nextCursor` and do not include `totalCount`.
-    - Accepted: No free-text/Organization-name search is introduced; the list surface remains limited to direction, status and pagination.
-    - Accepted: Expose lookup of a specific Trading Relationship by TradingRelationshipId.
-    - Accepted: GetById accepts only `TradingRelationshipId`; acting Organization scope comes from request context rather than an OrganizationId request parameter.
-    - Accepted: A specific relationship may be read only when the Organization the actor is currently acting as is either Supplier or Customer in that relationship.
-    - Accepted: Lookup of an unknown `TradingRelationshipId` returns `404 Not Found`.
-    - Accepted: Lookup of a relationship outside the acting Organization's scope also returns `404 Not Found`, avoiding disclosure that another Organization's relationship exists.
-    - Rationale: Direction is core domain semantics and should be explicit in the query surface. Acting Organization is the single source of request scope. Cursor pagination provides stable traversal under concurrent inserts without exposing persistence keys or requiring total-count queries.
-  - Request/response contracts and error semantics
-    - Status: Complete
-    - Accepted: Create, End, GetById and list items use the same compact relationship representation containing `TradingRelationshipId`, `SupplierOrganizationId`, `CustomerOrganizationId`, `Status`, `CreatedAt`, and applicable `EndedAt`.
-    - Accepted: Create does not externally distinguish a newly created relationship from an already-existing Active relationship; both return `200 OK` with the same representation. `CreatedAt` still communicates the resource's actual age.
-    - Accepted: End returns `200 OK` with the same relationship representation in its Ended state, including `EndedAt`; repeated End returns the same final state.
-    - Accepted: Missing Supplier or Customer Organization during Create returns `404 Not Found`.
-    - Accepted: An Archived Supplier or Customer Organization during Create returns `409 Conflict`.
-    - Accepted: Create errors identify both the reason and the contextual party, allowing distinct `SupplierNotFound`, `CustomerNotFound`, `SupplierArchived`, and `CustomerArchived` semantics.
-    - Accepted: A self-relationship request returns `400 Bad Request` with a machine-readable `SupplierAndCustomerMustDiffer` error.
-    - Accepted: Expected API failures use stable machine-readable error codes in addition to HTTP status; clients need not parse human-readable error text.
-    - Accepted: Missing acting Organization context returns `400 Bad Request` with stable machine-readable `ActingOrganizationRequired` semantics.
-    - Accepted: Authorization denials in a supplied acting Organization context return `403 Forbidden` with a single public forbidden semantic; internal causes such as not-member, insufficient role, or archived acting Organization are retained for authorization/audit purposes but are not exposed as distinct public API error codes.
-    - Accepted: Unknown relationship identity on lookup or End returns `404 Not Found`. An existing relationship outside the acting Organization's scope is exposed as `404 Not Found`, while an authenticated actor inside the correct Organization scope who lacks the required command capability receives `403 Forbidden`.
-    - Accepted: Authentication/`401 Unauthorized` is a cross-cutting API/infrastructure concern and is not modeled as a TradingRelationships use-case error.
-    - Rationale: API errors distinguish invalid requests, absent resources, lifecycle conflicts, authorization failures inside a valid scope, and hidden out-of-scope resources. Stable error codes preserve concrete semantics independently of human-readable messages without leaking internal authorization reasons.
-  - Actor/organization authorization requirements for each operation
-    - Status: Complete
-    - Accepted: OrganizationAccess owns membership, roles and permission interpretation. TradingRelationships depends on a purpose-built OrganizationAccess authorization contract rather than reading OrganizationAccess persistence or interpreting its role enum.
-    - Accepted: Authorization is capability-based. TradingRelationships asks whether the current person may perform the relevant capability in the acting Organization (for example read relationship scope versus manage Trading Relationships); OrganizationAccess maps its current `Owner`/`Member` model to that answer.
-    - Accepted: The authorization result may preserve expected internal denial reasons such as Allowed, NotMember, InsufficientRole and OrganizationArchived for use-case/audit handling, without exposing the underlying membership model or distinct public error codes.
-    - Accepted: The same OrganizationAccess authorization boundary is used for reads and commands. Every List/GetById verifies read capability; Create/End verify management capability. `ICurrentOrganization` identifies the selected Organization but does not itself imply that the current person is authorized to act for it.
-    - Accepted: Under the current policy, Create and End management capability maps to `Owner`; ordinary relationship reads are available to active `Owner` or `Member` memberships, subject to relationship scope.
-    - Accepted: Archived acting Organizations cannot perform Create or End, while reads remain available according to the established OrganizationAccess lifecycle semantics. Denied Create/End due to archived acting Organization maps externally to the same `403 Forbidden` semantic as other authorization denials.
-    - Accepted: Acting Organization is security/request context, not ordinary business input. The current-Organization abstraction belongs to `OrganizationAccess.Contracts`; infrastructure supplies it alongside the current person, and individual endpoints do not accept `ActingOrganizationId` as request data.
-    - Accepted: The current-Organization abstraction is deliberately thin: it supplies the selected Organization identity, while capability authorization is explicitly performed through OrganizationAccess by each relevant use case.
-    - Accepted: Authorization in the acting Organization is checked before TradingRelationships data access/relationship lookup. For Create, acting-party scope is also checked before counterparty existence/status validation to avoid information disclosure.
-    - Accepted: Create requires the acting Organization to be one of the requested Supplier/Customer parties; otherwise it returns `403 Forbidden` before counterparty validation.
-    - Accepted: When the acting Organization is not a party to an existing specific relationship, GetById/End expose it as `404 Not Found` rather than revealing it through `403 Forbidden`.
-    - Accepted: When the acting Organization is a valid party but the authenticated actor lacks the management capability required for Create/End, the API returns `403 Forbidden`.
-    - Accepted: Concrete authorization interface/type names and implementation structure are intentionally left to implementation; the planning boundary ends at ownership, capabilities, context and observable semantics.
-    - Rationale: OrganizationAccess remains the sole owner of whether a person may act for an Organization and how roles map to capabilities. TradingRelationships consumes only contextual authorization outcomes and owns only relationship-specific scope. Acting Organization is request/security context, while authorization remains explicit rather than hidden in that context abstraction.
-  - Idempotency and repeated-operation behaviour
-    - Status: Complete
-    - Accepted: Repeated Create against an already-active directed pair and repeated End against an already-ended relationship are idempotent successes. No separate idempotency-key mechanism is required by these cases at this stage.
-    - Accepted: Idempotent End does not extend to unknown relationship IDs; those return `404 Not Found`.
-  - Domain-specific audit/observability requirements, without choosing the application-wide logging strategy
-    - Status: Complete
-    - Accepted: Successful and failed/denied Create and End attempts must be auditable with actor, acting Organization, relationship identity/context, operation, timestamp and outcome/error semantics as applicable.
-    - Accepted: Read operations do not receive a TradingRelationships-specific audit requirement; read-access auditing remains a cross-cutting observability concern.
-    - Accepted: This block defines required auditability only; storage mechanism, logging library, telemetry conventions and application-wide implementation strategy remain separate architecture work.
+  - Create relationship command semantics — Complete. Either party may initiate; acting Organization must be a party, requires management capability, archived actors cannot Create, unrelated actors receive 403 before counterparty validation, request contains both party IDs, no counterparty approval is modeled, and repeated Create for an already Active directed pair is idempotent `200 OK` returning the existing representation.
+  - End relationship command semantics — Complete. Either party with management capability may End; archived acting Organizations cannot End, input is relationship ID only, out-of-scope/unknown relationships are 404, repeated End is idempotent and preserves EndedAt, and successful End returns `200 OK` with final representation.
+  - Required read/query use cases and query semantics — Complete. Direction-specific Supplier/Customer lists derive scope from acting Organization, default to Active with Ended/all options, use opaque cursor/keyset pagination ordered `CreatedAt DESC, TradingRelationshipId DESC`, and expose scoped GetById with unknown/out-of-scope both 404.
+  - Request/response contracts and error semantics — Complete. Create/End/Get/List share a compact relationship representation. Expected failures use stable machine-readable codes; missing/archived parties, self-relationship, missing acting Organization, authorization and hidden out-of-scope semantics are defined. Authentication/401 remains cross-cutting.
+  - Actor/organization authorization requirements — Complete. OrganizationAccess owns membership/role interpretation and exposes capability-based authorization; reads require read capability, commands require management capability. Acting Organization is trusted request context but does not itself authorize.
+  - Idempotency and repeated-operation behaviour — Complete. Repeated Active-pair Create and already-Ended End are idempotent successes; no separate idempotency key is required.
+  - Domain-specific audit/observability requirements — Complete. Successful and failed/denied Create/End attempts must be auditable; read auditing and logging/telemetry implementation remain cross-cutting.
 - Verification:
   - Focused integration/API tests cover the main externally observable behaviours for Create, End, GetById and directional lists, including authorization/scope, idempotency, status filtering/pagination and important error paths. Avoid a mechanical exhaustive matrix when behaviour is already protected at a more focused layer.
 - Depends on:
@@ -152,26 +84,40 @@ The block map is complete. `/grill-planning-block` should resolve the blocks in 
 - Status: In progress
 - Purpose: Define module-owned storage and how the domain rules from Block 1 are enforced under real database and concurrent execution.
 - Decisions:
-  - DbContext/schema/entity mapping and migration ownership — In progress.
+  - DbContext/schema/entity mapping and migration ownership — Complete.
     - Accepted: `TradingRelationship` is mapped directly by EF Core; no separate persistence entity/mapping layer is introduced.
     - Accepted: TradingRelationships owns PostgreSQL schema `trading_relationships`, its DbContext, entity mappings and migrations, following ADR-0003.
     - Accepted: The aggregate persists as one relationship table with its stable ID, Supplier/Customer Organization IDs, Status, CreatedAt and nullable EndedAt.
-    - Rationale: The persistence shape closely matches the small aggregate, so a separate persistence model adds ceremony without a current isolation benefit. A dedicated schema preserves the physical module boundary.
-  - Database constraints and indexes required to enforce resolved domain rules — In progress.
+    - Accepted: `TradingRelationshipId` is generated by the application before persistence according to PriceSync's established UUID/ID convention; the exact UUID version is an implementation/convention detail rather than a Block 4 architecture decision.
+    - Accepted: CreatedAt, party IDs and other immutable aggregate state are protected by domain/application/EF ownership rather than database triggers.
+    - Rationale: The persistence shape closely matches the small aggregate, so a separate persistence model adds ceremony without a current isolation benefit. A dedicated schema preserves the physical module boundary, while aggregate identity exists independently of persistence.
+  - Database constraints and indexes required to enforce resolved domain rules — Complete.
     - Accepted: At most one Active relationship for a directed `(SupplierOrganizationId, CustomerOrganizationId)` pair is enforced both by the normal application query/idempotent path and by a PostgreSQL partial unique index over the directed pair filtered to Active rows.
     - Accepted: `Status` is stored as readable text (`Active`/`Ended`) rather than an integer or PostgreSQL enum, with a database CHECK constraint restricting allowed values.
     - Accepted: A CHECK constraint enforces state consistency: Active requires `EndedAt IS NULL`; Ended requires `EndedAt IS NOT NULL`. The temporal rule that EndedAt is set once remains a domain/application responsibility.
+    - Accepted: A CHECK constraint also enforces `SupplierOrganizationId <> CustomerOrganizationId` as a cheap database-level backstop for the domain invariant.
     - Accepted: Supplier/Customer Organization IDs are external module references and have no foreign keys to `organization_access` persistence. Organization existence/status is validated through the OrganizationAccess contract.
-    - Rationale: Database constraints protect cheap local invariants and close concurrency races while avoiding persistence coupling across module boundaries.
-  - Transaction boundaries — In progress.
+    - Accepted: Directional list access paths get two composite indexes, one Supplier-oriented and one Customer-oriented, shaped around organization ID, status, and the decided `CreatedAt DESC, TradingRelationshipId DESC` keyset ordering.
+    - Accepted: These indexes optimize the default/status-filtered list paths. The less common `all` status query may require an additional sort; no duplicate set of status-free indexes is added without observed need.
+    - Rationale: Database constraints protect cheap local invariants and close concurrency races while avoiding persistence coupling across module boundaries. Query indexes follow known current access paths without pre-optimizing every filter variant.
+  - Transaction boundaries — Complete.
     - Accepted: Create does not introduce an explicit transaction around the pre-insert lookup and insert. OrganizationAccess validation remains outside any cross-module transaction, and EF Core/SaveChanges uses its normal write transaction. The partial unique index is the concurrency guarantee.
-    - Rationale: A normal-isolation explicit transaction would not remove the Create race, while Serializable is unnecessary when the expected race is already resolved by the unique constraint.
-  - Concurrency/race handling for lifecycle-changing operations — In progress.
+    - Accepted: End does not wrap its atomic conditional update and subsequent result/readback query in an explicit transaction; the conditional update itself is the consistency boundary.
+    - Rationale: Normal-isolation explicit transactions do not remove the Create race, and Serializable is unnecessary when the expected race is resolved by the unique constraint. Ended is terminal, so the post-update read cannot observe another legitimate lifecycle transition that would require a wider transaction.
+  - Concurrency/race handling for lifecycle-changing operations — Complete.
     - Accepted: On concurrent Create, violation of the specific Active-pair partial unique index is treated as the expected losing race; the winner's Active relationship is read back and returned through the already-defined idempotent `200 OK` semantics. Other database failures are not translated into idempotent success.
     - Accepted: End uses an atomic conditional update that transitions only a row currently in Active state. If zero rows are updated, the relationship is read again: an existing Ended relationship is idempotent success preserving its original EndedAt, while an unknown relationship remains `404 Not Found` subject to the already-defined scope semantics.
     - Accepted: The End transition timestamp comes from PriceSync's application clock/`TimeProvider` and the same timestamp is supplied to the atomic update; PostgreSQL does not define the business transition time.
-    - Rationale: Constraints/conditional updates make PostgreSQL the atomic arbiter for the small state transitions without introducing general optimistic-version infrastructure, pessimistic locking or broad retry loops.
-  - Historical retention semantics in persistence — Open
+    - Accepted: The End vertical slice may perform the atomic state transition directly in persistence (for example EF Core `ExecuteUpdateAsync`) rather than materializing the aggregate solely to call its lifecycle method. Persistence verification must protect equivalence with the domain lifecycle invariant.
+    - Accepted: No generic optimistic concurrency token/`xmin`, pessimistic locking or general retry mechanism is introduced. The known races are handled explicitly by the unique constraint and conditional update.
+    - Rationale: Constraints/conditional updates make PostgreSQL the atomic arbiter for the small state transitions without introducing concurrency infrastructure that has no additional current problem to solve.
+  - Historical retention semantics in persistence — Complete.
+    - Accepted: Ended relationships remain durable historical rows and are never reused when the same directed pair is re-established; re-establishment inserts a new aggregate/new ID.
+    - Accepted: Normal TradingRelationships application functionality exposes no physical delete path. Any future legal/retention/administrative purge requirement is separate cross-cutting work and must be designed explicitly if needed.
+    - Rationale: Relationship history is domain-significant and downstream historical references must remain stable; deletion semantics should not be invented without a concrete requirement.
+- Verification:
+  - Use real PostgreSQL integration tests for database-specific guarantees, including the Active-pair partial unique index, CHECK constraints, concurrent Create and concurrent End behaviour.
+  - Keep ordinary mapping/query verification focused and avoid duplicating the same behaviour mechanically across domain, persistence and full API layers.
 - Depends on:
   - Block 1
   - Block 3
@@ -217,6 +163,16 @@ No independent cross-cutting test-strategy decision has been identified at block
 - Define PriceSync-wide logging/observability strategy and library choices separately from issue #12. This should cover cross-cutting concerns such as structured logging, correlation, telemetry, and shared conventions rather than being decided opportunistically inside one module.
 
 ## Session Log
+
+### 2026-09-17 — Block 4 grilling, second batch
+
+- Ended relationships have no normal physical-delete path; historical rows are retained and never reused on re-establishment.
+- Supplier- and Customer-direction list queries receive composite indexes optimized for organization + status + keyset ordering; `all` is not given duplicate status-free indexes without measured need.
+- Database also enforces Supplier and Customer differ through a CHECK constraint.
+- No generic concurrency token is introduced; known Create/End races remain handled by their specific database mechanisms.
+- TradingRelationship IDs are application-generated before persistence according to the project's ID convention; immutable state does not use database triggers.
+- End may use a direct atomic persistence update, with no wider explicit transaction around update/readback.
+- Real PostgreSQL integration tests verify PostgreSQL-specific constraints and concurrent Create/End guarantees.
 
 ### 2026-09-17 — Block 4 grilling, first batch
 
