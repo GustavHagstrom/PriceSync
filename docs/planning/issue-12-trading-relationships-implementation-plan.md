@@ -149,7 +149,7 @@ The block map is complete. `/grill-planning-block` should resolve the blocks in 
 
 #### Block 4 — Persistence, consistency, and concurrency
 
-- Status: Ready to grill
+- Status: In progress
 - Purpose: Define module-owned storage and how the domain rules from Block 1 are enforced under real database and concurrent execution.
 - Decisions:
   - DbContext/schema/entity mapping and migration ownership — Open
@@ -203,6 +203,11 @@ No independent cross-cutting test-strategy decision has been identified at block
 
 ## Session Log
 
+### 2026-09-17 — Block 4 grilling started
+
+- Block 4 selected as the next `Ready to grill` block whose dependencies are complete.
+- Existing architecture already fixes PostgreSQL + EF Core/Npgsql and module-owned DbContext, mappings, migrations, and schema ownership through ADR-0003; Block 4 should refine TradingRelationships-specific persistence/concurrency decisions rather than reopen that architecture choice.
+
 ### 2026-09-17 — Block 3 grilling completed, sixth batch
 
 - `ICurrentOrganization`/current-Organization context belongs to `OrganizationAccess.Contracts`; it supplies selected Organization identity but does not itself authorize the current person.
@@ -211,65 +216,3 @@ No independent cross-cutting test-strategy decision has been identified at block
 - Missing acting Organization is `400 Bad Request` with stable `ActingOrganizationRequired` error semantics. Authentication/`401` remains a cross-cutting API concern.
 - Authorization design stops at ownership, capabilities, context and observable semantics; concrete interface/type design is intentionally deferred to implementation.
 - Block 3 completed on 2026-09-17.
-
-### 2026-09-17 — Block 3 grilling, fifth batch
-
-- Create and End both return `200 OK` with the compact relationship representation for first execution and idempotent retries; Create is externally an ensure operation rather than exposing whether a new aggregate was created.
-- Create explicitly supplies Supplier and Customer IDs, while acting Organization comes from trusted request context. Authorization/scope is checked before counterparty existence/status validation to avoid information disclosure.
-- End outside the acting Organization's relationship scope returns `404 Not Found`, matching GetById.
-- OrganizationAccess owns authorization interpretation through a purpose-built capability-based contract. TradingRelationships does not read memberships/roles or OrganizationAccess persistence directly.
-- The authorization boundary covers reads and commands and returns meaningful expected denial outcomes without exposing the internal role model; the current `Owner`/`Member` model is mapped inside OrganizationAccess.
-- Acting Organization is supplied by request/security context (for example `ICurrentOrganization` or equivalent), not as ordinary endpoint input.
-
-### 2026-09-17 — Block 3 grilling, fourth batch
-
-- Existing OrganizationAccess roles are used directly: `Owner` is required for Create/End; ordinary reads are available to `Owner`/`Member` according to established membership semantics. This was refined in the fifth batch: TradingRelationships observes capabilities rather than interpreting roles directly.
-- Archived acting Organizations cannot Create or End, but can retain read access; this is authorization policy and does not change Block 2's decision that End does not revalidate party Organization status.
-- Create requires the acting Organization to be Supplier or Customer and returns `403 Forbidden` otherwise.
-- List/GetById/End derive Organization scope from request context rather than accepting redundant OrganizationId parameters; End takes only TradingRelationshipId as command input.
-- Directional lists use opaque cursor/keyset pagination, stable newest-first ordering, `items` + `nextCursor`, and no `totalCount`.
-
-### 2026-09-17 — Block 3 grilling, third batch
-
-- Create and End require explicit auditability for both successful and failed/denied attempts, including actor, acting Organization, operation, relationship context, timestamp and outcome; the technical observability mechanism remains separate architecture work.
-- Reads do not receive a module-specific audit requirement.
-- Directional list queries are paginated, ordered by `CreatedAt DESC` plus `TradingRelationshipId` tie-breaker, and do not add free-text/Organization-name search.
-- Create, End, GetById and list items use the same compact relationship representation.
-- Self-relationship is `400 Bad Request` with a machine-readable error, and expected API failures generally expose stable machine-readable error codes.
-- Focused integration/API tests verify the main external behaviours without requiring an exhaustive combinatorial matrix.
-
-### 2026-09-17 — Block 3 grilling, second batch
-
-- Create returns the basic Trading Relationship representation and uses the same externally observable success semantics whether it created a new aggregate or returned the already-active relationship.
-- End returns the relationship in its final Ended state; repeated End preserves the original `EndedAt` and returns the same final representation.
-- Unknown relationship IDs return `404 Not Found` for lookup and End. Out-of-scope relationship lookup also returns `404` to avoid disclosing another Organization's relationship.
-- An authenticated actor in the correct Organization scope who lacks the required administrative command permission receives `403 Forbidden`.
-- Create returns `404` when Supplier or Customer Organization does not exist and `409 Conflict` when either Organization is Archived. Error semantics identify the affected Supplier/Customer role.
-
-### 2026-09-17 — Block 3 grilling, first batch
-
-- Either Supplier or Customer side may create an already externally established relationship; no counterparty approval flow exists.
-- Either side may end the relationship.
-- Create and End require administrative permission in the Organization the actor is currently acting as; reads may be available to ordinary members.
-- Repeated Create for an already-active directed pair and repeated End for an already-ended relationship are idempotent successes.
-- Read surface uses direction-specific Supplier/Customer list queries, defaults to Active with explicit historical filtering, and includes lookup by TradingRelationshipId.
-- Read authorization is scoped to the Organization the actor is currently acting as, which must be a party to the relationship.
-
-### 2026-09-17 — Block 2 grilling completed
-
-- OrganizationAccess exposes a purpose-built single-Organization status query through `OrganizationAccess.Contracts`; TradingRelationships calls it separately for Supplier and Customer.
-- New relationship creation, including re-establishment, requires both Organizations to be currently Active; validation is point-in-time without cross-module locking.
-- Organization archival does not automatically end existing relationships, and ending does not revalidate Organization status.
-- Supplier/Customer roles and creation eligibility are owned by TradingRelationships; OrganizationAccess owns Organization identity/lifecycle.
-- TradingRelationships stores only Organization IDs and neither snapshots, synchronizes, nor caches Organization status.
-- Validation occurs in the application/use-case layer before aggregate creation; expected status results remain distinct from technical failures.
-- Block 2 completed on 2026-09-17.
-
-### 2026-09-17 — Block 1 grilling completed
-
-- Stable TradingRelationshipId plus directed Supplier/Customer natural key.
-- Distinct immutable parties; direction significant; at most one Active relationship per directed pair.
-- Re-establishment creates a new aggregate; lifecycle is Active/Ended with Ended terminal.
-- CreatedAt/EndedAt represent PriceSync lifecycle time and preserve historical references.
-- Focused domain tests protect meaningful aggregate-local lifecycle/invariants; cross-aggregate uniqueness/concurrency verification belongs to Block 4.
-- Block 1 completed on 2026-09-17.
