@@ -47,10 +47,13 @@ The block map is complete. `/grill-planning-block` should resolve the blocks in 
     - Accepted: Re-establishing a previously ended directed Supplier/Customer relationship creates a new `TradingRelationship` with a new `TradingRelationshipId`; the ended relationship remains unchanged as history and is not reactivated.
     - Rationale: Parallel active relationships for the same directed parties would represent the same access/distribution scope and make downstream ownership ambiguous. Treating each establishment as a distinct aggregate preserves clear historical periods and stable downstream references while allowing the same directed parties to establish a new relationship later.
   - Lifecycle states and allowed transitions
-    - Status: Open
+    - Status: Complete
+    - Accepted: The lifecycle contains only `Active` and `Ended`. A newly represented externally established relationship starts as `Active`; the only lifecycle transition is `Active → Ended`; `Ended` is terminal.
+    - Rationale: PriceSync represents an already established external relationship rather than negotiating or approving it, so `Pending` has no domain meaning here. No current requirement establishes a separate suspended/paused state.
   - Creation, ending, re-establishment, and historical semantics
     - Status: In progress
     - Accepted: Re-establishment after an ended relationship is a new relationship instance rather than a state transition on the ended aggregate.
+    - Accepted: Ending is terminal for that aggregate; it cannot return to `Active`.
     - Rationale: An ended aggregate represents one completed historical relationship period; later commercial re-establishment is a new period with its own identity and lifecycle.
   - Temporal facts owned by the aggregate
     - Status: Open
@@ -172,6 +175,7 @@ No independent cross-cutting test-strategy decision has been identified at block
 - Direction invariant: `A → B` and `B → A` are distinct relationships and may coexist.
 - Active uniqueness: at most one active relationship may exist for an exact directed Supplier/Customer pair; ended historical instances may coexist.
 - Re-establishment: a new relationship with a new ID is created; the previous ended relationship remains immutable history.
+- Lifecycle: only `Active` and `Ended`; creation starts `Active`, `Active → Ended` is the only transition, and `Ended` is terminal.
 
 ### 2026-09-17 — Block-map correction
 
