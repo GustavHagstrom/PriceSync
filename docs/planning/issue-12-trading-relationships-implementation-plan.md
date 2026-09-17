@@ -24,7 +24,7 @@ Implement the directed Supplier → Customer Trading Relationship boundary accor
 
 ## Grilling Blocks
 
-The block map is complete. `/grill-planning-block` should resolve the blocks in dependency order, starting with Block 1. The map may still be reshaped if later grilling exposes a genuinely new decision tree.
+The block map is complete. `/grill-planning-block` should resolve the blocks in dependency order. The map may still be reshaped if later grilling exposes a genuinely new decision tree.
 
 #### Block 1 — Aggregate model and lifecycle
 
@@ -73,7 +73,7 @@ The block map is complete. `/grill-planning-block` should resolve the blocks in 
 
 #### Block 2 — Organization boundary
 
-- Status: Ready to grill
+- Status: In progress
 - Purpose: Define how TradingRelationships depends on OrganizationAccess while preserving module ownership and contextual Supplier/Customer roles.
 - Decisions:
   - Organization reference and existence-validation semantics
@@ -151,7 +151,7 @@ The block map is complete. `/grill-planning-block` should resolve the blocks in 
 
 ## Fog
 
-None currently. All visible in-scope decision areas belong to a block, and no remaining uncertainty prevents starting Block 1.
+None currently. All visible in-scope decision areas belong to a block.
 
 ## Out of Scope
 
@@ -163,7 +163,7 @@ None currently. All visible in-scope decision areas belong to a block, and no re
 - Rewriting historical downstream facts when a relationship ends.
 - A repository-wide logging/observability strategy or library choice. This requires separate cross-cutting architecture work; issue #12 only identifies domain/use-case-specific observability needs.
 - A separate implementation-structure design. Existing module, DI, and Vertical Slice conventions should be followed unless later grilling discovers a genuinely new architectural decision.
-- A standalone verification block. Verification decisions belong with the block whose behaviour or boundary they prove; only genuinely cross-cutting test concerns should be recorded separately.
+- A standalone verification block. Verification decisions belong with the owning design block unless a cross-cutting test concern emerges.
 - Implementation decomposition into tickets; `/to-tickets` owns that after all blocks are grilled.
 
 ## Test Strategy
@@ -175,6 +175,13 @@ No independent cross-cutting test-strategy decision has been identified at block
 - Define PriceSync-wide logging/observability strategy and library choices separately from issue #12. This should cover cross-cutting concerns such as structured logging, correlation, telemetry, and shared conventions rather than being decided opportunistically inside one module.
 
 ## Session Log
+
+### 2026-09-17 — Block 2 grilling started
+
+- Block 2 marked `In progress` after Block 1 completion.
+- Existing OrganizationAccess planning establishes that `OrganizationId` is already a boundary-relevant strongly typed ID in `OrganizationAccess.Contracts`.
+- Existing OrganizationAccess planning deliberately exposes no generic Organization lookup/authorization interface; purpose-built cross-context queries should be added only for a concrete consuming use case such as TradingRelationships.
+- Direct access from TradingRelationships to OrganizationAccess persistence remains forbidden.
 
 ### 2026-09-17 — Block 1 grilling started
 
