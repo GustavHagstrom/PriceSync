@@ -66,27 +66,35 @@ The block map is complete. `/grill-planning-block` should resolve the blocks in 
 - Decisions:
   - Create relationship command semantics
     - Status: In progress
-    - Accepted: Either the Supplier-side or Customer-side Organization may initiate creation, provided the actor has the required administrative permission in the Organization they are acting as.
+    - Accepted: Either the Supplier-side or Customer-side Organization may initiate creation. The acting Organization must itself be the Supplier or Customer in the requested relationship.
+    - Accepted: Create requires the actor to hold the existing OrganizationAccess `Owner` role in the acting Organization; `Member` is insufficient for lifecycle-changing commands.
+    - Accepted: An Archived acting Organization cannot Create a relationship.
+    - Accepted: If the acting Organization is neither requested party, Create returns `403 Forbidden`.
     - Accepted: No counterparty approval, invitation, or opt-in is modeled. Successful creation immediately represents the already externally established relationship as Active.
     - Accepted: Repeating create for a directed pair that already has an Active relationship is idempotent success and returns the existing active relationship/identity rather than creating another aggregate or reporting a conflict.
-    - Rationale: PriceSync records an externally established relationship rather than negotiating it. The initiating side has no lasting ownership role, and retry-safe creation avoids duplicate aggregates while preserving the one-active-per-directed-pair invariant.
+    - Rationale: PriceSync records an externally established relationship rather than negotiating it. Either party may register it, but an Organization cannot create relationships on behalf of unrelated Organizations. Existing OrganizationAccess roles are reused rather than introducing issue-specific permissions.
   - End relationship command semantics
     - Status: In progress
-    - Accepted: Either Supplier or Customer may end the relationship when the actor has the required administrative permission in the Organization they are acting as.
+    - Accepted: Either Supplier or Customer may end the relationship when the actor is `Owner` in the Organization they are acting as.
+    - Accepted: An Archived acting Organization cannot End a relationship. This is authorization at the use-case boundary, not revalidation of the relationship parties; the other active party can still End it.
+    - Accepted: End input requires only `TradingRelationshipId`; acting Organization/person come from request context and party membership is checked against authoritative relationship data.
     - Accepted: Ending an already Ended relationship is idempotent success. The existing EndedAt is preserved and no new lifecycle change occurs.
     - Accepted: Ending an unknown `TradingRelationshipId` returns `404 Not Found`; idempotent success applies only when the identified relationship exists and is already Ended.
-    - Rationale: Both parties participate in the relationship and neither creator nor Supplier receives permanent unilateral lifecycle ownership. Idempotent End supports safe retries without rewriting historical facts, while an unknown identity must not falsely imply that a relationship was successfully ended.
+    - Rationale: Both parties participate in the relationship and neither creator nor Supplier receives permanent unilateral lifecycle ownership. Idempotent End supports safe retries without rewriting historical facts. Request context supplies authorization scope rather than duplicating party data in the command.
   - Required read/query use cases and query semantics
     - Status: Complete
     - Accepted: Expose direction-specific list queries from the acting Organization perspective: relationships where it is Supplier and relationships where it is Customer.
+    - Accepted: List endpoints do not accept an OrganizationId parameter; Organization scope comes from the current acting Organization context.
     - Accepted: List queries return Active relationships by default and allow callers to explicitly request Ended/all relationships.
-    - Accepted: List queries are paginated and deterministically ordered newest first by `CreatedAt DESC`, with `TradingRelationshipId` as stable tie-breaker.
+    - Accepted: List queries use cursor/keyset pagination and are deterministically ordered newest first by `CreatedAt DESC`, with `TradingRelationshipId` as stable tie-breaker.
+    - Accepted: The cursor is opaque to clients. Responses contain `items` plus `nextCursor` and do not include `totalCount`.
     - Accepted: No free-text/Organization-name search is introduced; the list surface remains limited to direction, status and pagination.
     - Accepted: Expose lookup of a specific Trading Relationship by TradingRelationshipId.
+    - Accepted: GetById accepts only `TradingRelationshipId`; acting Organization scope comes from request context rather than an OrganizationId request parameter.
     - Accepted: A specific relationship may be read only when the Organization the actor is currently acting as is either Supplier or Customer in that relationship.
     - Accepted: Lookup of an unknown `TradingRelationshipId` returns `404 Not Found`.
     - Accepted: Lookup of a relationship outside the acting Organization's scope also returns `404 Not Found`, avoiding disclosure that another Organization's relationship exists.
-    - Rationale: Direction is core domain semantics and should be explicit in the query surface. Operational reads default to current relationships while retaining access to history. Pagination has a stable operationally useful order without expanding TradingRelationships into Organization search/read-model ownership.
+    - Rationale: Direction is core domain semantics and should be explicit in the query surface. Acting Organization is the single source of request scope. Cursor pagination provides stable traversal under concurrent inserts without exposing persistence keys or requiring total-count queries.
   - Request/response contracts and error semantics
     - Status: Complete
     - Accepted: Create, End, GetById and list items use the same compact relationship representation containing `TradingRelationshipId`, `SupplierOrganizationId`, `CustomerOrganizationId`, `Status`, `CreatedAt`, and applicable `EndedAt`.
@@ -97,14 +105,16 @@ The block map is complete. `/grill-planning-block` should resolve the blocks in 
     - Accepted: Create errors identify both the reason and the contextual party, allowing distinct `SupplierNotFound`, `CustomerNotFound`, `SupplierArchived`, and `CustomerArchived` semantics.
     - Accepted: A self-relationship request returns `400 Bad Request` with a machine-readable `SupplierAndCustomerMustDiffer` error.
     - Accepted: Expected API failures use stable machine-readable error codes in addition to HTTP status; clients need not parse human-readable error text.
-    - Accepted: Unknown relationship identity on lookup or End returns `404 Not Found`. A relationship outside the acting Organization's scope is exposed as `404 Not Found`, while an authenticated actor inside the correct Organization scope who lacks the required administrative command permission receives `403 Forbidden`.
+    - Accepted: Unknown relationship identity on lookup or End returns `404 Not Found`. A relationship outside the acting Organization's scope is exposed as `404 Not Found`, while an authenticated actor inside the correct Organization scope who lacks the required command permission receives `403 Forbidden`.
     - Rationale: API errors distinguish invalid requests, absent resources, lifecycle conflicts, authorization failures inside a valid scope, and hidden out-of-scope resources. Stable error codes preserve concrete semantics independently of human-readable messages.
   - Actor/organization authorization requirements for each operation
-    - Status: In progress
-    - Accepted: Create and End require an administrative Organization permission in the Organization the actor is acting as. Ordinary relationship reads may be available to regular members of the acting Organization, provided that Organization is a party to the relationship/query.
-    - Accepted: When the acting Organization is not a party to a specific relationship, the API returns `404 Not Found` rather than revealing the relationship through `403 Forbidden`.
-    - Accepted: When the acting Organization is a valid party but the authenticated actor lacks the administrative permission required for Create/End, the API returns `403 Forbidden`.
-    - Rationale: Create and End alter the Organization's external relationship/access scope and therefore require stronger authority than read-only access. Scope hiding and permission denial remain distinct concerns.
+    - Status: Complete
+    - Accepted: Create and End require the existing OrganizationAccess `Owner` role in the acting Organization. Ordinary relationship reads are available to active `Owner` or `Member` memberships, subject to relationship scope.
+    - Accepted: Archived acting Organizations cannot perform Create or End, while reads remain available according to the established OrganizationAccess lifecycle semantics.
+    - Accepted: Create requires the acting Organization to be one of the requested Supplier/Customer parties; otherwise it returns `403 Forbidden`.
+    - Accepted: When the acting Organization is not a party to an existing specific relationship, GetById/End expose it as `404 Not Found` rather than revealing it through `403 Forbidden`.
+    - Accepted: When the acting Organization is a valid party but the authenticated actor lacks the `Owner` role required for Create/End, the API returns `403 Forbidden`.
+    - Rationale: Issue #12 reuses the existing Owner/Member authorization model rather than inventing a new permission system. Request scope is derived solely from the acting Organization context, and existing out-of-scope relationships remain undisclosed.
   - Idempotency and repeated-operation behaviour
     - Status: Complete
     - Accepted: Repeated Create against an already-active directed pair and repeated End against an already-ended relationship are idempotent successes. No separate idempotency-key mechanism is required by these cases at this stage.
@@ -176,6 +186,14 @@ No independent cross-cutting test-strategy decision has been identified at block
 - Define PriceSync-wide logging/observability strategy and library choices separately from issue #12. This should cover cross-cutting concerns such as structured logging, correlation, telemetry, and shared conventions rather than being decided opportunistically inside one module.
 
 ## Session Log
+
+### 2026-09-17 — Block 3 grilling, fourth batch
+
+- Existing OrganizationAccess roles are used directly: `Owner` is required for Create/End; ordinary reads are available to `Owner`/`Member` according to established membership semantics.
+- Archived acting Organizations cannot Create or End, but can retain read access; this is authorization policy and does not change Block 2's decision that End does not revalidate party Organization status.
+- Create requires the acting Organization to be Supplier or Customer and returns `403 Forbidden` otherwise.
+- List/GetById/End derive Organization scope from request context rather than accepting redundant OrganizationId parameters; End takes only TradingRelationshipId as command input.
+- Directional lists use opaque cursor/keyset pagination, stable newest-first ordering, `items` + `nextCursor`, and no `totalCount`.
 
 ### 2026-09-17 — Block 3 grilling, third batch
 
