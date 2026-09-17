@@ -32,7 +32,9 @@ The block map is complete. `/grill-planning-block` should resolve the blocks in 
 - Purpose: Define the complete domain semantics of Trading Relationships, including rules that may span multiple relationship instances.
 - Decisions:
   - Aggregate identity and required state
-    - Status: Open
+    - Status: In progress
+    - Accepted: `TradingRelationship` has its own stable `TradingRelationshipId`. The directed `(SupplierOrganizationId, CustomerOrganizationId)` pair is also a domain-significant natural key used when defining uniqueness and re-establishment semantics, but is not the aggregate identity.
+    - Rationale: Other bounded contexts need a stable relationship reference independent of party-key mechanics, while the Supplier/Customer pair still carries domain meaning for cross-aggregate rules.
   - Supplier/Customer relationship invariants
     - Status: Open
   - Cross-aggregate relationship rules such as uniqueness or re-establishment semantics
@@ -155,7 +157,7 @@ No independent cross-cutting test-strategy decision has been identified at block
 ### 2026-09-17 — Block 1 grilling started
 
 - Block 1 marked `In progress`.
-- No design decisions have been accepted yet in this session.
+- Aggregate identity: accepted hybrid identity semantics — stable `TradingRelationshipId` plus domain-significant directed Supplier/Customer natural key for uniqueness/re-establishment rules.
 
 ### 2026-09-17 — Block-map correction
 
