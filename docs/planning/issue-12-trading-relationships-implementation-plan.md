@@ -29,11 +29,13 @@ The map below defines what later `/grill-planning-block` sessions must resolve. 
 #### Block 1 — Aggregate model and lifecycle
 
 - Status: Ready to grill
-- Purpose: Define the complete domain model and lifecycle semantics of one directed Trading Relationship.
+- Purpose: Define the complete domain semantics of Trading Relationships, including rules that may span multiple relationship instances.
 - Decisions:
   - Aggregate identity and required state
     - Status: Open
   - Supplier/Customer relationship invariants
+    - Status: Open
+  - Cross-aggregate relationship rules such as uniqueness or re-establishment semantics
     - Status: Open
   - Lifecycle states and allowed transitions
     - Status: Open
@@ -43,53 +45,57 @@ The map below defines what later `/grill-planning-block` sessions must resolve. 
     - Status: Open
 - Depends on:
   - None
-- Completion: The aggregate state, invariants, lifecycle transitions, and historical semantics are precise enough to implement without further domain decisions.
+- Completion: Aggregate state, invariants, lifecycle transitions, cross-aggregate domain rules, and historical semantics are precise enough for later blocks to determine enforcement.
 
-#### Block 2 — Organization boundary and authorization scope
+#### Block 2 — Organization boundary
 
 - Status: Ready to grill
-- Purpose: Define how TradingRelationships interacts with OrganizationAccess while preserving module ownership and contextual Supplier/Customer roles.
+- Purpose: Define how TradingRelationships depends on OrganizationAccess while preserving module ownership and contextual Supplier/Customer roles.
 - Decisions:
   - Organization reference and existence-validation semantics
     - Status: Open
-  - Cross-module contract needed from OrganizationAccess
+  - Contract required by TradingRelationships from OrganizationAccess
     - Status: Open
-  - Actor/organization authorization requirements for relationship operations
+  - Ownership boundary between relationship access scope and Organization identity/membership/permissions
     - Status: Open
-  - Ownership boundary between relationship access scope and Organization memberships/permissions
+  - Dependency direction and failure semantics across the OrganizationAccess boundary
     - Status: Open
 - Depends on:
   - Block 1
-- Completion: Organization references, cross-module validation, authorization responsibilities, and ownership boundaries are explicit.
+- Completion: Organization references, incoming cross-module dependency, validation responsibilities, and ownership boundaries are explicit.
 
 #### Block 3 — Use cases and external API surface
 
 - Status: Ready to grill
-- Purpose: Define the vertical slices and externally observable behaviour exposed by the TradingRelationships module.
+- Purpose: Define the vertical slices and externally observable behaviour exposed by the TradingRelationships module, including authorization at the use-case boundary.
 - Decisions:
   - Create relationship command semantics
     - Status: Open
   - End relationship command semantics
     - Status: Open
-  - Required read/query use cases, if any
+  - Required read/query use cases and query semantics
     - Status: Open
   - Request/response contracts and error semantics
     - Status: Open
+  - Actor/organization authorization requirements for each operation
+    - Status: Open
   - Idempotency and repeated-operation behaviour
+    - Status: Open
+  - Domain-specific audit/observability requirements, without choosing the application-wide logging strategy
     - Status: Open
 - Depends on:
   - Block 1
   - Block 2
-- Completion: The required vertical slices, their contracts, and externally observable success/failure semantics are fully defined.
+- Completion: Required vertical slices, query surface, authorization, contracts, and externally observable success/failure semantics are fully defined.
 
 #### Block 4 — Persistence, consistency, and concurrency
 
 - Status: Ready to grill
-- Purpose: Define module-owned storage and the guarantees required to preserve Trading Relationship invariants under real database and concurrent execution.
+- Purpose: Define module-owned storage and how the domain rules from Block 1 are enforced under real database and concurrent execution.
 - Decisions:
   - DbContext/schema/entity mapping and migration ownership
     - Status: Open
-  - Database constraints and indexes required by domain invariants
+  - Database constraints and indexes required to enforce resolved domain rules
     - Status: Open
   - Transaction boundaries
     - Status: Open
@@ -100,7 +106,7 @@ The map below defines what later `/grill-planning-block` sessions must resolve. 
 - Depends on:
   - Block 1
   - Block 3
-- Completion: Persistence structure, database guarantees, transaction scope, and concurrency behaviour are implementable and preserve the resolved domain semantics.
+- Completion: Persistence structure, database guarantees, transaction scope, and concurrency behaviour are implementable and preserve the domain semantics resolved in Block 1.
 
 #### Block 5 — Module contracts and downstream integration
 
@@ -110,6 +116,8 @@ The map below defines what later `/grill-planning-block` sessions must resolve. 
   - Contracts exposed by `PriceSync.Modules.TradingRelationships.Contracts`
     - Status: Open
   - Status/identity lookup required by Agreements or other modules
+    - Status: Open
+  - Whether lifecycle changes require synchronous contracts, domain/integration events, or another interaction pattern
     - Status: Open
   - How ending a relationship affects future downstream operations without rewriting historical facts
     - Status: Open
@@ -121,29 +129,9 @@ The map below defines what later `/grill-planning-block` sessions must resolve. 
   - Block 4
 - Completion: Downstream modules can consume exactly the relationship facts they need without taking ownership of lifecycle or crossing persistence boundaries.
 
-#### Block 6 — Verification strategy
-
-- Status: Ready to grill
-- Purpose: Define how the implementation proves domain lifecycle, use cases, persistence guarantees, and architectural ownership boundaries.
-- Decisions:
-  - Domain-level invariant coverage
-    - Status: Open
-  - Integration coverage for main use cases
-    - Status: Open
-  - Database/concurrency verification where required
-    - Status: Open
-  - Architecture/boundary verification
-    - Status: Open
-  - Test seams for cross-module interactions
-    - Status: Open
-- Depends on:
-  - Blocks 1–5
-- Completion: Material domain rules, externally observable use cases, persistence guarantees, and module boundaries each have an appropriate verification seam without unnecessary duplication.
-
 ## Fog
 
-- Whether read/query behaviour is substantial enough to remain inside Block 3 or should become its own block. Resolve structurally only if the required query surface proves independently complex.
-- Whether authorization scope is substantial enough to remain in Block 2 or needs a separate block after existing OrganizationAccess patterns are inspected during grilling.
+- None currently. Read/query behaviour remains inside Block 3 unless later grilling exposes an independently complex decision tree.
 
 ## Out of Scope
 
@@ -152,7 +140,18 @@ The map below defines what later `/grill-planning-block` sessions must resolve. 
 - Organization identity, membership, and permission ownership.
 - Price Publication, Customer Pricing, Delivery, or Retrieval implementation except for defining the minimal TradingRelationships contract they may consume.
 - Rewriting historical downstream facts when a relationship ends.
+- A repository-wide logging/observability strategy or library choice. This requires separate cross-cutting architecture work; issue #12 only identifies domain/use-case-specific observability needs.
+- A separate implementation-structure design. Existing module, DI, and Vertical Slice conventions should be followed unless later grilling discovers a genuinely new architectural decision.
+- A standalone verification block. Verification decisions belong with the block whose behaviour or boundary they prove; only genuinely cross-cutting test concerns should be recorded separately.
 - Implementation decomposition into tickets; `/to-tickets` owns that after all blocks are grilled.
+
+## Test Strategy
+
+No independent cross-cutting test-strategy decision has been identified at block-mapping time. Each `/grill-planning-block` session should define the verification needed for the decisions it resolves. Add cross-cutting test strategy here only if later grilling discovers one.
+
+## Follow-up Architecture Work
+
+- Define PriceSync-wide logging/observability strategy and library choices separately from issue #12. This should cover cross-cutting concerns such as structured logging, correlation, telemetry, and shared conventions rather than being decided opportunistically inside one module.
 
 ## Session Log
 
@@ -161,3 +160,18 @@ The map below defines what later `/grill-planning-block` sessions must resolve. 
 The initial session incorrectly resolved detailed design questions while running `/grill-to-plan`. Those provisional answers were removed from the current block map. The plan was reset to a breadth-first map of decision areas so each block can later be resolved by `/grill-planning-block`.
 
 The earlier discussion remains conversation history but is not treated as authoritative planning decisions until the owning block is grilled.
+
+### 2026-09-17 — Structural refinement
+
+Block-map decisions:
+
+- Keep downstream module contracts/integration separate from the use-case/API block.
+- Remove the standalone verification block; verification belongs to the owning design block unless a cross-cutting test concern emerges.
+- Keep persistence/consistency/concurrency separate from aggregate modelling: Block 1 defines domain rules and Block 4 determines enforcement.
+- Keep Organization boundary as its own block, but move operation authorization into the use-case/API block.
+- Block 1 owns domain semantics even when a rule spans multiple TradingRelationship instances.
+- Keep read/query surface within the use-case/API block unless later grilling exposes independently substantial complexity.
+- Keep domain/integration-event decisions within downstream integration rather than creating a separate event block.
+- Do not create an observability block for issue #12; domain-specific needs stay with their owning use cases while application-wide logging strategy becomes separate architecture work.
+- Split contracts by dependency direction: OrganizationAccess contracts consumed by TradingRelationships belong to Block 2; contracts exposed by TradingRelationships belong to Block 5.
+- Do not create an implementation-structure block; follow established module and Vertical Slice conventions unless a new architectural problem emerges.
