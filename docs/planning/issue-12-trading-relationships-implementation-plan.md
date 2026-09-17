@@ -56,9 +56,10 @@ The block map is complete. `/grill-planning-block` should resolve the blocks in 
     - Accepted: Ending is terminal for that aggregate; it cannot return to `Active`.
     - Rationale: An ended aggregate represents one completed historical relationship period; later commercial re-establishment is a new period with its own identity and lifecycle.
   - Temporal facts owned by the aggregate
-    - Status: In progress
+    - Status: Complete
     - Accepted: `CreatedAt` is the timestamp when the Trading Relationship is registered/created in PriceSync, not an externally supplied date for when the real-world commercial relationship originally began.
-    - Rationale: PriceSync owns and can state its own registration fact reliably. No current requirement establishes a separate externally effective relationship-start date or responsibility for supplying one.
+    - Accepted: `EndedAt` is the timestamp when PriceSync performs the `Active → Ended` transition. It is set once when the relationship ends and never changed afterwards; it is not an externally supplied or backdated commercial end date.
+    - Rationale: PriceSync owns and can state its own lifecycle facts reliably. No current requirement establishes separate externally effective relationship start/end dates or responsibility for supplying them.
 - Depends on:
   - None
 - Completion: Aggregate state, invariants, lifecycle transitions, cross-aggregate domain rules, and historical semantics are precise enough for later blocks to determine enforcement.
@@ -179,6 +180,7 @@ No independent cross-cutting test-strategy decision has been identified at block
 - Re-establishment: a new relationship with a new ID is created; the previous ended relationship remains immutable history.
 - Lifecycle: only `Active` and `Ended`; creation starts `Active`, `Active → Ended` is the only transition, and `Ended` is terminal.
 - Creation time: `CreatedAt` records when PriceSync registers the relationship, not when the external commercial relationship originally began.
+- Ending time: `EndedAt` records the PriceSync end transition, is set once, and is not externally supplied/backdated.
 
 ### 2026-09-17 — Block-map correction
 
