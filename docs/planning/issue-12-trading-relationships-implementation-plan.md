@@ -79,7 +79,8 @@ The block map is complete. `/grill-planning-block` should resolve the blocks in 
   - Organization reference and existence-validation semantics
     - Status: In progress
     - Accepted: Creating a Trading Relationship requires both `SupplierOrganizationId` and `CustomerOrganizationId` to reference Organizations that exist in OrganizationAccess. TradingRelationships must validate both references through the OrganizationAccess module boundary before creating the relationship.
-    - Rationale: A Trading Relationship must not be created against Organization identities that have never existed. OrganizationAccess remains the owner of Organization identity; TradingRelationships consumes only the validation semantics it needs and does not query OrganizationAccess persistence directly.
+    - Accepted: Both Organizations must be `Active` when a new Trading Relationship is created. An `Archived` Organization remains available for historical reads but cannot participate in a newly created relationship.
+    - Rationale: A Trading Relationship must not be created against Organization identities that have never existed. OrganizationAccess remains the owner of Organization identity and lifecycle; TradingRelationships consumes only the validation semantics it needs and does not query OrganizationAccess persistence directly. Creating a relationship is a new Organization-scoped business operation, so archived Organizations are not valid participants even though historical references to them remain valid.
   - Contract required by TradingRelationships from OrganizationAccess
     - Status: Open
   - Ownership boundary between relationship access scope and Organization identity/membership/permissions
@@ -185,6 +186,7 @@ No independent cross-cutting test-strategy decision has been identified at block
 - Existing OrganizationAccess planning deliberately exposes no generic Organization lookup/authorization interface; purpose-built cross-context queries should be added only for a concrete consuming use case such as TradingRelationships.
 - Direct access from TradingRelationships to OrganizationAccess persistence remains forbidden.
 - Organization existence: creating a Trading Relationship requires both Supplier and Customer Organization IDs to exist in OrganizationAccess, validated through its module boundary.
+- Organization lifecycle: both Organizations must be `Active` at relationship creation; archived Organizations remain valid only for historical references/reads.
 
 ### 2026-09-17 — Block 1 grilling started
 
