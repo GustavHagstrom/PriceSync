@@ -152,10 +152,25 @@ The block map is complete. `/grill-planning-block` should resolve the blocks in 
 - Status: In progress
 - Purpose: Define module-owned storage and how the domain rules from Block 1 are enforced under real database and concurrent execution.
 - Decisions:
-  - DbContext/schema/entity mapping and migration ownership — Open
-  - Database constraints and indexes required to enforce resolved domain rules — Open
-  - Transaction boundaries — Open
-  - Concurrency/race handling for lifecycle-changing operations — Open
+  - DbContext/schema/entity mapping and migration ownership — In progress.
+    - Accepted: `TradingRelationship` is mapped directly by EF Core; no separate persistence entity/mapping layer is introduced.
+    - Accepted: TradingRelationships owns PostgreSQL schema `trading_relationships`, its DbContext, entity mappings and migrations, following ADR-0003.
+    - Accepted: The aggregate persists as one relationship table with its stable ID, Supplier/Customer Organization IDs, Status, CreatedAt and nullable EndedAt.
+    - Rationale: The persistence shape closely matches the small aggregate, so a separate persistence model adds ceremony without a current isolation benefit. A dedicated schema preserves the physical module boundary.
+  - Database constraints and indexes required to enforce resolved domain rules — In progress.
+    - Accepted: At most one Active relationship for a directed `(SupplierOrganizationId, CustomerOrganizationId)` pair is enforced both by the normal application query/idempotent path and by a PostgreSQL partial unique index over the directed pair filtered to Active rows.
+    - Accepted: `Status` is stored as readable text (`Active`/`Ended`) rather than an integer or PostgreSQL enum, with a database CHECK constraint restricting allowed values.
+    - Accepted: A CHECK constraint enforces state consistency: Active requires `EndedAt IS NULL`; Ended requires `EndedAt IS NOT NULL`. The temporal rule that EndedAt is set once remains a domain/application responsibility.
+    - Accepted: Supplier/Customer Organization IDs are external module references and have no foreign keys to `organization_access` persistence. Organization existence/status is validated through the OrganizationAccess contract.
+    - Rationale: Database constraints protect cheap local invariants and close concurrency races while avoiding persistence coupling across module boundaries.
+  - Transaction boundaries — In progress.
+    - Accepted: Create does not introduce an explicit transaction around the pre-insert lookup and insert. OrganizationAccess validation remains outside any cross-module transaction, and EF Core/SaveChanges uses its normal write transaction. The partial unique index is the concurrency guarantee.
+    - Rationale: A normal-isolation explicit transaction would not remove the Create race, while Serializable is unnecessary when the expected race is already resolved by the unique constraint.
+  - Concurrency/race handling for lifecycle-changing operations — In progress.
+    - Accepted: On concurrent Create, violation of the specific Active-pair partial unique index is treated as the expected losing race; the winner's Active relationship is read back and returned through the already-defined idempotent `200 OK` semantics. Other database failures are not translated into idempotent success.
+    - Accepted: End uses an atomic conditional update that transitions only a row currently in Active state. If zero rows are updated, the relationship is read again: an existing Ended relationship is idempotent success preserving its original EndedAt, while an unknown relationship remains `404 Not Found` subject to the already-defined scope semantics.
+    - Accepted: The End transition timestamp comes from PriceSync's application clock/`TimeProvider` and the same timestamp is supplied to the atomic update; PostgreSQL does not define the business transition time.
+    - Rationale: Constraints/conditional updates make PostgreSQL the atomic arbiter for the small state transitions without introducing general optimistic-version infrastructure, pessimistic locking or broad retry loops.
   - Historical retention semantics in persistence — Open
 - Depends on:
   - Block 1
@@ -202,6 +217,15 @@ No independent cross-cutting test-strategy decision has been identified at block
 - Define PriceSync-wide logging/observability strategy and library choices separately from issue #12. This should cover cross-cutting concerns such as structured logging, correlation, telemetry, and shared conventions rather than being decided opportunistically inside one module.
 
 ## Session Log
+
+### 2026-09-17 — Block 4 grilling, first batch
+
+- Direct EF Core mapping of `TradingRelationship` selected; TradingRelationships owns PostgreSQL schema `trading_relationships`, DbContext, mappings and migrations.
+- Active directed-pair uniqueness is protected by both the normal application idempotency lookup and a partial unique index; concurrent losing Create reads back the winner after the specific expected constraint violation.
+- Status is persisted as constrained text; database CHECK constraints protect allowed statuses and Status/EndedAt consistency.
+- Organization IDs remain persistence-independent cross-module references with no foreign keys into OrganizationAccess.
+- Create relies on normal EF write transaction semantics rather than explicit/Serializable transactions; the unique index owns race arbitration.
+- End is an atomic conditional Active-to-Ended update. A zero-row update is resolved by rereading for idempotent Ended versus Not Found, and EndedAt comes from PriceSync's application clock.
 
 ### 2026-09-17 — Block 4 grilling started
 
