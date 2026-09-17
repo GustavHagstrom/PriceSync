@@ -28,7 +28,7 @@ The block map is complete. `/grill-planning-block` should resolve the blocks in 
 
 #### Block 1 — Aggregate model and lifecycle
 
-- Status: Ready to grill
+- Status: In progress
 - Purpose: Define the complete domain semantics of Trading Relationships, including rules that may span multiple relationship instances.
 - Decisions:
   - Aggregate identity and required state
@@ -151,6 +151,11 @@ No independent cross-cutting test-strategy decision has been identified at block
 - Define PriceSync-wide logging/observability strategy and library choices separately from issue #12. This should cover cross-cutting concerns such as structured logging, correlation, telemetry, and shared conventions rather than being decided opportunistically inside one module.
 
 ## Session Log
+
+### 2026-09-17 — Block 1 grilling started
+
+- Block 1 marked `In progress`.
+- No design decisions have been accepted yet in this session.
 
 ### 2026-09-17 — Block-map correction
 
