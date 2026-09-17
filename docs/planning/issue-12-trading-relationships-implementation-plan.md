@@ -40,7 +40,8 @@ The block map is complete. `/grill-planning-block` should resolve the blocks in 
     - Status: Complete
     - Accepted: Supplier and Customer must be two distinct Organizations within one `TradingRelationship`; `SupplierOrganizationId == CustomerOrganizationId` is invalid.
     - Accepted: Relationship direction is semantically significant. `A → B` and `B → A` are separate Trading Relationships and may coexist.
-    - Rationale: Supplier and Customer are contextual roles and one Organization may hold different roles across different relationships. A self-directed `X → X` relationship has no meaningful price-distribution scope, while two Organizations may legitimately supply each other in separate directed relationships.
+    - Accepted: `SupplierOrganizationId` and `CustomerOrganizationId` are immutable after creation. Changing either party means a different Trading Relationship and therefore a different aggregate identity.
+    - Rationale: Supplier and Customer are contextual roles and one Organization may hold different roles across different relationships. A self-directed `X → X` relationship has no meaningful price-distribution scope, while two Organizations may legitimately supply each other in separate directed relationships. Keeping the parties immutable ensures a stable `TradingRelationshipId` never changes which directed relationship historical downstream references identify.
   - Cross-aggregate relationship rules such as uniqueness or re-establishment semantics
     - Status: Complete
     - Accepted: For one exact directed `(SupplierOrganizationId, CustomerOrganizationId)` pair, at most one Trading Relationship may be active at a time. Historical ended relationships for the same directed pair may coexist with the active relationship.
@@ -176,6 +177,7 @@ No independent cross-cutting test-strategy decision has been identified at block
 - Required state: accepted `TradingRelationshipId`, Supplier/Customer Organization IDs, lifecycle status, `CreatedAt`, and nullable `EndedAt`; generic `UpdatedAt` is excluded from domain state.
 - Party invariant: Supplier and Customer must be distinct Organizations; self-directed relationships are invalid.
 - Direction invariant: `A → B` and `B → A` are distinct relationships and may coexist.
+- Party immutability: Supplier and Customer Organization IDs cannot change after creation; changing either party means a different Trading Relationship.
 - Active uniqueness: at most one active relationship may exist for an exact directed Supplier/Customer pair; ended historical instances may coexist.
 - Re-establishment: a new relationship with a new ID is created; the previous ended relationship remains immutable history.
 - Lifecycle: only `Active` and `Ended`; creation starts `Active`, `Active → Ended` is the only transition, and `Ended` is terminal.
