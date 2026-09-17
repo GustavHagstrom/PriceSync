@@ -19,6 +19,8 @@ It owns:
 - `CreatedAt`
 - nullable `EndedAt`
 
+`SupplierOrganizationId` and `CustomerOrganizationId` are immutable after creation. Changing either party means a different Trading Relationship and therefore a different aggregate identity.
+
 `CreatedAt` records when PriceSync registers the relationship. It does not represent an externally supplied date for when the real-world commercial relationship originally began. `EndedAt` records when PriceSync performs the `Active → Ended` transition; it is set once and is not an externally supplied or backdated commercial end date.
 
 The directed `(SupplierOrganizationId, CustomerOrganizationId)` pair is domain-significant for uniqueness and re-establishment rules, but is not the aggregate identity. Generic update metadata such as `UpdatedAt` is not domain state.
@@ -50,6 +52,7 @@ The area produces facts that a Trading Relationship exists or has ended. Downstr
 
 - A Trading Relationship connects exactly one Supplier Organization to exactly one distinct Customer Organization; a self-directed relationship is invalid.
 - Supplier and Customer are contextual roles in this relationship, not permanent Organization types.
+- Supplier and Customer Organization IDs are immutable for the lifetime of the relationship.
 - Direction is significant: `A → B` and `B → A` are separate relationships and may coexist.
 - At most one active Trading Relationship may exist for the same directed Supplier/Customer pair at a time.
 - Ended relationships are retained as history; later re-establishment creates a new relationship rather than reactivating an ended one.
