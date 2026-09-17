@@ -42,7 +42,9 @@ The block map is complete. `/grill-planning-block` should resolve the blocks in 
     - Accepted: Relationship direction is semantically significant. `A → B` and `B → A` are separate Trading Relationships and may coexist.
     - Rationale: Supplier and Customer are contextual roles and one Organization may hold different roles across different relationships. A self-directed `X → X` relationship has no meaningful price-distribution scope, while two Organizations may legitimately supply each other in separate directed relationships.
   - Cross-aggregate relationship rules such as uniqueness or re-establishment semantics
-    - Status: Open
+    - Status: In progress
+    - Accepted: For one exact directed `(SupplierOrganizationId, CustomerOrganizationId)` pair, at most one Trading Relationship may be active at a time. Historical ended relationships for the same directed pair may coexist with the active relationship.
+    - Rationale: Parallel active relationships for the same directed parties would represent the same access/distribution scope and make downstream ownership ambiguous, while retaining ended instances preserves history and permits a later relationship to be established as a distinct historical instance.
   - Lifecycle states and allowed transitions
     - Status: Open
   - Creation, ending, re-establishment, and historical semantics
@@ -165,6 +167,7 @@ No independent cross-cutting test-strategy decision has been identified at block
 - Required state: accepted `TradingRelationshipId`, Supplier/Customer Organization IDs, lifecycle status, `CreatedAt`, and nullable `EndedAt`; generic `UpdatedAt` is excluded from domain state.
 - Party invariant: Supplier and Customer must be distinct Organizations; self-directed relationships are invalid.
 - Direction invariant: `A → B` and `B → A` are distinct relationships and may coexist.
+- Active uniqueness: at most one active relationship may exist for an exact directed Supplier/Customer pair; ended historical instances may coexist.
 
 ### 2026-09-17 — Block-map correction
 
