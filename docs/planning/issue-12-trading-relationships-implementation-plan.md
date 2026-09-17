@@ -37,7 +37,9 @@ The block map is complete. `/grill-planning-block` should resolve the blocks in 
     - Accepted: Required aggregate state is `TradingRelationshipId`, `SupplierOrganizationId`, `CustomerOrganizationId`, lifecycle `Status`, `CreatedAt`, and nullable `EndedAt`. Generic update metadata such as `UpdatedAt` is not part of the domain state unless a later concrete requirement establishes domain meaning for it.
     - Rationale: Other bounded contexts need a stable relationship reference independent of party-key mechanics, while the Supplier/Customer pair still carries domain meaning for cross-aggregate rules. Creation and ending timestamps are lifecycle facts owned by the relationship rather than generic persistence audit metadata.
   - Supplier/Customer relationship invariants
-    - Status: Open
+    - Status: In progress
+    - Accepted: Supplier and Customer must be two distinct Organizations within one `TradingRelationship`; `SupplierOrganizationId == CustomerOrganizationId` is invalid.
+    - Rationale: Supplier and Customer are contextual roles and one Organization may hold different roles across different relationships, but a self-directed `X → X` relationship has no meaningful price-distribution scope and should be rejected by the domain.
   - Cross-aggregate relationship rules such as uniqueness or re-establishment semantics
     - Status: Open
   - Lifecycle states and allowed transitions
@@ -160,6 +162,7 @@ No independent cross-cutting test-strategy decision has been identified at block
 - Block 1 marked `In progress`.
 - Aggregate identity: accepted hybrid identity semantics — stable `TradingRelationshipId` plus domain-significant directed Supplier/Customer natural key for uniqueness/re-establishment rules.
 - Required state: accepted `TradingRelationshipId`, Supplier/Customer Organization IDs, lifecycle status, `CreatedAt`, and nullable `EndedAt`; generic `UpdatedAt` is excluded from domain state.
+- Party invariant: Supplier and Customer must be distinct Organizations; self-directed relationships are invalid.
 
 ### 2026-09-17 — Block-map correction
 
