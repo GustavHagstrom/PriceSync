@@ -1,6 +1,6 @@
 # Issue #12: Trading Relationships Implementation Plan
 
-> Status: Blocks defined
+> Status: Ready for implementation
 >
 > Authority: This file records planning decisions and history. Current domain language,
 > architecture, tests, and code remain authoritative for implemented behaviour.
@@ -24,7 +24,7 @@ Implement the directed Supplier → Customer Trading Relationship boundary accor
 
 ## Grilling Blocks
 
-The block map is complete. `/grill-planning-block` should resolve the blocks in dependency order. The map may still be reshaped if later grilling exposes a genuinely new decision tree.
+All planning blocks are complete. The plan is ready for implementation decomposition through `/to-tickets`.
 
 #### Block 1 — Aggregate model and lifecycle
 
@@ -81,7 +81,8 @@ The block map is complete. `/grill-planning-block` should resolve the blocks in 
 
 #### Block 4 — Persistence, consistency, and concurrency
 
-- Status: In progress
+- Status: Complete
+- Completed: 2026-09-17
 - Purpose: Define module-owned storage and how the domain rules from Block 1 are enforced under real database and concurrent execution.
 - Decisions:
   - DbContext/schema/entity mapping and migration ownership — Complete.
@@ -125,12 +126,26 @@ The block map is complete. `/grill-planning-block` should resolve the blocks in 
 
 #### Block 5 — Minimal public module boundary
 
-- Status: Ready to grill
+- Status: Complete
+- Completed: 2026-09-17
 - Purpose: Define only the public TradingRelationships module boundary required by issue #12, without proactively designing future consumer integrations.
 - Decisions:
-  - Minimum contracts, if any, that `PriceSync.Modules.TradingRelationships.Contracts` must expose for issue #12 — Open
-  - Minimum relationship identity/status access required outside the module by current scope — Open
-  - Dependency-direction and ownership guarantees that the public boundary must preserve — Open
+  - Minimum contracts required by issue #12 — Complete.
+    - Accepted: Issue #12 introduces no cross-module query contract for Trading Relationship identity/status because no current consumer requires one.
+    - Accepted: `PriceSync.Modules.TradingRelationships.Contracts` may remain empty/minimal; no type is introduced merely because the project exists.
+    - Accepted: HTTP request/response models belong to the TradingRelationships Vertical Slices and are not placed in the Contracts project. Contracts is reserved for real module-to-module contracts.
+  - Minimum relationship identity/status access outside the module — Complete.
+    - Accepted: No such access is required by current issue #12 scope. The concrete shape of a future Agreements or other consumer contract is deliberately deferred until that consumer is implemented.
+    - Accepted: Future modules do not consume the TradingRelationships domain model directly; they use explicit contracts designed from their concrete needs.
+  - Dependency direction and ownership — Complete.
+    - Accepted: The API host is the composition root and may reference `PriceSync.Modules.TradingRelationships` directly for module registration and endpoint mapping; this is not a cross-module domain dependency.
+    - Accepted: Other feature modules must not reference TradingRelationships implementation or persistence directly. A future cross-module dependency must go through an explicit TradingRelationships contract.
+    - Accepted: `TradingRelationships.Contracts` remains independent of the TradingRelationships implementation.
+    - Accepted: As a default design principle, TradingRelationships public contracts own their own contract types. Contracts-to-Contracts dependencies are introduced only when a concrete need justifies them rather than being established speculatively.
+    - Accepted: No architecture test is added yet for hypothetical Contracts-to-Contracts dependencies that do not exist.
+- Verification:
+  - Architecture tests protect the actual current boundary by preventing other feature modules from directly referencing the TradingRelationships implementation.
+  - No additional contract-behaviour verification is required because issue #12 introduces no cross-module contract.
 - Depends on:
   - Block 1
   - Block 3
@@ -139,7 +154,7 @@ The block map is complete. `/grill-planning-block` should resolve the blocks in 
 
 ## Fog
 
-None currently. All visible in-scope decision areas belong to a block.
+None. All in-scope planning decisions are resolved.
 
 ## Out of Scope
 
@@ -150,19 +165,34 @@ None currently. All visible in-scope decision areas belong to a block.
 - Hypothetical domain/integration events or contracts not required by issue #12.
 - Rewriting historical downstream facts when a relationship ends.
 - A repository-wide logging/observability strategy or library choice. This requires separate cross-cutting architecture work; issue #12 only identifies domain/use-case-specific observability needs.
-- A separate implementation-structure design. Existing module, DI, and Vertical Slice conventions should be followed unless later grilling discovers a genuinely new architectural decision.
+- A separate implementation-structure design. Existing module, DI, and Vertical Slice conventions should be followed unless implementation exposes a genuinely new architectural decision.
 - A standalone verification block. Verification decisions belong with the owning design block unless a cross-cutting test concern emerges.
 - Implementation decomposition into tickets; `/to-tickets` owns that after all blocks are grilled.
 
 ## Test Strategy
 
-No independent cross-cutting test-strategy decision has been identified at block-mapping time. Each `/grill-planning-block` session should define the verification needed for the decisions it resolves. Add cross-cutting test strategy here only if later grilling discovers one.
+No independent cross-cutting test-strategy decision emerged. Verification requirements are recorded in their owning blocks.
 
 ## Follow-up Architecture Work
 
 - Define PriceSync-wide logging/observability strategy and library choices separately from issue #12. This should cover cross-cutting concerns such as structured logging, correlation, telemetry, and shared conventions rather than being decided opportunistically inside one module.
 
 ## Session Log
+
+### 2026-09-17 — Block 5 grilling completed
+
+- Issue #12 adds no speculative cross-module TradingRelationships query/status contract; the Contracts project may remain empty/minimal until a concrete consumer exists.
+- HTTP DTOs remain owned by their Vertical Slices rather than being placed in the cross-module Contracts project.
+- The API host may reference the implementation as composition root, while other feature modules may not reference TradingRelationships implementation/persistence directly.
+- Future cross-module dependencies must use explicit contracts designed from concrete consumer needs; no future Agreements contract or shared domain type is designed now.
+- Contracts-to-Contracts dependencies are not established or architecture-tested speculatively.
+- Existing/current architecture verification is extended to protect the actual direct-implementation dependency rule; no additional contract tests are needed while no cross-module contract exists.
+- Block 5 completed on 2026-09-17. With Blocks 1–5 complete, Fog empty, verification owned by the relevant blocks, and no unresolved in-scope decisions, the plan is Ready for implementation.
+
+### 2026-09-17 — Block 4 grilling completed
+
+- Block 4 completion criterion was rechecked after the second decision batch. Persistence structure, database guarantees, transaction boundaries, concurrency behaviour, retention semantics and PostgreSQL verification are all implementable with no remaining in-block design question.
+- Block 4 completed on 2026-09-17.
 
 ### 2026-09-17 — Block 4 grilling, second batch
 
