@@ -73,20 +73,39 @@ The block map is complete. `/grill-planning-block` should resolve the blocks in 
 
 #### Block 2 — Organization boundary
 
-- Status: In progress
+- Status: Complete
+- Completed: 2026-09-17
 - Purpose: Define how TradingRelationships depends on OrganizationAccess while preserving module ownership and contextual Supplier/Customer roles.
 - Decisions:
   - Organization reference and existence-validation semantics
-    - Status: In progress
-    - Accepted: Creating a Trading Relationship requires both `SupplierOrganizationId` and `CustomerOrganizationId` to reference Organizations that exist in OrganizationAccess. TradingRelationships must validate both references through the OrganizationAccess module boundary before creating the relationship.
-    - Accepted: Both Organizations must be `Active` when a new Trading Relationship is created. An `Archived` Organization remains available for historical reads but cannot participate in a newly created relationship.
-    - Rationale: A Trading Relationship must not be created against Organization identities that have never existed. OrganizationAccess remains the owner of Organization identity and lifecycle; TradingRelationships consumes only the validation semantics it needs and does not query OrganizationAccess persistence directly. Creating a relationship is a new Organization-scoped business operation, so archived Organizations are not valid participants even though historical references to them remain valid.
+    - Status: Complete
+    - Accepted: Creating a Trading Relationship requires both `SupplierOrganizationId` and `CustomerOrganizationId` to reference Organizations that exist in OrganizationAccess and are currently `Active`. Re-establishment is a new creation and performs the same validation again.
+    - Accepted: Validation is point-in-time. TradingRelationships does not coordinate a cross-module transaction or lock with OrganizationAccess if an Organization is archived concurrently after validation.
+    - Accepted: Archiving an Organization does not automatically end existing Trading Relationships, and current Organization status is not revalidated when an existing relationship is ended.
+    - Rationale: Creation is a new Organization-scoped operation and therefore requires currently valid participants. Existing relationship lifecycle remains independently owned by TradingRelationships. Cross-module locking would couple otherwise separate module-owned transactions for an edge race without a demonstrated requirement for stronger consistency.
   - Contract required by TradingRelationships from OrganizationAccess
-    - Status: Open
+    - Status: Complete
+    - Accepted: `OrganizationAccess.Contracts` exposes a purpose-built single-Organization status query. TradingRelationships calls it separately for Supplier and Customer rather than using a relationship-specific batch contract.
+    - Accepted: The minimal result distinguishes `Active`, `Archived`, and `NotFound`; no generic Organization read model, name, metadata, role information, or eligibility abstraction is exposed.
+    - Accepted: TradingRelationships does not cache or persist Organization status. Each new relationship creation queries current status through the module contract.
+    - Rationale: The consumer needs only identity existence and current lifecycle status. A single-ID contract remains independent of TradingRelationships-specific Supplier/Customer pairing while avoiding unnecessary exposure of the Organization model.
   - Ownership boundary between relationship access scope and Organization identity/membership/permissions
-    - Status: Open
+    - Status: Complete
+    - Accepted: OrganizationAccess owns Organization identity and lifecycle facts. TradingRelationships owns the rule that a new relationship requires `Active` Organizations and owns Supplier/Customer as contextual roles created by relationship direction.
+    - Accepted: OrganizationAccess does not know whether an Organization is being used as Supplier or Customer. TradingRelationships stores only the Organization IDs and does not snapshot or synchronize Organization lifecycle state.
+    - Accepted: OrganizationAccess continues to own memberships and permissions; actor authorization for TradingRelationship use cases is resolved in Block 3.
+    - Rationale: Supplier/Customer are relationship-specific roles rather than permanent Organization types. Keeping eligibility policy in the consuming use case prevents OrganizationAccess from acquiring TradingRelationships domain language or responsibilities.
   - Dependency direction and failure semantics across the OrganizationAccess boundary
-    - Status: Open
+    - Status: Complete
+    - Accepted: The status query belongs to `OrganizationAccess.Contracts`; TradingRelationships depends on that public contract only and must not access OrganizationAccess implementation or persistence directly.
+    - Accepted: Organization validation is performed in the TradingRelationships application/use-case layer before aggregate creation. The aggregate receives Organization IDs and has no dependency on OrganizationAccess.
+    - Accepted: `Active`, `Archived`, and `NotFound` are expected contract results. Technical failures crossing the OrganizationAccess boundary fail the operation and must not be translated into `NotFound`.
+    - Accepted: Block 2 defines only internal module-boundary semantics. Exact external error contracts and HTTP mappings for `Archived` and `NotFound` belong to Block 3.
+    - Rationale: Provider-owned module contracts preserve the existing dependency direction while keeping domain aggregates free of infrastructure/cross-module dependencies. Expected business outcomes must remain distinguishable from technical dependency failures.
+- Verification:
+  - Focused application/integration tests should verify relationship creation with `Active`, `Archived`, and `NotFound` Organization results and re-establishment applying the same validation.
+  - Architecture verification should protect against TradingRelationships depending directly on OrganizationAccess implementation/persistence.
+  - Aggregate unit tests do not need to duplicate OrganizationAccess validation because that rule is enforced at the application/module boundary.
 - Depends on:
   - Block 1
 - Completion: Organization references, incoming cross-module dependency, validation responsibilities, and ownership boundaries are explicit.
@@ -178,6 +197,20 @@ No independent cross-cutting test-strategy decision has been identified at block
 - Define PriceSync-wide logging/observability strategy and library choices separately from issue #12. This should cover cross-cutting concerns such as structured logging, correlation, telemetry, and shared conventions rather than being decided opportunistically inside one module.
 
 ## Session Log
+
+### 2026-09-17 — Block 2 grilling completed
+
+- OrganizationAccess exposes a purpose-built single-Organization status query through `OrganizationAccess.Contracts`; TradingRelationships calls it separately for Supplier and Customer.
+- The result exposes only `Active`, `Archived`, and `NotFound`; no generic Organization read model or TradingRelationships-specific role/eligibility concept is added.
+- New relationship creation, including re-establishment, requires both Organizations to be currently `Active`.
+- Validation is point-in-time; no cross-module transaction or locking is introduced for concurrent Organization archival.
+- Organization archival does not automatically end existing relationships, and ending an existing relationship does not revalidate Organization status.
+- Supplier/Customer roles and the rule requiring Active participants are owned by TradingRelationships; OrganizationAccess owns Organization identity/lifecycle and does not know relationship roles.
+- TradingRelationships stores only Organization IDs and neither snapshots, synchronizes, nor caches Organization status.
+- Validation occurs in the application/use-case layer before aggregate creation; the aggregate does not depend on OrganizationAccess.
+- Expected `Active`/`Archived`/`NotFound` results remain distinct from technical failures. External HTTP/error mapping is deferred to Block 3.
+- Verification uses focused application/integration tests plus architecture protection against direct OrganizationAccess implementation/persistence dependencies.
+- Block 2 completed on 2026-09-17.
 
 ### 2026-09-17 — Block 2 grilling started
 
