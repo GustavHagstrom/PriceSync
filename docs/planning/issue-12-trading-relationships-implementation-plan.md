@@ -1,6 +1,6 @@
 # Issue #12: Trading Relationships Implementation Plan
 
-> Status: Structuring
+> Status: Blocks defined
 >
 > Authority: This file records planning decisions and history. Current domain language,
 > architecture, tests, and code remain authoritative for implemented behaviour.
@@ -24,7 +24,7 @@ Implement the directed Supplier → Customer Trading Relationship boundary accor
 
 ## Grilling Blocks
 
-The map below defines what later `/grill-planning-block` sessions must resolve. It intentionally does not resolve those design questions here.
+The block map is complete. `/grill-planning-block` should resolve the blocks in dependency order, starting with Block 1. The map may still be reshaped if later grilling exposes a genuinely new decision tree.
 
 #### Block 1 — Aggregate model and lifecycle
 
@@ -108,37 +108,34 @@ The map below defines what later `/grill-planning-block` sessions must resolve. 
   - Block 3
 - Completion: Persistence structure, database guarantees, transaction scope, and concurrency behaviour are implementable and preserve the domain semantics resolved in Block 1.
 
-#### Block 5 — Module contracts and downstream integration
+#### Block 5 — Minimal public module boundary
 
 - Status: Ready to grill
-- Purpose: Define the minimal public contract through which Agreements and future Supplier-backed distribution flows consume Trading Relationship identity/status.
+- Purpose: Define only the public TradingRelationships module boundary required by issue #12, without proactively designing future consumer integrations.
 - Decisions:
-  - Contracts exposed by `PriceSync.Modules.TradingRelationships.Contracts`
+  - Minimum contracts, if any, that `PriceSync.Modules.TradingRelationships.Contracts` must expose for issue #12
     - Status: Open
-  - Status/identity lookup required by Agreements or other modules
+  - Minimum relationship identity/status access required outside the module by current scope
     - Status: Open
-  - Whether lifecycle changes require synchronous contracts, domain/integration events, or another interaction pattern
-    - Status: Open
-  - How ending a relationship affects future downstream operations without rewriting historical facts
-    - Status: Open
-  - Dependency direction and prohibition of shared persistence/transactions
+  - Dependency-direction and ownership guarantees that the public boundary must preserve
     - Status: Open
 - Depends on:
   - Block 1
   - Block 3
   - Block 4
-- Completion: Downstream modules can consume exactly the relationship facts they need without taking ownership of lifecycle or crossing persistence boundaries.
+- Completion: Issue #12 exposes no more public module surface than currently required, while preserving a clean ownership boundary for future consumers.
 
 ## Fog
 
-- None currently. Read/query behaviour remains inside Block 3 unless later grilling exposes an independently complex decision tree.
+None currently. All visible in-scope decision areas belong to a block, and no remaining uncertainty prevents starting Block 1.
 
 ## Out of Scope
 
 - Negotiating, requesting, inviting, or commercially accepting a Trading Relationship.
 - Price Agreement terms or Agreement lifecycle.
 - Organization identity, membership, and permission ownership.
-- Price Publication, Customer Pricing, Delivery, or Retrieval implementation except for defining the minimal TradingRelationships contract they may consume.
+- Proactive design of future Agreements, Price Publication, Customer Pricing, Delivery, or Retrieval integrations. Their concrete consumer needs should be designed when those integrations are implemented.
+- Hypothetical domain/integration events or contracts not required by issue #12.
 - Rewriting historical downstream facts when a relationship ends.
 - A repository-wide logging/observability strategy or library choice. This requires separate cross-cutting architecture work; issue #12 only identifies domain/use-case-specific observability needs.
 - A separate implementation-structure design. Existing module, DI, and Vertical Slice conventions should be followed unless later grilling discovers a genuinely new architectural decision.
@@ -175,3 +172,10 @@ Block-map decisions:
 - Do not create an observability block for issue #12; domain-specific needs stay with their owning use cases while application-wide logging strategy becomes separate architecture work.
 - Split contracts by dependency direction: OrganizationAccess contracts consumed by TradingRelationships belong to Block 2; contracts exposed by TradingRelationships belong to Block 5.
 - Do not create an implementation-structure block; follow established module and Vertical Slice conventions unless a new architectural problem emerges.
+
+### 2026-09-17 — Block map completed
+
+- Narrowed Block 5 from proactive downstream integration design to the minimal public module boundary actually required by issue #12.
+- Future consumer-specific contracts, events, and integration behaviour are deferred until those consumers are implemented.
+- Confirmed that no remaining visible fog prevents starting Block 1.
+- Plan status advanced from `Structuring` to `Blocks defined`.
