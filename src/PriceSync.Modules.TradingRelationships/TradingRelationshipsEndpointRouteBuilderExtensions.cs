@@ -1,0 +1,18 @@
+﻿using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Routing;
+
+namespace PriceSync.Modules.TradingRelationships;
+
+public static class TradingRelationshipsEndpointRouteBuilderExtensions
+{
+    public static IEndpointRouteBuilder MapTradingRelationshipsEndpoints(this IEndpointRouteBuilder endpoints)
+    {
+        var api = endpoints
+            .MapGroup("/api/v1/trading-relationships")
+            .RequireAuthorization();
+
+
+
+        return endpoints;
+    }
+}

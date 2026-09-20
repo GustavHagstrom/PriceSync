@@ -22,7 +22,7 @@ builder.Services.AddAuthentication(UnavailableAuthenticationHandler.SchemeName)
 builder.Services.AddAuthorization();
 builder.Services.AddScoped<ICurrentPerson, ClaimsCurrentPerson>();
 builder.Services.AddOrganizationAccessModule(builder.Configuration);
-builder.Services.AddTradingRelationshipsModule();
+builder.Services.AddTradingRelationshipsModule(builder.Configuration);
 builder.Services.AddAgreementsModule();
 builder.Services.AddPricePublicationModule();
 builder.Services.AddCustomerPricingModule();
@@ -65,6 +65,7 @@ app.UseAuthorization();
 
 app.MapGet("/", () => Results.Ok(new { service = "PriceSync.Api" }));
 app.MapOrganizationAccessEndpoints();
+app.MapTradingRelationshipsEndpoints();
 
 app.Run();
 
