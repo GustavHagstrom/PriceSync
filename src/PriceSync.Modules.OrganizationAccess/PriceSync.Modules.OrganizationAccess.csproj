@@ -11,6 +11,11 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Content Update="$(NuGetPackageRoot)microsoft.codeanalysis.workspaces.msbuild\*\contentFiles\any\any\BuildHost-*\**\*"
+             Visible="false" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\PriceSync.SharedKernel\PriceSync.SharedKernel.csproj" />
     <ProjectReference Include="..\PriceSync.Modules.OrganizationAccess.Contracts\PriceSync.Modules.OrganizationAccess.Contracts.csproj" />
   </ItemGroup>
