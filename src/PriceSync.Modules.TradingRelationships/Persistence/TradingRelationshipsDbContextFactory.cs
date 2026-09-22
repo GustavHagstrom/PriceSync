@@ -3,7 +3,7 @@ using Microsoft.EntityFrameworkCore.Design;
 
 namespace PriceSync.Modules.TradingRelationships.Persistence;
 
-internal sealed class TradingRelationshipsDesignTimeDbContextFactory
+internal sealed class TradingRelationshipsDbContextFactory
     : IDesignTimeDbContextFactory<TradingRelationshipsDbContext>
 {
     public TradingRelationshipsDbContext CreateDbContext(string[] args)

@@ -1,6 +1,6 @@
-﻿namespace PriceSync.Modules.TradingRelationships.Features.CreateTradingRelationship;
+﻿namespace PriceSync.Modules.TradingRelationships.Features.Create;
 
-internal static class CreateTradingRelationshipErrorCodes
+internal static class CreateErrorCodes
 {
     public const string ActingOrganizationRequired = "acting_organization_required";
     public const string Forbidden = "forbidden";

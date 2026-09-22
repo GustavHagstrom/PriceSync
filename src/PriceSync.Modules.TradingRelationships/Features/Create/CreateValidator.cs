@@ -1,10 +1,10 @@
 ﻿using PriceSync.BuildingBlocks.Validation;
 
-namespace PriceSync.Modules.TradingRelationships.Features.CreateTradingRelationship;
+namespace PriceSync.Modules.TradingRelationships.Features.Create;
 
-internal class CreateTradingRelationshipValidator
+internal class CreateValidator
 {
-    public ValidationErrors Validate(CreateTradingRelationshipCommand command)
+    public ValidationErrors Validate(CreateCommand command)
     {
         var errors = new ValidationErrors();
 

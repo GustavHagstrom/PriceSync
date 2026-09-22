@@ -1,5 +1,0 @@
-﻿using PriceSync.Modules.OrganizationAccess.Contracts;
-
-namespace PriceSync.Modules.TradingRelationships.Features.CreateTradingRelationship;
-
-internal record class CreateTradingRelationshipCommand(OrganizationId SupplierOrganizationId, OrganizationId CustomerOrganizationId);

@@ -1,14 +1,13 @@
 ﻿using Microsoft.AspNetCore.Http;
 
-namespace PriceSync.Modules.TradingRelationships.Features.CreateTradingRelationship;
+namespace PriceSync.Modules.TradingRelationships.Features.Create;
 
-internal class CreateTradingRelationshipEndpoint
+internal class CreateEndpoint
 {
-    public const string RouteName = "CreateTradingRelationship";
     internal static async Task<IResult> HandleAsync(
-        CreateTradingRelationshipCommand request,
-        CreateTradingRelationshipHandler handler,
-        CreateTradingRelationshipValidator validator,
+        CreateCommand request,
+        CreateHandler handler,
+        CreateValidator validator,
         CancellationToken cancellationToken)
     {
         var errors = validator.Validate(request);
@@ -20,56 +19,56 @@ internal class CreateTradingRelationshipEndpoint
                 statusCode: StatusCodes.Status400BadRequest,
                 extensions: new Dictionary<string, object?>
                 {
-                    { "code", CreateTradingRelationshipErrorCodes.ValidationFailed }
+                    { "code", CreateErrorCodes.ValidationFailed }
                 });
         }
 
         var result = await handler.HandleAsync(request, cancellationToken);
         var response = result switch
         {
-            CreateTradingRelationshipResult.Created created => Results.CreatedAtRoute(RouteName, new { id = created.Response.Id }, created.Response),
-            CreateTradingRelationshipResult.Existed existed => Results.Ok(existed.Response),
-            CreateTradingRelationshipResult.ActingOrganizationRequired => Results.Problem(
+            CreateResult.Created created => Results.CreatedAtRoute(Routes.Names.Get, new { id = created.Response.Id }, created.Response),
+            CreateResult.Existed existed => Results.Ok(existed.Response),
+            CreateResult.ActingOrganizationRequired => Results.Problem(
                 statusCode: StatusCodes.Status400BadRequest,
                 title: "Current organization is missing",
                 extensions: new Dictionary<string, object?>
                 {
-                    { "code", CreateTradingRelationshipErrorCodes.ActingOrganizationRequired }
+                    { "code", CreateErrorCodes.ActingOrganizationRequired }
                 }),
-            CreateTradingRelationshipResult.Forbidden => Results.Problem(
+            CreateResult.Forbidden => Results.Problem(
                 statusCode: StatusCodes.Status403Forbidden,
                 title: "Forbidden",
                 extensions: new Dictionary<string, object?>
                 {
-                    { "code", CreateTradingRelationshipErrorCodes.Forbidden }
+                    { "code", CreateErrorCodes.Forbidden }
                 }),
-            CreateTradingRelationshipResult.SupplierNotFound => Results.Problem(
+            CreateResult.SupplierNotFound => Results.Problem(
                 statusCode: StatusCodes.Status404NotFound,
                 title: "Supplier organization not found",
                 extensions: new Dictionary<string, object?>
                 {
-                    { "code", CreateTradingRelationshipErrorCodes.SupplierNotFound }
+                    { "code", CreateErrorCodes.SupplierNotFound }
                 }),
-            CreateTradingRelationshipResult.CustomerNotFound => Results.Problem(
+            CreateResult.CustomerNotFound => Results.Problem(
                 statusCode: StatusCodes.Status404NotFound,
                 title: "Customer organization not found",
                 extensions: new Dictionary<string, object?>
                 {
-                    { "code", CreateTradingRelationshipErrorCodes.CustomerNotFound }
+                    { "code", CreateErrorCodes.CustomerNotFound }
                 }),
-            CreateTradingRelationshipResult.SupplierOrganizationEnded => Results.Problem(
+            CreateResult.SupplierOrganizationEnded => Results.Problem(
                 statusCode: StatusCodes.Status400BadRequest,
                 title: "Supplier organization has ended",
                 extensions: new Dictionary<string, object?>
                 {
-                    { "code", CreateTradingRelationshipErrorCodes.SupplierOrganizationEnded }
+                    { "code", CreateErrorCodes.SupplierOrganizationEnded }
                 }),
-            CreateTradingRelationshipResult.CustomerOrganizationEnded => Results.Problem(
+            CreateResult.CustomerOrganizationEnded => Results.Problem(
                 statusCode: StatusCodes.Status400BadRequest,
                 title: "Customer organization has ended",
                 extensions: new Dictionary<string, object?>
                 {
-                    { "code", CreateTradingRelationshipErrorCodes.CustomerOrganizationEnded }
+                    { "code", CreateErrorCodes.CustomerOrganizationEnded }
                 }),
             _ => throw new InvalidOperationException("Unexpected result type.")
         };

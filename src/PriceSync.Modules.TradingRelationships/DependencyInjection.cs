@@ -1,12 +1,12 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using PriceSync.Modules.TradingRelationships.Features.CreateTradingRelationship;
+using PriceSync.Modules.TradingRelationships.Features.Create;
 using PriceSync.Modules.TradingRelationships.Persistence;
 
 namespace PriceSync.Modules.TradingRelationships;
 
-public static class TradingRelationshipsModuleServiceCollectionExtensions
+public static class DependencyInjection
 {
     public static IServiceCollection AddTradingRelationshipsModule(this IServiceCollection services, IConfiguration configuration)
     {
@@ -22,8 +22,8 @@ public static class TradingRelationshipsModuleServiceCollectionExtensions
                     TradingRelationshipsDbContext.SchemaName));
         });
 
-        services.AddScoped<CreateTradingRelationshipHandler>();
-        services.AddScoped<CreateTradingRelationshipValidator>();
+        services.AddScoped<CreateHandler>();
+        services.AddScoped<CreateValidator>();
 
         return services;
     }

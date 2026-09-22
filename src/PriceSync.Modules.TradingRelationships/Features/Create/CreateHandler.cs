@@ -6,9 +6,9 @@ using PriceSync.Modules.TradingRelationships.Models;
 using PriceSync.Modules.TradingRelationships.Persistence;
 using PriceSync.Modules.TradingRelationships.Persistence.Configurations;
 
-namespace PriceSync.Modules.TradingRelationships.Features.CreateTradingRelationship;
+namespace PriceSync.Modules.TradingRelationships.Features.Create;
 
-internal class CreateTradingRelationshipHandler
+internal class CreateHandler
 {
     private readonly ICurrentPerson _currentPerson;
     private readonly IOrganizationAuthorizer _organizationAuthorizer;
@@ -17,7 +17,7 @@ internal class CreateTradingRelationshipHandler
     private readonly TradingRelationshipsDbContext _dbContext;
     private readonly ICurrentOrganization _currentOrganization;
 
-    public CreateTradingRelationshipHandler(
+    public CreateHandler(
         ICurrentPerson currentPerson, 
         ICurrentOrganization currentOrganization, 
         IOrganizationAuthorizer organizationAuthorizer, 
@@ -33,42 +33,42 @@ internal class CreateTradingRelationshipHandler
         _dbContext = dbContext;
     }
 
-    internal async Task<CreateTradingRelationshipResult> HandleAsync(CreateTradingRelationshipCommand command, CancellationToken cancellationToken)
+    internal async Task<CreateResult> HandleAsync(CreateCommand command, CancellationToken cancellationToken)
     {
         if(_currentOrganization.OrganizationId is null)
         {
-            return new CreateTradingRelationshipResult.ActingOrganizationRequired();
+            return new CreateResult.ActingOrganizationRequired();
         }
 
         if (_currentOrganization.OrganizationId != command.SupplierOrganizationId && _currentOrganization.OrganizationId != command.CustomerOrganizationId)
         {
-            return new CreateTradingRelationshipResult.Forbidden();
+            return new CreateResult.Forbidden();
         }
 
         var hasCapability = await _organizationAuthorizer.HasCapabilityAsync(_currentPerson.PersonId, _currentOrganization.OrganizationId.Value, OrganizationCapability.ManageTradingRelationships, cancellationToken);
         if (!hasCapability)
         {
-            return new CreateTradingRelationshipResult.Forbidden();
+            return new CreateResult.Forbidden();
         }
 
         var supplierStatus = await _organizationStatusReader.GetStatusAsync(command.SupplierOrganizationId, cancellationToken);
         if(supplierStatus == OrganizationStatusResult.Archived)
         {
-            return new CreateTradingRelationshipResult.SupplierOrganizationEnded();
+            return new CreateResult.SupplierOrganizationEnded();
         }
         if(supplierStatus == OrganizationStatusResult.NotFound)
         {
-            return new CreateTradingRelationshipResult.SupplierNotFound();
+            return new CreateResult.SupplierNotFound();
         }
 
         var customerStatus = await _organizationStatusReader.GetStatusAsync(command.CustomerOrganizationId, cancellationToken);
         if (customerStatus == OrganizationStatusResult.Archived)
         {
-            return new CreateTradingRelationshipResult.CustomerOrganizationEnded();
+            return new CreateResult.CustomerOrganizationEnded();
         }
         if (customerStatus == OrganizationStatusResult.NotFound)
         {
-            return new CreateTradingRelationshipResult.CustomerNotFound();
+            return new CreateResult.CustomerNotFound();
         }
 
 
@@ -83,14 +83,14 @@ internal class CreateTradingRelationshipHandler
 
         if(existingRelationship != null)
         {
-            return new CreateTradingRelationshipResult.Existed(new TradingRelationshipResponse(existingRelationship));
+            return new CreateResult.Existed(new TradingRelationshipResponse(existingRelationship));
         }
 
         try
         {
             _dbContext.TradingRelationships.Add(tradingRelationship);
             await _dbContext.SaveChangesAsync(cancellationToken);
-            return new CreateTradingRelationshipResult.Created(new TradingRelationshipResponse(tradingRelationship));
+            return new CreateResult.Created(new TradingRelationshipResponse(tradingRelationship));
         }
         catch (DbUpdateException ex) when (IsActiveRelationshipUniqueViolation(ex))
         {
@@ -103,7 +103,7 @@ internal class CreateTradingRelationshipHandler
                     x.Status == TradingRelationshipStatus.Active,
                     cancellationToken);
 
-            return new CreateTradingRelationshipResult.Existed(new TradingRelationshipResponse(winner));
+            return new CreateResult.Existed(new TradingRelationshipResponse(winner));
         }
     }
     private bool IsActiveRelationshipUniqueViolation(DbUpdateException ex)
