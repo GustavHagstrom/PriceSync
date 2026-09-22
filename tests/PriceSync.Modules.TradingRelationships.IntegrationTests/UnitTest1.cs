@@ -1,4 +1,4 @@
-﻿namespace PriceSYnc.Modules.TradingRelationships.IntegrationTests;
+﻿namespace PriceSync.Modules.TradingRelationships.IntegrationTests;
 
 public class UnitTest1
 {

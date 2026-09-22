@@ -1,8 +1,8 @@
 <Solution>
   <Folder Name="/src/">
-    <Project Path="PriceSync.BuildingBlocks/PriceSync.BuildingBlocks.csproj" Id="4d8bfc03-3efe-4c7f-80ce-f5d4a9122e20" />
     <Project Path="src/PriceSync.Api/PriceSync.Api.csproj" />
     <Project Path="src/PriceSync.Application/PriceSync.Application.csproj" />
+    <Project Path="src/PriceSync.BuildingBlocks/PriceSync.BuildingBlocks.csproj" />
     <Project Path="src/PriceSync.Modules.Agreements.Contracts/PriceSync.Modules.Agreements.Contracts.csproj" />
     <Project Path="src/PriceSync.Modules.Agreements/PriceSync.Modules.Agreements.csproj" />
     <Project Path="src/PriceSync.Modules.CustomerPricing.Contracts/PriceSync.Modules.CustomerPricing.Contracts.csproj" />
@@ -20,9 +20,9 @@
     <Project Path="src/PriceSync.SharedKernel/PriceSync.SharedKernel.csproj" />
   </Folder>
   <Folder Name="/tests/">
-    <Project Path="PriceSYnc.Modules.TradingRelationships.IntegrationTests/PriceSYnc.Modules.TradingRelationships.IntegrationTests.csproj" Id="5eb902f3-d580-4509-b6a4-ba4100038026" />
     <Project Path="tests/PriceSync.ArchitectureTests/PriceSync.ArchitectureTests.csproj" />
     <Project Path="tests/PriceSync.Modules.OrganizationAccess.IntegrationTests/PriceSync.Modules.OrganizationAccess.IntegrationTests.csproj" />
     <Project Path="tests/PriceSync.Modules.OrganizationAccess.UnitTests/PriceSync.Modules.OrganizationAccess.UnitTests.csproj" />
+    <Project Path="tests/PriceSync.Modules.TradingRelationships.IntegrationTests/PriceSync.Modules.TradingRelationships.IntegrationTests.csproj" />
   </Folder>
 </Solution>

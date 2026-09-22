@@ -2,5 +2,5 @@
 
 public interface ICurrentOrganization
 {
-    OrganizationId OrganizationId { get; }
+    OrganizationId? OrganizationId { get; }
 }

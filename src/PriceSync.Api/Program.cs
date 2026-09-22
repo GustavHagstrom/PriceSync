@@ -21,8 +21,10 @@ builder.Services.AddAuthentication(UnavailableAuthenticationHandler.SchemeName)
         options => { });
 builder.Services.AddAuthorization();
 builder.Services.AddScoped<ICurrentPerson, ClaimsCurrentPerson>();
+builder.Services.AddScoped<ICurrentOrganization, CurrentOrganization>();
 builder.Services.AddOrganizationAccessModule(builder.Configuration);
 builder.Services.AddTradingRelationshipsModule(builder.Configuration);
+builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddAgreementsModule();
 builder.Services.AddPricePublicationModule();
 builder.Services.AddCustomerPricingModule();

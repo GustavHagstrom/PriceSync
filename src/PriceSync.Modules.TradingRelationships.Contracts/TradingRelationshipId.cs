@@ -2,7 +2,7 @@
 
 public readonly record struct TradingRelationshipId
 {
-    public TradingRelationshipId(Guid value)
+    private TradingRelationshipId(Guid value)
     {
         if (value == Guid.Empty)
         {
@@ -12,5 +12,7 @@ public readonly record struct TradingRelationshipId
     }
     public Guid Value { get; }
     public override string ToString() => Value.ToString();
+    public static TradingRelationshipId Create() => new TradingRelationshipId(Guid.CreateVersion7());
+    public static TradingRelationshipId FromGuid(Guid value) => new TradingRelationshipId(value);
 
 }

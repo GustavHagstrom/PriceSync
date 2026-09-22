@@ -8,6 +8,7 @@ namespace PriceSync.Modules.TradingRelationships.Persistence.Configurations;
 
 internal class TradingRelationshipConfiguration : IEntityTypeConfiguration<TradingRelationship>
 {
+    internal const string ActiveSupplierCustomerUniqueIndex = "ux_trading_relationships_active_supplier_customer";
     public void Configure(EntityTypeBuilder<TradingRelationship> builder)
     {
         builder.ToTable("TradingRelationships", TradingRelationshipsDbContext.SchemaName);
@@ -17,7 +18,7 @@ internal class TradingRelationshipConfiguration : IEntityTypeConfiguration<Tradi
 
         builder.Property(tr => tr.Id)
             .HasColumnName("Id")
-            .HasConversion(trId => trId.Value, value => new TradingRelationshipId(value))
+            .HasConversion(trId => trId.Value, value => TradingRelationshipId.FromGuid(value))
             .ValueGeneratedNever();
 
         builder.Property(tr => tr.SupplierOrganizationId)
@@ -47,13 +48,25 @@ internal class TradingRelationshipConfiguration : IEntityTypeConfiguration<Tradi
             .HasColumnType("text")
             .IsRequired();
 
-        builder.HasIndex(relationship => relationship.SupplierOrganizationId)
-            .HasDatabaseName(
-                "ix_trading_relationships_supplier_organization_id");
+        builder.HasIndex(relationship => new
+        {
+            relationship.SupplierOrganizationId,
+            relationship.Status,
+            relationship.CreatedAt,
+            relationship.Id
+        })
+            .IsDescending(false, false, true, true)
+            .HasDatabaseName("ix_trading_relationships_supplier_status_created_at_id");
 
-        builder.HasIndex(relationship => relationship.CustomerOrganizationId)
-            .HasDatabaseName(
-                "ix_trading_relationships_customer_organization_id");
+        builder.HasIndex(relationship => new
+        {
+            relationship.CustomerOrganizationId,
+            relationship.Status,
+            relationship.CreatedAt,
+            relationship.Id
+        })
+            .IsDescending(false, false, true, true)
+            .HasDatabaseName("ix_trading_relationships_customer_status_created_at_id");
 
         builder.HasIndex(relationship => new
         {
@@ -62,7 +75,7 @@ internal class TradingRelationshipConfiguration : IEntityTypeConfiguration<Tradi
         })
             .IsUnique()
             .HasFilter("status = 'active'")
-            .HasDatabaseName("ux_trading_relationships_active_supplier_customer");
+            .HasDatabaseName(ActiveSupplierCustomerUniqueIndex);
 
         builder.ToTable(table =>
         {

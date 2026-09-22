@@ -1,5 +1,6 @@
 ﻿using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Routing;
+using PriceSync.Modules.TradingRelationships.Features.CreateTradingRelationship;
 
 namespace PriceSync.Modules.TradingRelationships;
 
@@ -11,6 +12,8 @@ public static class TradingRelationshipsEndpointRouteBuilderExtensions
             .MapGroup("/api/v1/trading-relationships")
             .RequireAuthorization();
 
+        api.MapPost("", CreateTradingRelationshipEndpoint.HandleAsync)
+            .WithName("CreateTradingRelationship");
 
 
         return endpoints;

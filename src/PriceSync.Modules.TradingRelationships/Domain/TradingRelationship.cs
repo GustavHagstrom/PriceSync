@@ -14,29 +14,26 @@ internal class TradingRelationship
 
     private TradingRelationship() { }
 
-    internal void End(TimeProvider timeProvider)
+    internal void End(DateTimeOffset now)
     {
-        if (timeProvider == null) throw new ArgumentNullException(nameof(timeProvider));
         if (Status == LifecycleStatus.Ended)
         {
             throw new InvalidOperationException("Trading relationship is already ended.");
         }
         Status = LifecycleStatus.Ended;
-        EndedAt = timeProvider.GetUtcNow();
+        EndedAt = now;
     }
-    internal static TradingRelationship Create(TradingRelationshipId id, OrganizationId supplierOrganizationId, OrganizationId customerOrganizationId, TimeProvider timeProvider)
+    internal static TradingRelationship Create(OrganizationId supplierOrganizationId, OrganizationId customerOrganizationId, DateTimeOffset now)
     {
-        if(id.Value == Guid.Empty) throw new ArgumentException("Trading relationship ID cannot be empty.", nameof(id));
         if (supplierOrganizationId.Value == Guid.Empty) throw new ArgumentException("Supplier organization ID cannot be empty.", nameof(supplierOrganizationId));
         if (customerOrganizationId.Value == Guid.Empty) throw new ArgumentException("Customer organization ID cannot be empty.", nameof(customerOrganizationId));
         if(supplierOrganizationId == customerOrganizationId) throw new ArgumentException("Supplier and customer organization IDs cannot be the same.");
-        if (timeProvider == null) throw new ArgumentNullException(nameof(timeProvider));
         return new TradingRelationship
         {
-            Id = id,
+            Id = TradingRelationshipId.Create(),
             SupplierOrganizationId = supplierOrganizationId,
             CustomerOrganizationId = customerOrganizationId,
-            CreatedAt = timeProvider.GetUtcNow(),
+            CreatedAt = now,
             Status = LifecycleStatus.Active
         };
     }
