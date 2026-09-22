@@ -10,17 +10,17 @@ internal class TradingRelationship
     public OrganizationId CustomerOrganizationId { get; private set; }
     public DateTimeOffset CreatedAt { get; private set; }
     public DateTimeOffset? EndedAt { get; private set; }
-    public LifecycleStatus Status { get; private set; }
+    public TradingRelationshipStatus Status { get; private set; }
 
     private TradingRelationship() { }
 
     internal void End(DateTimeOffset now)
     {
-        if (Status == LifecycleStatus.Ended)
+        if (Status == TradingRelationshipStatus.Ended)
         {
             throw new InvalidOperationException("Trading relationship is already ended.");
         }
-        Status = LifecycleStatus.Ended;
+        Status = TradingRelationshipStatus.Ended;
         EndedAt = now;
     }
     internal static TradingRelationship Create(OrganizationId supplierOrganizationId, OrganizationId customerOrganizationId, DateTimeOffset now)
@@ -34,7 +34,7 @@ internal class TradingRelationship
             SupplierOrganizationId = supplierOrganizationId,
             CustomerOrganizationId = customerOrganizationId,
             CreatedAt = now,
-            Status = LifecycleStatus.Active
+            Status = TradingRelationshipStatus.Active
         };
     }
 }

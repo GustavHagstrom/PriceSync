@@ -2,5 +2,5 @@
 
 public interface IOrganizationAuthorizer
 {
-    Task<bool> HasCapabilityAsync(PersonId personId, OrganizationId organizationId, OrganizationCapability capability, CancellationToken? cancellationToken);
+    Task<bool> HasCapabilityAsync(PersonId personId, OrganizationId organizationId, OrganizationCapability capability, CancellationToken cancellationToken = default);
 }

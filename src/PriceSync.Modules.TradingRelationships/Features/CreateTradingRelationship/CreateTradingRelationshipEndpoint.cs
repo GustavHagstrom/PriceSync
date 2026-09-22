@@ -4,6 +4,7 @@ namespace PriceSync.Modules.TradingRelationships.Features.CreateTradingRelations
 
 internal class CreateTradingRelationshipEndpoint
 {
+    public const string RouteName = "CreateTradingRelationship";
     internal static async Task<IResult> HandleAsync(
         CreateTradingRelationshipCommand request,
         CreateTradingRelationshipHandler handler,
@@ -26,14 +27,14 @@ internal class CreateTradingRelationshipEndpoint
         var result = await handler.HandleAsync(request, cancellationToken);
         var response = result switch
         {
-            CreateTradingRelationshipResult.Created created => Results.Created($"api/v1/trading-relationships/{created.Id}", new { created.Id.Value, SupplierId = created.SupplierId.Value, CustomerId =  created.CustomerId.Value, created.CreatedAt, created.Status }),
-            CreateTradingRelationshipResult.Existed existed => Results.Ok(new { existed.Id.Value, SupplierId = existed.SupplierId.Value, CustomerId = existed.CustomerId.Value, existed.CreatedAt, existed.Status }),
-            CreateTradingRelationshipResult.MissingCurrentOrganization => Results.Problem(
+            CreateTradingRelationshipResult.Created created => Results.CreatedAtRoute(RouteName, new { id = created.Response.Id }, created.Response),
+            CreateTradingRelationshipResult.Existed existed => Results.Ok(existed.Response),
+            CreateTradingRelationshipResult.ActingOrganizationRequired => Results.Problem(
                 statusCode: StatusCodes.Status400BadRequest,
                 title: "Current organization is missing",
                 extensions: new Dictionary<string, object?>
                 {
-                    { "code", CreateTradingRelationshipErrorCodes.MissingCurrentOrganization }
+                    { "code", CreateTradingRelationshipErrorCodes.ActingOrganizationRequired }
                 }),
             CreateTradingRelationshipResult.Forbidden => Results.Problem(
                 statusCode: StatusCodes.Status403Forbidden,

@@ -2,7 +2,7 @@
 
 public interface IOrganizationStatusReader
 {
-    Task<OrganizationStatusResult> GetStatusAsync(OrganizationId organizationId, CancellationToken? cancellationToken);
+    Task<OrganizationStatusResult> GetStatusAsync(OrganizationId organizationId, CancellationToken cancellationToken);
 }
 
 public enum OrganizationStatusResult

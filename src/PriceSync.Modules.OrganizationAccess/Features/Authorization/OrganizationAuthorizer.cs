@@ -7,7 +7,7 @@ namespace PriceSync.Modules.OrganizationAccess.Features.Authorization;
 
 internal class OrganizationAuthorizer(OrganizationAccessDbContext dbContext) : IOrganizationAuthorizer
 {
-    public async Task<bool> HasCapabilityAsync(PersonId personId, OrganizationId organizationId, OrganizationCapability capability, CancellationToken? cancellationToken)
+    public async Task<bool> HasCapabilityAsync(PersonId personId, OrganizationId organizationId, OrganizationCapability capability, CancellationToken cancellationToken = default)
     {
         if(personId.Value == Guid.Empty)
         {
@@ -17,23 +17,23 @@ internal class OrganizationAuthorizer(OrganizationAccessDbContext dbContext) : I
         {
             return false;
         }
-        var existingOrganization = await dbContext.Organizations.FirstOrDefaultAsync(o => o.Id == organizationId && o.Status == OrganizationStatus.Active, cancellationToken ?? CancellationToken.None);
+        var existingOrganization = await dbContext.Organizations.FirstOrDefaultAsync(o => o.Id == organizationId && o.Status == OrganizationStatus.Active, cancellationToken);
         if (existingOrganization == null)
         {
             return false;
         }
         var result = capability switch
         {
-            OrganizationCapability.ReadTradingRelationships => await CheckReadTradingRelationshipCapability(personId, organizationId),
-            OrganizationCapability.ManageTradingRelationships => await CheckManageTradingRelationshipsCapability(personId, organizationId),
+            OrganizationCapability.ReadTradingRelationships => await CheckReadTradingRelationshipCapability(personId, organizationId, cancellationToken),
+            OrganizationCapability.ManageTradingRelationships => await CheckManageTradingRelationshipsCapability(personId, organizationId, cancellationToken),
             _ => throw new ArgumentOutOfRangeException(nameof(capability), capability, "Invalid capability value.")
         };
         return result;
     }
-    private async Task<bool> CheckReadTradingRelationshipCapability(PersonId personId, OrganizationId organizationId, CancellationToken? cancellationToken = null)
+    private async Task<bool> CheckReadTradingRelationshipCapability(PersonId personId, OrganizationId organizationId, CancellationToken cancellationToken = default)
     {
         var membership = await dbContext.OrganizationMemberships
-            .FirstOrDefaultAsync(m => m.PersonId == personId && m.OrganizationId == organizationId && m.Status == OrganizationMembershipStatus.Active, cancellationToken ?? CancellationToken.None);
+            .FirstOrDefaultAsync(m => m.PersonId == personId && m.OrganizationId == organizationId && m.Status == OrganizationMembershipStatus.Active, cancellationToken);
         if (membership == null)
         {
             return false;
@@ -44,10 +44,10 @@ internal class OrganizationAuthorizer(OrganizationAccessDbContext dbContext) : I
         }
         return true;
     }
-    private async Task<bool> CheckManageTradingRelationshipsCapability(PersonId personId, OrganizationId organizationId, CancellationToken? cancellationToken = null)
+    private async Task<bool> CheckManageTradingRelationshipsCapability(PersonId personId, OrganizationId organizationId, CancellationToken cancellationToken = default)
     {
         var membership = await dbContext.OrganizationMemberships
-            .FirstOrDefaultAsync(m => m.PersonId == personId && m.OrganizationId == organizationId && m.Status == OrganizationMembershipStatus.Active, cancellationToken ?? CancellationToken.None);
+            .FirstOrDefaultAsync(m => m.PersonId == personId && m.OrganizationId == organizationId && m.Status == OrganizationMembershipStatus.Active, cancellationToken);
         if(membership == null)
         {
             return false;

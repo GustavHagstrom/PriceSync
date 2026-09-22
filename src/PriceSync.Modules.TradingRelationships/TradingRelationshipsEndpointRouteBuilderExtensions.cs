@@ -13,7 +13,7 @@ public static class TradingRelationshipsEndpointRouteBuilderExtensions
             .RequireAuthorization();
 
         api.MapPost("", CreateTradingRelationshipEndpoint.HandleAsync)
-            .WithName("CreateTradingRelationship");
+            .WithName(CreateTradingRelationshipEndpoint.RouteName);
 
 
         return endpoints;

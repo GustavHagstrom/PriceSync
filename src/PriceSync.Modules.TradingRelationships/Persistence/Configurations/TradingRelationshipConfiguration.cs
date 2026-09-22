@@ -44,7 +44,7 @@ internal class TradingRelationshipConfiguration : IEntityTypeConfiguration<Tradi
             .HasColumnName("status")
             .HasConversion(
                 status => status.ToString().ToLowerInvariant(),
-                value => Enum.Parse<LifecycleStatus>(value, ignoreCase: true))
+                value => Enum.Parse<TradingRelationshipStatus>(value, ignoreCase: true))
             .HasColumnType("text")
             .IsRequired();
 

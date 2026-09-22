@@ -1,6 +1,6 @@
 ﻿namespace PriceSync.Modules.TradingRelationships.Domain;
 
-internal enum LifecycleStatus
+internal enum TradingRelationshipStatus
 {
     Active,
     Ended,
