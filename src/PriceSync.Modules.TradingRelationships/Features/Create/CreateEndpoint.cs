@@ -10,7 +10,9 @@ internal class CreateEndpoint
         CreateValidator validator,
         CancellationToken cancellationToken)
     {
-        var errors = validator.Validate(request);
+        var command = new CreateCommand(new(request.SupplierOrganizationId), new(request.CustomerOrganizationId));
+
+        var errors = validator.Validate(command);
         if (errors.HasErrors)
         {
             return Results.ValidationProblem(
@@ -23,9 +25,6 @@ internal class CreateEndpoint
                 });
         }
 
-        var command = new CreateCommand(
-            new(request.SupplierOrganizationId),
-            new(request.CustomerOrganizationId));
         var result = await handler.HandleAsync(command, cancellationToken);
         var response = result switch
         {

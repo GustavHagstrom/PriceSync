@@ -11,5 +11,6 @@ internal static class Routes
     {
         public const string Create = "CreateTradingRelationship";
         public const string Get = "GetTradingRelationship";
+        public const string End = "EndTradingRelationship";
     }
 }
