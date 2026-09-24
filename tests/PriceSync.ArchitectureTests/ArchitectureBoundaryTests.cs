@@ -80,7 +80,7 @@ public sealed class ArchitectureBoundaryTests
     }
 
     [Fact]
-    public void Organization_access_contracts_exports_only_the_initial_boundary_types()
+    public void Organization_access_contracts_exports_only_the_approved_boundary_types()
     {
         typeof(OrganizationId).Assembly.ExportedTypes
             .Select(type => type.FullName)
@@ -90,6 +90,11 @@ public sealed class ArchitectureBoundaryTests
                     "PriceSync.Modules.OrganizationAccess.Contracts.OrganizationId",
                     "PriceSync.Modules.OrganizationAccess.Contracts.PersonId",
                     "PriceSync.Modules.OrganizationAccess.Contracts.ICurrentPerson",
+                    "PriceSync.Modules.OrganizationAccess.Contracts.ICurrentOrganization",
+                    "PriceSync.Modules.OrganizationAccess.Contracts.IOrganizationAuthorizer",
+                    "PriceSync.Modules.OrganizationAccess.Contracts.IOrganizationStatusReader",
+                    "PriceSync.Modules.OrganizationAccess.Contracts.OrganizationCapability",
+                    "PriceSync.Modules.OrganizationAccess.Contracts.OrganizationStatusResult",
                 ]);
     }
 
@@ -220,6 +225,45 @@ public sealed class ArchitectureBoundaryTests
         crossModuleViolations
             .Should()
             .BeEmpty("other modules and hosts must not query the organization_access schema or couple to Organization & Access persistence internals");
+    }
+
+    [Fact]
+    public void Only_trading_relationships_references_its_persistence_schema_and_db_context()
+    {
+        var repositoryRoot = FindRepositoryRoot(AppContext.BaseDirectory);
+        var sourceRoot = Path.Combine(repositoryRoot, "src");
+        var tradingRelationshipsRoot = Path.Combine(sourceRoot, "PriceSync.Modules.TradingRelationships");
+        var forbiddenReferences = new[]
+        {
+            "trading_relationships",
+            "TradingRelationshipsDbContext",
+            "PriceSync.Modules.TradingRelationships.Persistence",
+        };
+
+        var ownedReferences = Directory
+            .EnumerateFiles(tradingRelationshipsRoot, "*.cs", SearchOption.AllDirectories)
+            .Select(File.ReadAllText)
+            .ToArray();
+
+        ownedReferences.Should().Contain(
+            contents => forbiddenReferences.Any(contents.Contains),
+            "the TradingRelationships module should own the persistence implementation being protected");
+
+        var crossModuleViolations = Directory
+            .EnumerateFiles(sourceRoot, "*.cs", SearchOption.AllDirectories)
+            .Where(path => Path.GetRelativePath(tradingRelationshipsRoot, path).StartsWith("..", StringComparison.Ordinal))
+            .SelectMany(path =>
+            {
+                var contents = File.ReadAllText(path);
+                return forbiddenReferences
+                    .Where(contents.Contains)
+                    .Select(forbiddenReference => $"{Path.GetRelativePath(repositoryRoot, path)} contains {forbiddenReference}");
+            })
+            .ToArray();
+
+        crossModuleViolations
+            .Should()
+            .BeEmpty("other modules and hosts must not query the trading_relationships schema or couple to TradingRelationships persistence internals");
     }
 
     private static string FindRepositoryRoot(string startDirectory)

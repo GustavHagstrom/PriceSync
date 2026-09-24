@@ -57,11 +57,15 @@ public sealed class ApiProblemDetailsTests
     {
         protected override void ConfigureWebHost(IWebHostBuilder builder)
         {
+            builder.UseSetting("ConnectionStrings:OrganizationAccess", "Host=unused");
+            builder.UseSetting("ConnectionStrings:TradingRelationships", "Host=unused");
+
             builder.ConfigureAppConfiguration((_, configuration) =>
             {
                 configuration.AddInMemoryCollection(new Dictionary<string, string?>
                 {
                     ["ConnectionStrings:OrganizationAccess"] = "Host=unused",
+                    ["ConnectionStrings:TradingRelationships"] = "Host=unused",
                 });
             });
         }

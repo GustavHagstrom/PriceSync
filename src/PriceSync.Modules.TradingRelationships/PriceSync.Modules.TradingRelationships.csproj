@@ -1,7 +1,6 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <ItemGroup>
-    <ProjectReference Include="..\PriceSync.BuildingBlocks\PriceSync.BuildingBlocks.csproj" />
     <ProjectReference Include="..\PriceSync.Modules.OrganizationAccess.Contracts\PriceSync.Modules.OrganizationAccess.Contracts.csproj" />
     <ProjectReference Include="..\PriceSync.SharedKernel\PriceSync.SharedKernel.csproj" />
     <ProjectReference Include="..\PriceSync.Modules.TradingRelationships.Contracts\PriceSync.Modules.TradingRelationships.Contracts.csproj" />

@@ -1,25 +1,26 @@
-﻿using PriceSync.BuildingBlocks.Validation;
-
 namespace PriceSync.Modules.TradingRelationships.Features.Create;
 
 internal class CreateValidator
 {
-    public ValidationErrors Validate(CreateCommand command)
+    public ValidationErrors Validate(CreateRequest request)
     {
         var errors = new ValidationErrors();
 
-        if (command.SupplierOrganizationId == command.CustomerOrganizationId)
+        if (request.SupplierOrganizationId == request.CustomerOrganizationId)
         {
-            errors.Add(nameof(command.CustomerOrganizationId), "You cannot create a trading relationship with the same organization.");
+            errors.Add(nameof(request.CustomerOrganizationId), "You cannot create a trading relationship with the same organization.");
         }
-        if(command.SupplierOrganizationId.Value == Guid.Empty)
+
+        if (request.SupplierOrganizationId == Guid.Empty)
         {
-            errors.Add(nameof(command.SupplierOrganizationId), "Supplier organization ID cannot be empty.");
+            errors.Add(nameof(request.SupplierOrganizationId), "Supplier organization ID cannot be empty.");
         }
-        if(command.CustomerOrganizationId.Value == Guid.Empty)
+
+        if (request.CustomerOrganizationId == Guid.Empty)
         {
-            errors.Add(nameof(command.CustomerOrganizationId), "Customer organization ID cannot be empty.");
+            errors.Add(nameof(request.CustomerOrganizationId), "Customer organization ID cannot be empty.");
         }
+
         return errors;
     }
 }

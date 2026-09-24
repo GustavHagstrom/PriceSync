@@ -5,7 +5,7 @@ namespace PriceSync.Modules.TradingRelationships.Features.Create;
 internal class CreateEndpoint
 {
     internal static async Task<IResult> HandleAsync(
-        CreateCommand request,
+        CreateRequest request,
         CreateHandler handler,
         CreateValidator validator,
         CancellationToken cancellationToken)
@@ -14,7 +14,7 @@ internal class CreateEndpoint
         if (errors.HasErrors)
         {
             return Results.ValidationProblem(
-                errors.GetErrors(), 
+                errors.GetErrors(),
                 title: "Validation errors occurred",
                 statusCode: StatusCodes.Status400BadRequest,
                 extensions: new Dictionary<string, object?>
@@ -23,10 +23,15 @@ internal class CreateEndpoint
                 });
         }
 
-        var result = await handler.HandleAsync(request, cancellationToken);
+        var command = new CreateCommand(
+            new(request.SupplierOrganizationId),
+            new(request.CustomerOrganizationId));
+        var result = await handler.HandleAsync(command, cancellationToken);
         var response = result switch
         {
-            CreateResult.Created created => Results.CreatedAtRoute(Routes.Names.Get, new { id = created.Response.Id }, created.Response),
+            CreateResult.Created created => Results.Created(
+                $"{Routes.BaseV1}/{created.Response.Id}",
+                created.Response),
             CreateResult.Existed existed => Results.Ok(existed.Response),
             CreateResult.ActingOrganizationRequired => Results.Problem(
                 statusCode: StatusCodes.Status400BadRequest,
@@ -73,6 +78,6 @@ internal class CreateEndpoint
             _ => throw new InvalidOperationException("Unexpected result type.")
         };
         return response;
-        
+
     }
 }

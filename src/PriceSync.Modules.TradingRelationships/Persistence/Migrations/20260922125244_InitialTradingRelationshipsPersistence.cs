@@ -6,7 +6,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace PriceSync.Modules.TradingRelationships.Persistence.Migrations
 {
     /// <inheritdoc />
-    public partial class InitialTradingRelationshipsPersistence : Migration
+    internal partial class InitialTradingRelationshipsPersistence : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
