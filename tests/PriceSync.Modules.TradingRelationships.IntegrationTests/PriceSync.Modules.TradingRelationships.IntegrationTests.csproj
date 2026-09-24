@@ -9,10 +9,11 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="FluentAssertions" Version="8.11.0" />
     <PackageReference Include="coverlet.collector" Version="6.0.4" />
+    <PackageReference Include="FluentAssertions" Version="8.11.0" />
     <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" Version="10.0.12" />
     <PackageReference Include="Microsoft.EntityFrameworkCore" Version="10.0.12" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" Version="10.0.12" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
     <PackageReference Include="Npgsql" Version="10.0.3" />
     <PackageReference Include="Testcontainers.PostgreSql" Version="4.15.0" />
@@ -21,12 +22,14 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Using Include="Xunit" />
+    <ProjectReference Include="..\..\src\PriceSync.Modules.OrganizationAccess.Contracts\PriceSync.Modules.OrganizationAccess.Contracts.csproj" />
+    <ProjectReference Include="..\..\src\PriceSync.Api\PriceSync.Api.csproj" />
+    <ProjectReference Include="..\..\src\PriceSync.Modules.TradingRelationships.Contracts\PriceSync.Modules.TradingRelationships.Contracts.csproj" />
+    <ProjectReference Include="..\..\src\PriceSync.Modules.TradingRelationships\PriceSync.Modules.TradingRelationships.csproj" />
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\src\PriceSync.Api\PriceSync.Api.csproj" />
-    <ProjectReference Include="..\..\src\PriceSync.Modules.TradingRelationships\PriceSync.Modules.TradingRelationships.csproj" />
+    <Using Include="Xunit" />
   </ItemGroup>
 
 </Project>
