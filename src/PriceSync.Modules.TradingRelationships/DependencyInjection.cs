@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using PriceSync.Modules.TradingRelationships.Features.Create;
+using PriceSync.Modules.TradingRelationships.Features.End;
 using PriceSync.Modules.TradingRelationships.Persistence;
 
 namespace PriceSync.Modules.TradingRelationships;
@@ -24,6 +25,9 @@ public static class DependencyInjection
 
         services.AddScoped<CreateHandler>();
         services.AddScoped<CreateValidator>();
+
+        services.AddScoped<EndHandler>();
+        services.AddScoped<EndValidator>();
 
         return services;
     }

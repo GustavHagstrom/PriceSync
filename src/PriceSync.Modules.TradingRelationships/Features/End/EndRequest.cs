@@ -1,5 +1,3 @@
 ﻿namespace PriceSync.Modules.TradingRelationships.Features.End;
 
-public class EndRequest
-{
-}
+public record EndRequest(Guid TradingRelationshipId);

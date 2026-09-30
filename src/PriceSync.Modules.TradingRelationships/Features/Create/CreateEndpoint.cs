@@ -28,10 +28,10 @@ internal class CreateEndpoint
         var result = await handler.HandleAsync(command, cancellationToken);
         var response = result switch
         {
-            CreateResult.Created created => Results.Created(
-                $"{Routes.BaseV1}/{created.Response.Id}",
-                created.Response),
+            CreateResult.Created created => Results.Created($"{Routes.BaseV1}/{created.Response.Id}", created.Response),
+
             CreateResult.Existed existed => Results.Ok(existed.Response),
+
             CreateResult.ActingOrganizationRequired => Results.Problem(
                 statusCode: StatusCodes.Status400BadRequest,
                 title: "Current organization is missing",
@@ -39,6 +39,7 @@ internal class CreateEndpoint
                 {
                     { "code", CreateErrorCodes.ActingOrganizationRequired }
                 }),
+
             CreateResult.Forbidden => Results.Problem(
                 statusCode: StatusCodes.Status403Forbidden,
                 title: "Forbidden",
@@ -46,6 +47,7 @@ internal class CreateEndpoint
                 {
                     { "code", CreateErrorCodes.Forbidden }
                 }),
+
             CreateResult.SupplierNotFound => Results.Problem(
                 statusCode: StatusCodes.Status404NotFound,
                 title: "Supplier organization not found",
@@ -53,6 +55,7 @@ internal class CreateEndpoint
                 {
                     { "code", CreateErrorCodes.SupplierNotFound }
                 }),
+
             CreateResult.CustomerNotFound => Results.Problem(
                 statusCode: StatusCodes.Status404NotFound,
                 title: "Customer organization not found",
@@ -60,6 +63,7 @@ internal class CreateEndpoint
                 {
                     { "code", CreateErrorCodes.CustomerNotFound }
                 }),
+
             CreateResult.SupplierOrganizationEnded => Results.Problem(
                 statusCode: StatusCodes.Status400BadRequest,
                 title: "Supplier organization has ended",
@@ -67,6 +71,7 @@ internal class CreateEndpoint
                 {
                     { "code", CreateErrorCodes.SupplierOrganizationEnded }
                 }),
+
             CreateResult.CustomerOrganizationEnded => Results.Problem(
                 statusCode: StatusCodes.Status400BadRequest,
                 title: "Customer organization has ended",
@@ -74,6 +79,7 @@ internal class CreateEndpoint
                 {
                     { "code", CreateErrorCodes.CustomerOrganizationEnded }
                 }),
+
             _ => throw new InvalidOperationException("Unexpected result type.")
         };
         return response;
