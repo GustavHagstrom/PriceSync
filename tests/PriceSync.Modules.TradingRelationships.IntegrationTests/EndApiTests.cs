@@ -1,3 +1,6 @@
+using System.Collections.Concurrent;
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.Extensions.Logging;
 using System.Data.Common;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using System.Net;
@@ -101,7 +104,7 @@ public sealed class EndApiTests(PostgreSqlFixture fixture) : IAsyncLifetime
         stillActive.GetRawText().Should().Be(created.GetRawText());
     }
     [Theory]
-    [InlineData(false, HttpStatusCode.NotFound, "trading-relationship-not-found")]
+    [InlineData(false, HttpStatusCode.NotFound, "not-found")]
     [InlineData(true, HttpStatusCode.BadRequest, "validation-failed")]
     public async Task End_rejects_unknown_or_empty_relationship_id(bool empty, HttpStatusCode expectedStatus, string code)
     {
@@ -211,6 +214,99 @@ public sealed class EndApiTests(PostgreSqlFixture fixture) : IAsyncLifetime
         var history = await historyResponse.Content.ReadFromJsonAsync<JsonElement>();
         history.GetRawText().Should().Be(ended.GetRawText());
     }
+    [Fact]
+    public async Task End_logs_actor_relationship_and_distinguishes_repeated_success()
+    {
+        var logs = new RecordingLogProvider();
+        var supplier = Guid.CreateVersion7();
+        await using var application = CreateApplication();
+        using var loggedApplication = application.WithWebHostBuilder(builder =>
+            builder.ConfigureLogging(logging => logging.AddProvider(logs)));
+        using var client = loggedApplication.CreateClient();
+        client.DefaultRequestHeaders.Add("organization_id", supplier.ToString());
+        var created = await CreateRelationshipAsync(client, supplier, Guid.CreateVersion7());
+        var relationshipId = created.GetProperty("id").GetGuid();
+        _clock.UtcNow = CreatedAt.AddDays(1);
+
+        var first = await client.DeleteAsync(Url(relationshipId));
+        var repeated = await client.DeleteAsync(Url(relationshipId));
+
+        first.StatusCode.Should().Be(HttpStatusCode.OK);
+        repeated.StatusCode.Should().Be(HttpStatusCode.OK);
+        var entries = logs.Entries.ToArray();
+        entries.Should().HaveCount(2);
+        entries.Select(entry => entry["Reason"]).Should().Equal("Ended", "AlreadyEnded");
+        foreach (var entry in entries)
+        {
+            entry["Operation"].Should().Be("EndTradingRelationship");
+            entry["Outcome"].Should().Be("Succeeded");
+            entry["PersonId"].Should().BeOfType<Guid>().Which.Should().NotBeEmpty();
+            entry["OrganizationId"].Should().Be(supplier);
+            entry["TradingRelationshipId"].Should().Be(relationshipId);
+            entry["EndedAt"].Should().Be(_clock.UtcNow);
+            entry["TraceId"].Should().BeOfType<string>().Which.Should().NotBeNullOrEmpty();
+        }
+        entries[0]["PersonId"].Should().Be(entries[1]["PersonId"]);
+    }
+
+    [Theory]
+    [InlineData(false, HttpStatusCode.Forbidden, "Denied", "AuthorizationDenied")]
+    [InlineData(true, HttpStatusCode.InternalServerError, "Failed", "TechnicalFailure")]
+    public async Task Unsuccessful_end_logs_its_context_and_preserves_the_error_response(
+        bool technicalFailure, HttpStatusCode expectedStatus, string outcome, string reason)
+    {
+        var logs = new RecordingLogProvider();
+        var organizationId = Guid.CreateVersion7();
+        var relationshipId = Guid.CreateVersion7();
+        await using var application = CreateApplication(allowed: technicalFailure,
+            status: _ => throw new InvalidOperationException("Status service unavailable."));
+        using var loggedApplication = application.WithWebHostBuilder(builder =>
+            builder.ConfigureLogging(logging => logging.AddProvider(logs)));
+        using var client = loggedApplication.CreateClient();
+        client.DefaultRequestHeaders.Add("organization_id", organizationId.ToString());
+
+        var response = await client.DeleteAsync(Url(relationshipId));
+
+        response.StatusCode.Should().Be(expectedStatus);
+        var entry = logs.Entries.Should().ContainSingle().Subject;
+        entry["Outcome"].Should().Be(outcome);
+        entry["Reason"].Should().Be(reason);
+        entry["PersonId"].Should().BeOfType<Guid>().Which.Should().NotBeEmpty();
+        entry["OrganizationId"].Should().Be(organizationId);
+        entry["TradingRelationshipId"].Should().Be(relationshipId);
+        if (technicalFailure)
+            entry["ErrorType"].Should().Be(typeof(InvalidOperationException).FullName);
+    }
+
+    private sealed class RecordingLogProvider : ILoggerProvider, ISupportExternalScope
+    {
+        private IExternalScopeProvider _scopes = new LoggerExternalScopeProvider();
+        public ConcurrentQueue<Dictionary<string, object?>> Entries { get; } = new();
+        public void SetScopeProvider(IExternalScopeProvider scopeProvider) => _scopes = scopeProvider;
+        public ILogger CreateLogger(string categoryName) => new RecordingLogger(this, categoryName);
+        public void Dispose() { }
+
+        private sealed class RecordingLogger(RecordingLogProvider provider, string categoryName) : ILogger
+        {
+            public bool IsEnabled(LogLevel logLevel) => true;
+            public IDisposable? BeginScope<TState>(TState state) where TState : notnull => provider._scopes.Push(state);
+            public void Log<TState>(LogLevel logLevel, EventId eventId, TState state,
+                Exception? exception, Func<TState, Exception?, string> formatter)
+            {
+                if (!categoryName.EndsWith(".EndHandler", StringComparison.Ordinal)) return;
+                var fields = new Dictionary<string, object?>();
+                provider._scopes.ForEachScope((scope, values) =>
+                {
+                    if (scope is IEnumerable<KeyValuePair<string, object?>> properties)
+                        foreach (var property in properties) values[property.Key] = property.Value;
+                }, fields);
+                if (state is IEnumerable<KeyValuePair<string, object?>> properties)
+                    foreach (var property in properties) fields[property.Key] = property.Value;
+                provider.Entries.Enqueue(fields);
+            }
+        }
+    }
+
     private ApiApplication CreateApplication(bool allowed = true, bool authenticated = true,
         Func<OrganizationId, OrganizationStatusResult>? status = null,
         IReadOnlyCollection<IInterceptor>? interceptors = null, TimeProvider? clock = null) => new(

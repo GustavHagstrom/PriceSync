@@ -1,8 +1,4 @@
 ﻿using PriceSync.BuildingBlocks.Validation;
-using System;
-using System.Collections.Generic;
-using System.ComponentModel.DataAnnotations;
-using System.Text;
 
 namespace PriceSync.Modules.TradingRelationships.Features.End;
 

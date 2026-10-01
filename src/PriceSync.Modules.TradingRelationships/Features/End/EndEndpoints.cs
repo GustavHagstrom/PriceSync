@@ -33,7 +33,7 @@ internal class EndEndpoints
             EndResult.Ended ended => Results.Ok(ended.Response),
 
             EndResult.TradingRelationshipNotFound => Results.Problem(
-                title: "Trading relationship not found",
+                title: "Not Found",
                 statusCode: StatusCodes.Status404NotFound,
                 extensions: new Dictionary<string, object?>
                 {
@@ -65,11 +65,11 @@ internal class EndEndpoints
                 }),
 
             EndResult.ActingOrganizationNotMemberOfTradingRelationship => Results.Problem(
-                title: "Acting organization is not a member of the trading relationship",
+                title: "Not Found",
                 statusCode: StatusCodes.Status404NotFound,
                 extensions: new Dictionary<string, object?>
                 {
-                    { "code", EndErrorCodes.ActingOrganizationNotMemberOfTradingRelationship }
+                    { "code", EndErrorCodes.TradingRelationshipNotFound }
                 }),
 
             EndResult.Forbidden => Results.Problem(
