@@ -1,65 +1,56 @@
-﻿using Microsoft.EntityFrameworkCore;
+using System.Diagnostics;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using PriceSync.Modules.OrganizationAccess.Contracts;
 using PriceSync.Modules.OrganizationAccess.Domain;
 using PriceSync.Modules.OrganizationAccess.Persistence;
 
 namespace PriceSync.Modules.OrganizationAccess.Features.Authorization;
 
-internal class OrganizationAuthorizer(OrganizationAccessDbContext dbContext) : IOrganizationAuthorizer
+internal class OrganizationAuthorizer(
+    OrganizationAccessDbContext dbContext,
+    ILogger<OrganizationAuthorizer> logger) : IOrganizationAuthorizer
 {
-    public async Task<bool> HasCapabilityAsync(PersonId personId, OrganizationId organizationId, OrganizationCapability capability, CancellationToken cancellationToken = default)
+    public async Task<bool> HasCapabilityAsync(
+        PersonId personId,
+        OrganizationId organizationId,
+        OrganizationCapability capability,
+        CancellationToken cancellationToken = default)
     {
-        if(personId.Value == Guid.Empty)
-        {
-            return false;
-        }
-        if(organizationId.Value == Guid.Empty)
-        {
-            return false;
-        }
-        var existingOrganization = await dbContext.Organizations.FirstOrDefaultAsync(o => o.Id == organizationId && o.Status == OrganizationStatus.Active, cancellationToken);
-        if (existingOrganization == null)
-        {
-            return false;
-        }
-        var result = capability switch
-        {
-            OrganizationCapability.ReadTradingRelationships => await CheckReadTradingRelationshipCapability(personId, organizationId, cancellationToken),
-            OrganizationCapability.ManageTradingRelationships => await CheckManageTradingRelationshipsCapability(personId, organizationId, cancellationToken),
-            _ => throw new ArgumentOutOfRangeException(nameof(capability), capability, "Invalid capability value.")
-        };
-        return result;
-    }
-    private async Task<bool> CheckReadTradingRelationshipCapability(PersonId personId, OrganizationId organizationId, CancellationToken cancellationToken = default)
-    {
-        var membership = await dbContext.OrganizationMemberships
-            .FirstOrDefaultAsync(m => m.PersonId == personId && m.OrganizationId == organizationId && m.Status == OrganizationMembershipStatus.Active, cancellationToken);
-        if (membership == null)
-        {
-            return false;
-        }
-        if (membership.Status != OrganizationMembershipStatus.Active)
-        {
-            return false;
-        }
+        if (personId.Value == Guid.Empty)
+            return Deny("InvalidPersonId");
+        if (organizationId.Value == Guid.Empty)
+            return Deny("InvalidOrganizationId");
+
+        var organization = await dbContext.Organizations
+            .FirstOrDefaultAsync(o => o.Id == organizationId, cancellationToken);
+        if (organization is null)
+            return Deny("OrganizationNotFound");
+        if (organization.Status != OrganizationStatus.Active)
+            return Deny("OrganizationArchived");
+
+        if (capability is not (OrganizationCapability.ReadTradingRelationships or OrganizationCapability.ManageTradingRelationships))
+            throw new ArgumentOutOfRangeException(nameof(capability), capability, "Invalid capability value.");
+
+        var membership = await dbContext.OrganizationMemberships.FirstOrDefaultAsync(
+            m => m.PersonId == personId && m.OrganizationId == organizationId &&
+                 m.Status == OrganizationMembershipStatus.Active, cancellationToken);
+        if (membership is null)
+            return Deny("NoActiveMembership");
+        if (capability == OrganizationCapability.ManageTradingRelationships &&
+            !membership.Roles.Contains(OrganizationRole.Owner))
+            return Deny("RequiredRoleMissing");
+
         return true;
-    }
-    private async Task<bool> CheckManageTradingRelationshipsCapability(PersonId personId, OrganizationId organizationId, CancellationToken cancellationToken = default)
-    {
-        var membership = await dbContext.OrganizationMemberships
-            .FirstOrDefaultAsync(m => m.PersonId == personId && m.OrganizationId == organizationId && m.Status == OrganizationMembershipStatus.Active, cancellationToken);
-        if(membership == null)
+
+        bool Deny(string reason)
         {
+            logger.LogInformation(
+                "Organization authorization completed with {Outcome}, reason {Reason}, " +
+                "person {PersonId}, organization {OrganizationId}, capability {Capability}, trace {TraceId}",
+                "Denied", reason, personId.Value, organizationId.Value, capability,
+                Activity.Current?.TraceId.ToString());
             return false;
         }
-        if(membership.Status != OrganizationMembershipStatus.Active)
-        {
-            return false;
-        }
-        if(membership.Roles.Any(r => r == OrganizationRole.Owner))
-        {
-            return true;
-        }
-        return false;
     }
 }

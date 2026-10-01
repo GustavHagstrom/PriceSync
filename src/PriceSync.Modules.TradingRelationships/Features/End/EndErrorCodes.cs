@@ -1,4 +1,4 @@
-﻿namespace PriceSync.Modules.TradingRelationships.Features.End;
+namespace PriceSync.Modules.TradingRelationships.Features.End;
 
 internal static class EndErrorCodes
 {
@@ -6,6 +6,4 @@ internal static class EndErrorCodes
     public const string ValidationFailed = "validation_failed";
     public const string Forbidden = "forbidden";
     public const string ActingOrganizationRequired = "acting_organization_required";
-    public const string ActingOrganizationEnded = "acting_organization_ended";
-    public const string ActingOrganizationNotFound = "acting_organization_not_found";
 }

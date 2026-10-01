@@ -14,7 +14,7 @@ public static class Endpoints
             .RequireAuthorization();
 
         api.MapPost("", CreateEndpoint.HandleAsync).WithName(Routes.Names.Create);
-        api.MapDelete("{tradingRelationshipId:guid}", EndEndpoints.HandleAsync).WithName(Routes.Names.End);
+        api.MapDelete("{tradingRelationshipId:guid}", EndEndpoint.HandleAsync).WithName(Routes.Names.End);
 
         return endpoints;
     }

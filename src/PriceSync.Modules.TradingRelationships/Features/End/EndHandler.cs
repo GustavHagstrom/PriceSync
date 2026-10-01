@@ -63,25 +63,23 @@ internal class EndHandler
             if (organizationStatus == OrganizationStatusResult.Archived)
             {
                 LogOutcome("Denied", "ActingOrganizationArchived");
-                return new EndResult.ActingOrganizationEnded();
+                return new EndResult.Forbidden();
             }
             if (organizationStatus == OrganizationStatusResult.NotFound)
             {
                 LogOutcome("Denied", "ActingOrganizationNotFound");
-                return new EndResult.ActingOrganizationNotFound();
+                return new EndResult.Forbidden();
             }
-            var tradingRelationship = await _dbContext.TradingRelationships.AsNoTracking().SingleOrDefaultAsync(x => x.Id == command.TradingRelationshipId, cancellationToken);
+            var actingOrganizationId = _currentOrganization.OrganizationId.Value;
+            var scopedRelationships = _dbContext.TradingRelationships.Where(x =>
+                x.Id == command.TradingRelationshipId &&
+                (x.SupplierOrganizationId == actingOrganizationId || x.CustomerOrganizationId == actingOrganizationId));
+            var tradingRelationship = await scopedRelationships.AsNoTracking().SingleOrDefaultAsync(cancellationToken);
             if (tradingRelationship is null)
             {
                 LogOutcome("Denied", "TradingRelationshipNotFound");
                 return new EndResult.TradingRelationshipNotFound();
             }
-            if (_currentOrganization.OrganizationId != tradingRelationship.CustomerOrganizationId && _currentOrganization.OrganizationId != tradingRelationship.SupplierOrganizationId)
-            {
-                LogOutcome("Denied", "OutsidePartyScope");
-                return new EndResult.ActingOrganizationNotMemberOfTradingRelationship();
-            }
-
             if (tradingRelationship.Status == TradingRelationshipStatus.Ended)
             {
                 LogOutcome("Succeeded", "AlreadyEnded", tradingRelationship.EndedAt);
@@ -90,9 +88,8 @@ internal class EndHandler
 
             var now = _timeProvider.GetUtcNow();
 
-            var affectedRows = await _dbContext.TradingRelationships
+            var affectedRows = await scopedRelationships
                 .Where(x =>
-                    x.Id == command.TradingRelationshipId &&
                     x.EndedAt == null &&
                     x.Status == TradingRelationshipStatus.Active)
                 .ExecuteUpdateAsync(
@@ -102,7 +99,7 @@ internal class EndHandler
                     ,cancellationToken);
 
 
-            tradingRelationship = await _dbContext.TradingRelationships.AsNoTracking().SingleOrDefaultAsync(x => x.Id == command.TradingRelationshipId, cancellationToken);
+            tradingRelationship = await scopedRelationships.AsNoTracking().SingleOrDefaultAsync(cancellationToken);
             if (tradingRelationship is null)
             {
                 throw new InvalidOperationException(

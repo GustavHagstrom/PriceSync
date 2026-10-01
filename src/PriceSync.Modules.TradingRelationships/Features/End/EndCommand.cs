@@ -1,7 +1,4 @@
-﻿using PriceSync.Modules.TradingRelationships.Contracts;
-using System;
-using System.Collections.Generic;
-using System.Text;
+using PriceSync.Modules.TradingRelationships.Contracts;
 
 namespace PriceSync.Modules.TradingRelationships.Features.End;
 

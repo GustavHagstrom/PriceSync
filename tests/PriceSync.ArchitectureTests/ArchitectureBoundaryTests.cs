@@ -57,7 +57,7 @@ public sealed class ArchitectureBoundaryTests
                 .Should()
                 .OnlyContain(
                     reference => allowedReferences.Contains(reference),
-                    $"{projectName} may reference shared kernel and module contracts, but not module implementations");
+                    $"{projectName} may reference shared kernel, technical building blocks and module contracts, but not module implementations");
         }
     }
 
@@ -155,6 +155,15 @@ public sealed class ArchitectureBoundaryTests
 
         createOrganizationId.Should().Throw<ArgumentException>();
         createPersonId.Should().Throw<ArgumentException>();
+    }
+
+    [Fact]
+    public void Technical_building_blocks_do_not_depend_on_modules()
+    {
+        _projects["PriceSync.BuildingBlocks"].ProjectReferences
+            .Should()
+            .NotContain(reference => reference.StartsWith("PriceSync.Modules.", StringComparison.Ordinal),
+                "technical building blocks must remain independent from module business concepts");
     }
 
     [Fact]

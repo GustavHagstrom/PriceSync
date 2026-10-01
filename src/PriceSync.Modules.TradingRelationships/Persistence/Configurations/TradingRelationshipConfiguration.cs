@@ -1,4 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using PriceSync.Modules.OrganizationAccess.Contracts;
 using PriceSync.Modules.TradingRelationships.Contracts;
@@ -25,7 +25,7 @@ internal class TradingRelationshipConfiguration : IEntityTypeConfiguration<Tradi
             .HasColumnName("supplier_organization_id")
             .HasConversion(orgId => orgId.Value, value => new OrganizationId(value))
             .IsRequired();
-        
+
         builder.Property(tr => tr.CustomerOrganizationId)
             .HasColumnName("customer_organization_id")
             .HasConversion(orgId => orgId.Value, value => new OrganizationId(value))
@@ -47,8 +47,6 @@ internal class TradingRelationshipConfiguration : IEntityTypeConfiguration<Tradi
                 value => Enum.Parse<TradingRelationshipStatus>(value, ignoreCase: true))
             .HasColumnType("text")
             .IsRequired();
-
-        //builder.Property<uint>("xmin").IsRowVersion();
 
         builder.HasIndex(relationship => new
         {

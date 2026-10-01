@@ -71,9 +71,9 @@ public sealed class EndApiTests(PostgreSqlFixture fixture) : IAsyncLifetime
     }
     [Theory]
     [InlineData("unauthenticated", HttpStatusCode.Unauthorized, "authentication_required")]
-    [InlineData("no_organization", HttpStatusCode.BadRequest, "acting-organization-required")]
+    [InlineData("no_organization", HttpStatusCode.BadRequest, "acting_organization_required")]
     [InlineData("no_capability", HttpStatusCode.Forbidden, "forbidden")]
-    [InlineData("unrelated", HttpStatusCode.NotFound, "not-found")]
+    [InlineData("unrelated", HttpStatusCode.NotFound, "not_found")]
     [InlineData("archived_actor", HttpStatusCode.Forbidden, "forbidden")]
     public async Task Rejected_end_leaves_the_relationship_active(string scenario, HttpStatusCode expectedStatus, string code)
     {
@@ -104,8 +104,8 @@ public sealed class EndApiTests(PostgreSqlFixture fixture) : IAsyncLifetime
         stillActive.GetRawText().Should().Be(created.GetRawText());
     }
     [Theory]
-    [InlineData(false, HttpStatusCode.NotFound, "not-found")]
-    [InlineData(true, HttpStatusCode.BadRequest, "validation-failed")]
+    [InlineData(false, HttpStatusCode.NotFound, "not_found")]
+    [InlineData(true, HttpStatusCode.BadRequest, "validation_failed")]
     public async Task End_rejects_unknown_or_empty_relationship_id(bool empty, HttpStatusCode expectedStatus, string code)
     {
         await using var application = CreateApplication();
@@ -278,6 +278,83 @@ public sealed class EndApiTests(PostgreSqlFixture fixture) : IAsyncLifetime
             entry["ErrorType"].Should().Be(typeof(InvalidOperationException).FullName);
     }
 
+    [Theory]
+    [InlineData(OrganizationStatusResult.Archived)]
+    [InlineData(OrganizationStatusResult.NotFound)]
+    public async Task Actor_becoming_unavailable_after_authorization_is_forbidden_and_leaves_relationship_active(
+        OrganizationStatusResult status)
+    {
+        var supplier = Guid.CreateVersion7();
+        var customer = Guid.CreateVersion7();
+        await using var setupApplication = CreateApplication();
+        using var setup = setupApplication.CreateClient();
+        setup.DefaultRequestHeaders.Add("organization_id", supplier.ToString());
+        var created = await CreateRelationshipAsync(setup, supplier, customer);
+        await using var application = CreateApplication(status: _ => status);
+        using var client = application.CreateClient();
+        client.DefaultRequestHeaders.Add("organization_id", supplier.ToString());
+
+        var response = await client.DeleteAsync(Url(created.GetProperty("id").GetGuid()));
+
+        await ApiAssestions.AssertProblemAsync(response, HttpStatusCode.Forbidden, "forbidden");
+        var existingResponse = await setup.PostAsJsonAsync("/api/v1/trading-relationships", new
+        {
+            supplierOrganizationId = supplier, customerOrganizationId = customer,
+        });
+        existingResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        var existing = await existingResponse.Content.ReadFromJsonAsync<JsonElement>();
+        existing.GetRawText().Should().Be(created.GetRawText());
+    }
+
+    [Fact]
+    public async Task Unknown_and_out_of_scope_relationships_have_the_same_public_problem()
+    {
+        var supplier = Guid.CreateVersion7();
+        await using var application = CreateApplication();
+        using var owner = application.CreateClient();
+        owner.DefaultRequestHeaders.Add("organization_id", supplier.ToString());
+        var created = await CreateRelationshipAsync(owner, supplier, Guid.CreateVersion7());
+        using var outsider = application.CreateClient();
+        outsider.DefaultRequestHeaders.Add("organization_id", Guid.CreateVersion7().ToString());
+
+        var knownResponse = await outsider.DeleteAsync(Url(created.GetProperty("id").GetGuid()));
+        var unknownResponse = await outsider.DeleteAsync(Url(Guid.CreateVersion7()));
+
+        knownResponse.StatusCode.Should().Be(HttpStatusCode.NotFound);
+        unknownResponse.StatusCode.Should().Be(HttpStatusCode.NotFound);
+        var known = await knownResponse.Content.ReadFromJsonAsync<Dictionary<string, JsonElement>>();
+        var unknown = await unknownResponse.Content.ReadFromJsonAsync<Dictionary<string, JsonElement>>();
+        known!["code"].GetString().Should().Be("not_found");
+        known.Remove("traceId");
+        unknown!.Remove("traceId");
+        known.ToDictionary(item => item.Key, item => item.Value.GetRawText()).Should()
+            .BeEquivalentTo(unknown.ToDictionary(item => item.Key, item => item.Value.GetRawText()));
+    }
+
+    [Fact]
+    public async Task Invalid_end_logs_validation_denial_with_actor_and_request_context()
+    {
+        var logs = new RecordingLogProvider();
+        var organizationId = Guid.CreateVersion7();
+        await using var application = CreateApplication();
+        using var loggedApplication = application.WithWebHostBuilder(builder =>
+            builder.ConfigureLogging(logging => logging.AddProvider(logs)));
+        using var client = loggedApplication.CreateClient();
+        client.DefaultRequestHeaders.Add("organization_id", organizationId.ToString());
+
+        var response = await client.DeleteAsync(Url(Guid.Empty));
+
+        await ApiAssestions.AssertProblemAsync(response, HttpStatusCode.BadRequest, "validation_failed");
+        var entry = logs.Entries.Should().ContainSingle().Subject;
+        entry["Operation"].Should().Be("EndTradingRelationship");
+        entry["Outcome"].Should().Be("Denied");
+        entry["Reason"].Should().Be("ValidationFailed");
+        entry["PersonId"].Should().BeOfType<Guid>().Which.Should().NotBeEmpty();
+        entry["OrganizationId"].Should().Be(organizationId);
+        entry["TradingRelationshipId"].Should().Be(Guid.Empty);
+        entry["TraceId"].Should().BeOfType<string>().Which.Should().NotBeNullOrEmpty();
+    }
+
     private sealed class RecordingLogProvider : ILoggerProvider, ISupportExternalScope
     {
         private IExternalScopeProvider _scopes = new LoggerExternalScopeProvider();
@@ -293,7 +370,8 @@ public sealed class EndApiTests(PostgreSqlFixture fixture) : IAsyncLifetime
             public void Log<TState>(LogLevel logLevel, EventId eventId, TState state,
                 Exception? exception, Func<TState, Exception?, string> formatter)
             {
-                if (!categoryName.EndsWith(".EndHandler", StringComparison.Ordinal)) return;
+                if (!categoryName.EndsWith(".EndHandler", StringComparison.Ordinal) &&
+                    !categoryName.EndsWith(".EndEndpoints", StringComparison.Ordinal)) return;
                 var fields = new Dictionary<string, object?>();
                 provider._scopes.ForEachScope((scope, values) =>
                 {
