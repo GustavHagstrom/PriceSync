@@ -6,12 +6,12 @@ using Testcontainers.PostgreSql;
 namespace PriceSync.Modules.TradingRelationships.IntegrationTests;
 
 [CollectionDefinition(Name, DisableParallelization = true)]
-public sealed class TradingRelationshipsPostgreSqlCollection : ICollectionFixture<TradingRelationshipsPostgreSqlFixture>
+public sealed class TradingRelationshipsPostgreSqlCollection : ICollectionFixture<PostgreSqlFixture>
 {
     public const string Name = "TradingRelationshipsPostgreSql";
 }
 
-public sealed class TradingRelationshipsPostgreSqlFixture : IAsyncLifetime
+public sealed class PostgreSqlFixture : IAsyncLifetime
 {
     private readonly PostgreSqlContainer _container = new PostgreSqlBuilder("postgres:16-alpine")
         .WithDatabase("pricesync")

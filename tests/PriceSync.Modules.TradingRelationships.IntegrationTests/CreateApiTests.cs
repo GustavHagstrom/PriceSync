@@ -12,7 +12,7 @@ using PriceSync.Modules.TradingRelationships.Persistence;
 namespace PriceSync.Modules.TradingRelationships.IntegrationTests;
 
 [Collection(TradingRelationshipsPostgreSqlCollection.Name)]
-public sealed class CreateTradingRelationshipApiTests(TradingRelationshipsPostgreSqlFixture fixture) : IAsyncLifetime
+public sealed class CreateApiTests(PostgreSqlFixture fixture) : IAsyncLifetime
 {
     private static readonly DateTimeOffset CreatedAt = new(2026, 9, 24, 8, 30, 0, TimeSpan.Zero);
 
@@ -25,7 +25,7 @@ public sealed class CreateTradingRelationshipApiTests(TradingRelationshipsPostgr
     {
         var supplierId = NewOrganizationId();
         var customerId = NewOrganizationId();
-        await using var application = new TradingRelationshipsApiApplication(
+        await using var application = new ApiApplication(
             fixture.ConnectionString,
             null,
             new AllowingOrganizationAuthorizer(),
@@ -317,13 +317,13 @@ public sealed class CreateTradingRelationshipApiTests(TradingRelationshipsPostgr
         representations.Select(item => item.GetProperty("id").GetGuid()).Distinct().Should().ContainSingle();
     }
 
-    private TradingRelationshipsApiApplication CreateApplication(
+    private ApiApplication CreateApplication(
         IOrganizationAuthorizer? authorizer = null,
         IOrganizationStatusReader? statusReader = null,
         PersonId? personId = null,
         IReadOnlyCollection<IInterceptor>? interceptors = null)
     {
-        return new TradingRelationshipsApiApplication(
+        return new ApiApplication(
             fixture.ConnectionString,
             personId ?? new PersonId(Guid.CreateVersion7()),
             authorizer ?? new AllowingOrganizationAuthorizer(),

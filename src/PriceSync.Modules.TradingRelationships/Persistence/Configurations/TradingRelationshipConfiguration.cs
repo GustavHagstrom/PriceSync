@@ -48,7 +48,7 @@ internal class TradingRelationshipConfiguration : IEntityTypeConfiguration<Tradi
             .HasColumnType("text")
             .IsRequired();
 
-        builder.Property<uint>("xmin").IsRowVersion();
+        //builder.Property<uint>("xmin").IsRowVersion();
 
         builder.HasIndex(relationship => new
         {

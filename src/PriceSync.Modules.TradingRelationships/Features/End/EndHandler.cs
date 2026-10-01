@@ -51,7 +51,7 @@ internal class EndHandler
         {
             return new EndResult.ActingOrganizationNotFound();
         }
-        var tradingRelationship = await _dbContext.TradingRelationships.SingleOrDefaultAsync(x => x.Id == command.TradingRelationshipId, cancellationToken);
+        var tradingRelationship = await _dbContext.TradingRelationships.AsNoTracking().SingleOrDefaultAsync(x => x.Id == command.TradingRelationshipId, cancellationToken);
         if(tradingRelationship is null)
         {
             return new EndResult.TradingRelationshipNotFound();
@@ -66,22 +66,35 @@ internal class EndHandler
             return new EndResult.Ended(new TradingRelationshipResponse(tradingRelationship));
         }
 
-        tradingRelationship.End(_timeProvider.GetUtcNow());
+        var now = _timeProvider.GetUtcNow();
 
-        try
-        {
-            await _dbContext.SaveChangesAsync(cancellationToken);
-            return new EndResult.Ended(new TradingRelationshipResponse(tradingRelationship));
-        }
-        catch (DbUpdateConcurrencyException)
-        {
-            var winner = await _dbContext.TradingRelationships.AsNoTracking().SingleOrDefaultAsync(x => x.Id == command.TradingRelationshipId, cancellationToken);
-            if(winner is null)
-            {
-                throw new Exception("Unexpected error: Trading relationship not found after concurrency exception.");
-            }
-            return new EndResult.Ended(new TradingRelationshipResponse(winner));
-        }
+        var affectedRows = await _dbContext.TradingRelationships
+            .Where(x => 
+                x.Id == command.TradingRelationshipId && 
+                x.EndedAt == null && 
+                x.Status == TradingRelationshipStatus.Active)
+            .ExecuteUpdateAsync(
+                x => 
+                    x.SetProperty(tr => tr.Status, TradingRelationshipStatus.Ended)
+                    .SetProperty(tr => tr.EndedAt, now)
+                ,cancellationToken);
         
+
+        tradingRelationship = await _dbContext.TradingRelationships.AsNoTracking().SingleOrDefaultAsync(x => x.Id == command.TradingRelationshipId, cancellationToken);
+        if (tradingRelationship is null)
+        {
+            throw new InvalidOperationException(
+                "Trading relationship disappeared during End operation.");
+        }
+
+        if (tradingRelationship.Status != TradingRelationshipStatus.Ended)
+        {
+            throw new InvalidOperationException(
+                $"Expected trading relationship to be Ended after End operation, " +
+                $"but status was {tradingRelationship.Status}.");
+        }
+
+        return new EndResult.Ended(new TradingRelationshipResponse(tradingRelationship));
+
     }
 }
