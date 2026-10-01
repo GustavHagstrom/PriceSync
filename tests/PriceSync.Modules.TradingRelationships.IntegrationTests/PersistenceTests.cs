@@ -8,7 +8,7 @@ using PriceSync.Modules.TradingRelationships.Persistence;
 namespace PriceSync.Modules.TradingRelationships.IntegrationTests;
 
 [Collection(TradingRelationshipsPostgreSqlCollection.Name)]
-public sealed class TradingRelationshipsPersistenceTests(TradingRelationshipsPostgreSqlFixture fixture) : IAsyncLifetime
+public sealed class PersistenceTests(PostgreSqlFixture fixture) : IAsyncLifetime
 {
     public async Task InitializeAsync() => await fixture.ResetAsync();
 

@@ -2,7 +2,7 @@
 
 namespace PriceSync.Modules.TradingRelationships.Features.Create;
 
-internal abstract record class CreateResult
+internal abstract record CreateResult
 {
     internal sealed record Created(TradingRelationshipResponse Response) : CreateResult;
     internal sealed record Existed(TradingRelationshipResponse Response) : CreateResult;

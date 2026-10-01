@@ -15,7 +15,7 @@ using PriceSync.Modules.TradingRelationships.Persistence;
 
 namespace PriceSync.Modules.TradingRelationships.IntegrationTests;
 
-internal sealed class TradingRelationshipsApiApplication(
+internal sealed class ApiApplication(
     string connectionString,
     PersonId? personId,
     IOrganizationAuthorizer organizationAuthorizer,

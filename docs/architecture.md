@@ -122,7 +122,7 @@ Contracts must not contain aggregates, EF entities, persistence models, internal
 
 Allowed dependencies:
 
-- Module implementation projects may reference their own contracts, other module contracts, and `PriceSync.SharedKernel`.
+- Module implementation projects may reference their own contracts, other module contracts, `PriceSync.SharedKernel`, and `PriceSync.BuildingBlocks`.
 - Module implementation projects must not reference other module implementation projects.
 - Module contracts must not reference module implementation projects.
 - `PriceSync.SharedKernel` must not reference modules.
@@ -136,6 +136,10 @@ Each module owns its own persistence scope. The initial implementation uses Post
 Within the shared database, each module owns a separate PostgreSQL schema, including its tables, indexes, and EF migrations history. Modules do not create cross-schema EF navigations or foreign keys and do not query another module's schema directly.
 
 Modules must not share persistence entities, EF navigation properties, or direct table/model access across module boundaries. Cross-module reads and orchestration go through contracts using explicit identifiers and immutable version references.
+
+### Technical building blocks
+
+`PriceSync.BuildingBlocks` contains reusable, domain-neutral implementation helpers, such as validation error collection. Module implementation projects may depend on it; it must not depend on modules or contain business concepts, cross-module contracts, or persistence entities. It differs from `PriceSync.SharedKernel`, which holds shared infrastructure-neutral primitives rather than implementation helpers. Architecture tests enforce the permitted project references.
 
 ### Shared kernel
 

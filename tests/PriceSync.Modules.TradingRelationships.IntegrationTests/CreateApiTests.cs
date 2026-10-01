@@ -8,11 +8,12 @@ using Microsoft.EntityFrameworkCore.Diagnostics;
 using PriceSync.Modules.OrganizationAccess.Contracts;
 using PriceSync.Modules.TradingRelationships.Domain;
 using PriceSync.Modules.TradingRelationships.Persistence;
+using PriceSync.Modules.TradingRelationships.IntegrationTests.TestSupport;
 
 namespace PriceSync.Modules.TradingRelationships.IntegrationTests;
 
 [Collection(TradingRelationshipsPostgreSqlCollection.Name)]
-public sealed class CreateTradingRelationshipApiTests(TradingRelationshipsPostgreSqlFixture fixture) : IAsyncLifetime
+public sealed partial class CreateApiTests(PostgreSqlFixture fixture) : IAsyncLifetime
 {
     private static readonly DateTimeOffset CreatedAt = new(2026, 9, 24, 8, 30, 0, TimeSpan.Zero);
 
@@ -25,7 +26,7 @@ public sealed class CreateTradingRelationshipApiTests(TradingRelationshipsPostgr
     {
         var supplierId = NewOrganizationId();
         var customerId = NewOrganizationId();
-        await using var application = new TradingRelationshipsApiApplication(
+        await using var application = new ApiApplication(
             fixture.ConnectionString,
             null,
             new AllowingOrganizationAuthorizer(),
@@ -38,7 +39,7 @@ public sealed class CreateTradingRelationshipApiTests(TradingRelationshipsPostgr
             "/api/v1/trading-relationships",
             CreateRequest(supplierId, customerId));
 
-        await AssertProblemAsync(response, HttpStatusCode.Unauthorized, "authentication_required");
+        await ApiAssestions.AssertProblemAsync(response, HttpStatusCode.Unauthorized, "authentication_required");
     }
 
     [Fact]
@@ -81,7 +82,7 @@ public sealed class CreateTradingRelationshipApiTests(TradingRelationshipsPostgr
             "/api/v1/trading-relationships",
             CreateRequest(supplierId, customerId));
 
-        await AssertProblemAsync(response, HttpStatusCode.BadRequest, "acting_organization_required");
+        await ApiAssestions.AssertProblemAsync(response, HttpStatusCode.BadRequest, "acting_organization_required");
     }
 
     [Fact]
@@ -100,7 +101,7 @@ public sealed class CreateTradingRelationshipApiTests(TradingRelationshipsPostgr
             "/api/v1/trading-relationships",
             CreateRequest(supplierId, customerId));
 
-        await AssertProblemAsync(response, HttpStatusCode.Forbidden, "forbidden");
+        await ApiAssestions.AssertProblemAsync(response, HttpStatusCode.Forbidden, "forbidden");
         authorizer.Calls.Should().BeEmpty();
         statusReader.Calls.Should().BeEmpty();
     }
@@ -121,7 +122,7 @@ public sealed class CreateTradingRelationshipApiTests(TradingRelationshipsPostgr
             "/api/v1/trading-relationships",
             CreateRequest(supplierId, customerId));
 
-        await AssertProblemAsync(response, HttpStatusCode.Forbidden, "forbidden");
+        await ApiAssestions.AssertProblemAsync(response, HttpStatusCode.Forbidden, "forbidden");
         authorizer.Calls.Should().ContainSingle()
             .Which.Should().Be((customerId, OrganizationCapability.ManageTradingRelationships));
         statusReader.Calls.Should().BeEmpty();
@@ -144,7 +145,7 @@ public sealed class CreateTradingRelationshipApiTests(TradingRelationshipsPostgr
             "/api/v1/trading-relationships",
             CreateRequest(supplierId, customerId));
 
-        await AssertProblemAsync(response, HttpStatusCode.Forbidden, "forbidden");
+        await ApiAssestions.AssertProblemAsync(response, HttpStatusCode.Forbidden, "forbidden");
         statusReader.Calls.Should().BeEmpty();
     }
 
@@ -174,7 +175,7 @@ public sealed class CreateTradingRelationshipApiTests(TradingRelationshipsPostgr
             "/api/v1/trading-relationships",
             CreateRequest(supplierId, customerId));
 
-        await AssertProblemAsync(response, expectedStatus, expectedCode);
+        await ApiAssestions.AssertProblemAsync(response, expectedStatus, expectedCode);
     }
 
     [Fact]
@@ -192,7 +193,7 @@ public sealed class CreateTradingRelationshipApiTests(TradingRelationshipsPostgr
             "/api/v1/trading-relationships",
             CreateRequest(organizationId, organizationId));
 
-        await AssertProblemAsync(response, HttpStatusCode.BadRequest, "validation_failed");
+        await ApiAssestions.AssertProblemAsync(response, HttpStatusCode.BadRequest, "validation_failed");
         authorizer.Calls.Should().BeEmpty();
         statusReader.Calls.Should().BeEmpty();
     }
@@ -284,7 +285,7 @@ public sealed class CreateTradingRelationshipApiTests(TradingRelationshipsPostgr
             "/api/v1/trading-relationships",
             CreateRequest(supplierId, customerId));
 
-        await AssertProblemAsync(response, HttpStatusCode.BadRequest, "customer_organization_ended");
+        await ApiAssestions.AssertProblemAsync(response, HttpStatusCode.BadRequest, "customer_organization_ended");
         await using var verificationContext = new TradingRelationshipsDbContext(fixture.CreateOptions());
         var relationships = await verificationContext.TradingRelationships.ToListAsync();
         relationships.Should().ContainSingle();
@@ -317,13 +318,13 @@ public sealed class CreateTradingRelationshipApiTests(TradingRelationshipsPostgr
         representations.Select(item => item.GetProperty("id").GetGuid()).Distinct().Should().ContainSingle();
     }
 
-    private TradingRelationshipsApiApplication CreateApplication(
+    private ApiApplication CreateApplication(
         IOrganizationAuthorizer? authorizer = null,
         IOrganizationStatusReader? statusReader = null,
         PersonId? personId = null,
         IReadOnlyCollection<IInterceptor>? interceptors = null)
     {
-        return new TradingRelationshipsApiApplication(
+        return new ApiApplication(
             fixture.ConnectionString,
             personId ?? new PersonId(Guid.CreateVersion7()),
             authorizer ?? new AllowingOrganizationAuthorizer(),
@@ -339,67 +340,6 @@ public sealed class CreateTradingRelationshipApiTests(TradingRelationshipsPostgr
     };
 
     private static OrganizationId NewOrganizationId() => new(Guid.CreateVersion7());
-
-    private static async Task AssertProblemAsync(
-        HttpResponseMessage response,
-        HttpStatusCode expectedStatus,
-        string expectedCode)
-    {
-        response.StatusCode.Should().Be(expectedStatus);
-        response.Content.Headers.ContentType?.MediaType.Should().Be("application/problem+json");
-        var problem = await response.Content.ReadFromJsonAsync<JsonElement>();
-        problem.GetProperty("code").GetString().Should().Be(expectedCode);
-    }
-
-    private sealed class AllowingOrganizationAuthorizer : IOrganizationAuthorizer
-    {
-        public Task<bool> HasCapabilityAsync(
-            PersonId personId,
-            OrganizationId organizationId,
-            OrganizationCapability capability,
-            CancellationToken cancellationToken = default) => Task.FromResult(true);
-    }
-
-    private sealed class StubOrganizationAuthorizer(bool allowed = true) : IOrganizationAuthorizer
-    {
-        public List<(OrganizationId OrganizationId, OrganizationCapability Capability)> Calls { get; } = [];
-
-        public Task<bool> HasCapabilityAsync(
-            PersonId personId,
-            OrganizationId organizationId,
-            OrganizationCapability capability,
-            CancellationToken cancellationToken = default)
-        {
-            Calls.Add((organizationId, capability));
-            return Task.FromResult(allowed);
-        }
-    }
-
-    private sealed class ActiveOrganizationStatusReader : IOrganizationStatusReader
-    {
-        public Task<OrganizationStatusResult> GetStatusAsync(
-            OrganizationId organizationId,
-            CancellationToken cancellationToken) => Task.FromResult(OrganizationStatusResult.Active);
-    }
-
-    private sealed class StubOrganizationStatusReader(
-        Func<OrganizationId, OrganizationStatusResult>? getStatus = null) : IOrganizationStatusReader
-    {
-        public List<OrganizationId> Calls { get; } = [];
-
-        public Task<OrganizationStatusResult> GetStatusAsync(
-            OrganizationId organizationId,
-            CancellationToken cancellationToken)
-        {
-            Calls.Add(organizationId);
-            return Task.FromResult(getStatus?.Invoke(organizationId) ?? OrganizationStatusResult.Active);
-        }
-    }
-
-    private sealed class FrozenTimeProvider(DateTimeOffset utcNow) : TimeProvider
-    {
-        public override DateTimeOffset GetUtcNow() => utcNow;
-    }
 
     private sealed class ConcurrentLookupBarrierInterceptor : DbCommandInterceptor
     {
