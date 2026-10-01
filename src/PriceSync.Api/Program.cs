@@ -14,6 +14,8 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddPriceSyncApplication();
 builder.Services.AddProblemDetails();
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen();
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddAuthentication(UnavailableAuthenticationHandler.SchemeName)
     .AddScheme<AuthenticationSchemeOptions, UnavailableAuthenticationHandler>(
@@ -32,6 +34,12 @@ builder.Services.AddRetrievalConsumptionModule();
 builder.Services.AddIntegrationConfigurationModule();
 
 var app = builder.Build();
+
+if (app.Environment.IsDevelopment())
+{
+    app.UseSwagger();
+    app.UseSwaggerUI();
+}
 
 app.UseExceptionHandler(exceptionHandler =>
 {
@@ -65,7 +73,6 @@ app.UseStatusCodePages(async statusCodeContext =>
 app.UseAuthentication();
 app.UseAuthorization();
 
-app.MapGet("/", () => Results.Ok(new { service = "PriceSync.Api" }));
 app.MapOrganizationAccessEndpoints();
 app.MapTradingRelationshipsEndpoints();
 
