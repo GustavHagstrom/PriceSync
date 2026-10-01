@@ -46,6 +46,7 @@ public sealed class ArchitectureBoundaryTests
         var allowedReferences = ModuleNames
             .Select(moduleName => $"PriceSync.Modules.{moduleName}.Contracts")
             .Append("PriceSync.SharedKernel")
+            .Append("PriceSync.BuildingBlocks")
             .ToHashSet(StringComparer.Ordinal);
 
         foreach (var moduleName in ModuleNames)

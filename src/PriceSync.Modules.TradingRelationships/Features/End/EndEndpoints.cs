@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Http;
 using PriceSync.Modules.TradingRelationships.Contracts;
 
 namespace PriceSync.Modules.TradingRelationships.Features.End;
@@ -6,12 +6,14 @@ namespace PriceSync.Modules.TradingRelationships.Features.End;
 internal class EndEndpoints
 {
     internal static async Task<IResult> HandleAsync(
-        EndRequest request,
+        Guid tradingRelationshipId,
         EndHandler handler,
         EndValidator validator,
         CancellationToken cancellationToken)
     {
-        var command = new EndCommand(TradingRelationshipId.FromGuid(request.TradingRelationshipId));
+        var command = new EndCommand(tradingRelationshipId == Guid.Empty
+            ? default
+            : TradingRelationshipId.FromGuid(tradingRelationshipId));
         var errors = validator.Validate(command);
         if (errors.HasErrors)
         {
