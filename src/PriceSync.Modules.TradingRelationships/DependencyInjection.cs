@@ -3,6 +3,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using PriceSync.Modules.TradingRelationships.Features.Create;
 using PriceSync.Modules.TradingRelationships.Features.End;
+using PriceSync.Modules.TradingRelationships.Features.Get;
 using PriceSync.Modules.TradingRelationships.Persistence;
 
 namespace PriceSync.Modules.TradingRelationships;
@@ -28,6 +29,8 @@ public static class DependencyInjection
 
         services.AddScoped<EndHandler>();
         services.AddScoped<EndValidator>();
+
+        services.AddScoped<GetHandler>();
 
         return services;
     }

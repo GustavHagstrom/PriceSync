@@ -1,9 +1,13 @@
-namespace PriceSync.Modules.TradingRelationships.IntegrationTests;
+namespace PriceSync.Modules.TradingRelationships.IntegrationTests.TestSupport;
 
-public sealed partial class CreateApiTests
+
+public sealed class FrozenTimeProvider : TimeProvider
 {
-    private sealed class FrozenTimeProvider(DateTimeOffset utcNow) : TimeProvider
+    public FrozenTimeProvider(DateTimeOffset utcNow)
     {
-        public override DateTimeOffset GetUtcNow() => utcNow;
+        UtcNow = utcNow;
     }
+    public DateTimeOffset UtcNow { get; set; }
+    public override DateTimeOffset GetUtcNow() => UtcNow;
 }
+

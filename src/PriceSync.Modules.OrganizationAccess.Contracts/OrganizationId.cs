@@ -15,4 +15,6 @@ public readonly record struct OrganizationId
     public Guid Value { get; }
 
     public override string ToString() => Value.ToString();
+
+    public static OrganizationId Create() => new OrganizationId(Guid.CreateVersion7());
 }

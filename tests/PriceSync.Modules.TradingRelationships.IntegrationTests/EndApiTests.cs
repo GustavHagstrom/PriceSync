@@ -1,4 +1,3 @@
-using System.Collections.Concurrent;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Logging;
 using System.Data.Common;
@@ -13,10 +12,10 @@ using PriceSync.Modules.TradingRelationships.IntegrationTests.TestSupport;
 namespace PriceSync.Modules.TradingRelationships.IntegrationTests;
 
 [Collection(TradingRelationshipsPostgreSqlCollection.Name)]
-public sealed class EndApiTests(PostgreSqlFixture fixture) : IAsyncLifetime
+public sealed partial class EndApiTests(PostgreSqlFixture fixture) : IAsyncLifetime
 {
     private static readonly DateTimeOffset CreatedAt = new(2026, 9, 24, 8, 30, 0, TimeSpan.Zero);
-    private readonly TestClock _clock = new(CreatedAt);
+    private readonly FrozenTimeProvider _clock = new(CreatedAt);
     public Task InitializeAsync() => fixture.ResetAsync();
     public Task DisposeAsync() => Task.CompletedTask;
 
@@ -94,7 +93,7 @@ public sealed class EndApiTests(PostgreSqlFixture fixture) : IAsyncLifetime
 
         var response = await denied.DeleteAsync(url);
 
-        await ApiAssestions.AssertProblemAsync(response, expectedStatus, code);
+        await ApiAssertions.AssertProblemAsync(response, expectedStatus, code);
         var stillActiveResponse = await owner.PostAsJsonAsync("/api/v1/trading-relationships", new
         {
             supplierOrganizationId = supplier, customerOrganizationId = customer,
@@ -112,7 +111,7 @@ public sealed class EndApiTests(PostgreSqlFixture fixture) : IAsyncLifetime
         using var client = application.CreateClient();
         client.DefaultRequestHeaders.Add("organization_id", Guid.CreateVersion7().ToString());
         var response = await client.DeleteAsync(Url(empty ? Guid.Empty : Guid.CreateVersion7()));
-        await ApiAssestions.AssertProblemAsync(response, expectedStatus, code);
+        await ApiAssertions.AssertProblemAsync(response, expectedStatus, code);
     }
     [Fact]
     public async Task Active_party_can_end_a_relationship_with_an_archived_counterparty()
@@ -147,8 +146,8 @@ public sealed class EndApiTests(PostgreSqlFixture fixture) : IAsyncLifetime
         var barrier = new EndLookupBarrier();
         var firstTime = CreatedAt.AddDays(1);
         var secondTime = CreatedAt.AddDays(2);
-        await using var firstApplication = CreateApplication(interceptors: [barrier], clock: new TestClock(firstTime));
-        await using var secondApplication = CreateApplication(interceptors: [barrier], clock: new TestClock(secondTime));
+        await using var firstApplication = CreateApplication(interceptors: [barrier], clock: new FrozenTimeProvider(firstTime));
+        await using var secondApplication = CreateApplication(interceptors: [barrier], clock: new FrozenTimeProvider(secondTime));
         using var firstClient = firstApplication.CreateClient();
         using var secondClient = secondApplication.CreateClient();
         firstClient.DefaultRequestHeaders.Add("organization_id", supplier.ToString());
@@ -296,7 +295,7 @@ public sealed class EndApiTests(PostgreSqlFixture fixture) : IAsyncLifetime
 
         var response = await client.DeleteAsync(Url(created.GetProperty("id").GetGuid()));
 
-        await ApiAssestions.AssertProblemAsync(response, HttpStatusCode.Forbidden, "forbidden");
+        await ApiAssertions.AssertProblemAsync(response, HttpStatusCode.Forbidden, "forbidden");
         var existingResponse = await setup.PostAsJsonAsync("/api/v1/trading-relationships", new
         {
             supplierOrganizationId = supplier, customerOrganizationId = customer,
@@ -344,7 +343,7 @@ public sealed class EndApiTests(PostgreSqlFixture fixture) : IAsyncLifetime
 
         var response = await client.DeleteAsync(Url(Guid.Empty));
 
-        await ApiAssestions.AssertProblemAsync(response, HttpStatusCode.BadRequest, "validation_failed");
+        await ApiAssertions.AssertProblemAsync(response, HttpStatusCode.BadRequest, "validation_failed");
         var entry = logs.Entries.Should().ContainSingle().Subject;
         entry["Operation"].Should().Be("EndTradingRelationship");
         entry["Outcome"].Should().Be("Denied");
@@ -355,42 +354,12 @@ public sealed class EndApiTests(PostgreSqlFixture fixture) : IAsyncLifetime
         entry["TraceId"].Should().BeOfType<string>().Which.Should().NotBeNullOrEmpty();
     }
 
-    private sealed class RecordingLogProvider : ILoggerProvider, ISupportExternalScope
-    {
-        private IExternalScopeProvider _scopes = new LoggerExternalScopeProvider();
-        public ConcurrentQueue<Dictionary<string, object?>> Entries { get; } = new();
-        public void SetScopeProvider(IExternalScopeProvider scopeProvider) => _scopes = scopeProvider;
-        public ILogger CreateLogger(string categoryName) => new RecordingLogger(this, categoryName);
-        public void Dispose() { }
-
-        private sealed class RecordingLogger(RecordingLogProvider provider, string categoryName) : ILogger
-        {
-            public bool IsEnabled(LogLevel logLevel) => true;
-            public IDisposable? BeginScope<TState>(TState state) where TState : notnull => provider._scopes.Push(state);
-            public void Log<TState>(LogLevel logLevel, EventId eventId, TState state,
-                Exception? exception, Func<TState, Exception?, string> formatter)
-            {
-                if (!categoryName.EndsWith(".EndHandler", StringComparison.Ordinal) &&
-                    !categoryName.EndsWith(".EndEndpoints", StringComparison.Ordinal)) return;
-                var fields = new Dictionary<string, object?>();
-                provider._scopes.ForEachScope((scope, values) =>
-                {
-                    if (scope is IEnumerable<KeyValuePair<string, object?>> properties)
-                        foreach (var property in properties) values[property.Key] = property.Value;
-                }, fields);
-                if (state is IEnumerable<KeyValuePair<string, object?>> properties)
-                    foreach (var property in properties) fields[property.Key] = property.Value;
-                provider.Entries.Enqueue(fields);
-            }
-        }
-    }
-
     private ApiApplication CreateApplication(bool allowed = true, bool authenticated = true,
         Func<OrganizationId, OrganizationStatusResult>? status = null,
         IReadOnlyCollection<IInterceptor>? interceptors = null, TimeProvider? clock = null) => new(
         fixture.ConnectionString,
         authenticated ? new PersonId(Guid.CreateVersion7()) : null,
-        new TestAuthorizer(allowed), new TestStatusReader(status), clock ?? _clock, interceptors);
+        new StubOrganizationAuthorizer(allowed), new StubOrganizationStatusReader(status ?? (x => OrganizationStatusResult.Active)), clock ?? _clock, interceptors);
 
     private static string Url(Guid id) => $"/api/v1/trading-relationships/{id}";
 
@@ -404,19 +373,5 @@ public sealed class EndApiTests(PostgreSqlFixture fixture) : IAsyncLifetime
         return await response.Content.ReadFromJsonAsync<JsonElement>();
     }
 
-    private sealed class TestClock(DateTimeOffset now) : TimeProvider
-    {
-        public DateTimeOffset UtcNow { get; set; } = now;
-        public override DateTimeOffset GetUtcNow() => UtcNow;
-    }
-    private sealed class TestAuthorizer(bool allowed) : IOrganizationAuthorizer
-    {
-        public Task<bool> HasCapabilityAsync(PersonId personId, OrganizationId organizationId,
-            OrganizationCapability capability, CancellationToken cancellationToken = default) => Task.FromResult(allowed);
-    }
-    private sealed class TestStatusReader(Func<OrganizationId, OrganizationStatusResult>? status) : IOrganizationStatusReader
-    {
-        public Task<OrganizationStatusResult> GetStatusAsync(OrganizationId organizationId,
-            CancellationToken cancellationToken) => Task.FromResult(status?.Invoke(organizationId) ?? OrganizationStatusResult.Active);
-    }
+  
 }

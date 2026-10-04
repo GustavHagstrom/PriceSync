@@ -5,7 +5,7 @@ using System.Text.Json;
 
 namespace PriceSync.Modules.TradingRelationships.IntegrationTests.TestSupport;
 
-internal static class ApiAssestions
+internal static class ApiAssertions
 {
     public static async Task AssertProblemAsync(
         HttpResponseMessage response,

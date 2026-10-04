@@ -29,8 +29,8 @@ public sealed partial class CreateApiTests(PostgreSqlFixture fixture) : IAsyncLi
         await using var application = new ApiApplication(
             fixture.ConnectionString,
             null,
-            new AllowingOrganizationAuthorizer(),
-            new ActiveOrganizationStatusReader(),
+            new StubOrganizationAuthorizer(allowed: true),
+            new StubOrganizationStatusReader(x => OrganizationStatusResult.Active),
             new FrozenTimeProvider(CreatedAt));
         using var client = application.CreateClient();
         client.DefaultRequestHeaders.Add("organization_id", supplierId.Value.ToString());
@@ -39,7 +39,7 @@ public sealed partial class CreateApiTests(PostgreSqlFixture fixture) : IAsyncLi
             "/api/v1/trading-relationships",
             CreateRequest(supplierId, customerId));
 
-        await ApiAssestions.AssertProblemAsync(response, HttpStatusCode.Unauthorized, "authentication_required");
+        await ApiAssertions.AssertProblemAsync(response, HttpStatusCode.Unauthorized, "authentication_required");
     }
 
     [Fact]
@@ -82,7 +82,7 @@ public sealed partial class CreateApiTests(PostgreSqlFixture fixture) : IAsyncLi
             "/api/v1/trading-relationships",
             CreateRequest(supplierId, customerId));
 
-        await ApiAssestions.AssertProblemAsync(response, HttpStatusCode.BadRequest, "acting_organization_required");
+        await ApiAssertions.AssertProblemAsync(response, HttpStatusCode.BadRequest, "acting_organization_required");
     }
 
     [Fact]
@@ -101,7 +101,7 @@ public sealed partial class CreateApiTests(PostgreSqlFixture fixture) : IAsyncLi
             "/api/v1/trading-relationships",
             CreateRequest(supplierId, customerId));
 
-        await ApiAssestions.AssertProblemAsync(response, HttpStatusCode.Forbidden, "forbidden");
+        await ApiAssertions.AssertProblemAsync(response, HttpStatusCode.Forbidden, "forbidden");
         authorizer.Calls.Should().BeEmpty();
         statusReader.Calls.Should().BeEmpty();
     }
@@ -122,7 +122,7 @@ public sealed partial class CreateApiTests(PostgreSqlFixture fixture) : IAsyncLi
             "/api/v1/trading-relationships",
             CreateRequest(supplierId, customerId));
 
-        await ApiAssestions.AssertProblemAsync(response, HttpStatusCode.Forbidden, "forbidden");
+        await ApiAssertions.AssertProblemAsync(response, HttpStatusCode.Forbidden, "forbidden");
         authorizer.Calls.Should().ContainSingle()
             .Which.Should().Be((customerId, OrganizationCapability.ManageTradingRelationships));
         statusReader.Calls.Should().BeEmpty();
@@ -145,7 +145,7 @@ public sealed partial class CreateApiTests(PostgreSqlFixture fixture) : IAsyncLi
             "/api/v1/trading-relationships",
             CreateRequest(supplierId, customerId));
 
-        await ApiAssestions.AssertProblemAsync(response, HttpStatusCode.Forbidden, "forbidden");
+        await ApiAssertions.AssertProblemAsync(response, HttpStatusCode.Forbidden, "forbidden");
         statusReader.Calls.Should().BeEmpty();
     }
 
@@ -175,7 +175,7 @@ public sealed partial class CreateApiTests(PostgreSqlFixture fixture) : IAsyncLi
             "/api/v1/trading-relationships",
             CreateRequest(supplierId, customerId));
 
-        await ApiAssestions.AssertProblemAsync(response, expectedStatus, expectedCode);
+        await ApiAssertions.AssertProblemAsync(response, expectedStatus, expectedCode);
     }
 
     [Fact]
@@ -193,7 +193,7 @@ public sealed partial class CreateApiTests(PostgreSqlFixture fixture) : IAsyncLi
             "/api/v1/trading-relationships",
             CreateRequest(organizationId, organizationId));
 
-        await ApiAssestions.AssertProblemAsync(response, HttpStatusCode.BadRequest, "validation_failed");
+        await ApiAssertions.AssertProblemAsync(response, HttpStatusCode.BadRequest, "validation_failed");
         authorizer.Calls.Should().BeEmpty();
         statusReader.Calls.Should().BeEmpty();
     }
@@ -285,7 +285,7 @@ public sealed partial class CreateApiTests(PostgreSqlFixture fixture) : IAsyncLi
             "/api/v1/trading-relationships",
             CreateRequest(supplierId, customerId));
 
-        await ApiAssestions.AssertProblemAsync(response, HttpStatusCode.BadRequest, "customer_organization_ended");
+        await ApiAssertions.AssertProblemAsync(response, HttpStatusCode.BadRequest, "customer_organization_ended");
         await using var verificationContext = new TradingRelationshipsDbContext(fixture.CreateOptions());
         var relationships = await verificationContext.TradingRelationships.ToListAsync();
         relationships.Should().ContainSingle();
@@ -327,8 +327,8 @@ public sealed partial class CreateApiTests(PostgreSqlFixture fixture) : IAsyncLi
         return new ApiApplication(
             fixture.ConnectionString,
             personId ?? new PersonId(Guid.CreateVersion7()),
-            authorizer ?? new AllowingOrganizationAuthorizer(),
-            statusReader ?? new ActiveOrganizationStatusReader(),
+            authorizer ?? new StubOrganizationAuthorizer(allowed: true),
+            statusReader ?? new StubOrganizationStatusReader(x => OrganizationStatusResult.Active),
             new FrozenTimeProvider(CreatedAt),
             interceptors);
     }
