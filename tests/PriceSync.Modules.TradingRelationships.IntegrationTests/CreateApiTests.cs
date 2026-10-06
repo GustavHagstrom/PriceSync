@@ -82,7 +82,7 @@ public sealed partial class CreateApiTests(PostgreSqlFixture fixture) : IAsyncLi
             "/api/v1/trading-relationships",
             CreateRequest(supplierId, customerId));
 
-        await ApiAssertions.AssertProblemAsync(response, HttpStatusCode.BadRequest, "acting_organization_required");
+        await ApiAssertions.AssertProblemAsync(response, HttpStatusCode.BadRequest, OrganizationContextErrors.Required);
     }
 
     [Fact]

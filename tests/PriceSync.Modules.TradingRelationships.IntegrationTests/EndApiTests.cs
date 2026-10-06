@@ -70,7 +70,7 @@ public sealed partial class EndApiTests(PostgreSqlFixture fixture) : IAsyncLifet
     }
     [Theory]
     [InlineData("unauthenticated", HttpStatusCode.Unauthorized, "authentication_required")]
-    [InlineData("no_organization", HttpStatusCode.BadRequest, "acting_organization_required")]
+    [InlineData("no_organization", HttpStatusCode.BadRequest, OrganizationContextErrors.Required)]
     [InlineData("no_capability", HttpStatusCode.Forbidden, "forbidden")]
     [InlineData("unrelated", HttpStatusCode.NotFound, "not_found")]
     [InlineData("archived_actor", HttpStatusCode.Forbidden, "forbidden")]

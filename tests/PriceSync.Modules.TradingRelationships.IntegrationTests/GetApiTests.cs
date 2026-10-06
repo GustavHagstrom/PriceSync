@@ -1,8 +1,10 @@
 ﻿using FluentAssertions;
 using Microsoft.EntityFrameworkCore.Diagnostics;
+using PriceSync.Application;
 using PriceSync.Modules.OrganizationAccess.Contracts;
 using PriceSync.Modules.TradingRelationships.Features.Get;
 using PriceSync.Modules.TradingRelationships.IntegrationTests.TestSupport;
+using PriceSync.Modules.TradingRelationships.Models;
 using System.Net.Http.Json;
 using System.Text.Json;
 
@@ -28,7 +30,98 @@ public sealed class GetApiTests(PostgreSqlFixture fixture) : IAsyncLifetime
         content.GetProperty("code").GetString().Should().Be(GetErrorCodes.ValidationFailed);
     }
 
-  
+    [Fact]
+    public async Task Get_ShouldReturnBadRequest_WhenOrganizationIdIsMissing()
+    {
+        var application = CreateApplication(authenticated: true);
+        var client = application.CreateClient();
+
+        var response = await client.GetAsync(Url(Guid.NewGuid()));
+        var content = await response.Content.ReadFromJsonAsync<JsonElement>();
+
+        response.StatusCode.Should().Be(System.Net.HttpStatusCode.BadRequest);
+        content.GetProperty("code").GetString().Should().Be(OrganizationContextErrors.Required);
+    }
+
+    [Fact]
+    public async Task Get_ShouldReturnForbidden_WhenUserLacksCapability()
+    {
+        var application = CreateApplication(allowed: false);
+        var client = application.CreateClient();
+        client.DefaultRequestHeaders.Add("organization_id", Guid.NewGuid().ToString());
+        var tradingRelationship = await fixture.CreateTradingRelationShipAsync(_time.GetUtcNow());
+
+        var response = await client.GetAsync(Url(tradingRelationship.Id.Value));
+        var content = await response.Content.ReadFromJsonAsync<JsonElement>();
+
+        response.StatusCode.Should().Be(System.Net.HttpStatusCode.Forbidden);
+        content.GetProperty("code").GetString().Should().Be(GetErrorCodes.Forbidden);
+    }
+    [Fact]
+    public async Task Get_ShouldReturnBadRequest_WhenOrganizationStatusIsNotFound()
+    {
+        var application = CreateApplication(status: _ => OrganizationStatusResult.NotFound);
+        var client = application.CreateClient();
+        var organizationId = Guid.NewGuid();
+        client.DefaultRequestHeaders.Add("organization_id", organizationId.ToString());
+        var tradingRelationship = await fixture.CreateTradingRelationShipAsync(_time.GetUtcNow());
+
+        var response = await client.GetAsync(Url(tradingRelationship.Id.Value));
+        var content = await response.Content.ReadFromJsonAsync<JsonElement>();
+
+        response.StatusCode.Should().Be(System.Net.HttpStatusCode.BadRequest);
+        content.GetProperty("code").GetString().Should().Be(OrganizationContextErrors.Required);
+    }
+    [Theory]
+    [InlineData(OrganizationStatusResult.Archived)]
+    [InlineData(OrganizationStatusResult.Active)]
+    public async Task Get_ShouldReturnOk_ForArchivedAndActiveStatus(OrganizationStatusResult statusResult)
+    {
+        var application = CreateApplication(status: _ => statusResult);
+        var client = application.CreateClient();
+        var organizationId = Guid.NewGuid();
+        client.DefaultRequestHeaders.Add("organization_id", organizationId.ToString());
+        var tradingRelationship = await fixture.CreateTradingRelationShipAsync(_time.GetUtcNow());
+
+        var response = await client.GetAsync(Url(tradingRelationship.Id.Value));
+        var content = await response.Content.ReadFromJsonAsync<JsonElement>();
+
+        response.StatusCode.Should().Be(System.Net.HttpStatusCode.OK);
+    }
+    [Fact]
+    public async Task Get_ShouldReturnUnauthorized_WhenNotAuthenticated()
+    {
+        var application = CreateApplication(authenticated: false);
+        var client = application.CreateClient();
+        var tradingRelationship = await fixture.CreateTradingRelationShipAsync(_time.GetUtcNow());
+
+        var response = await client.GetAsync(Url(tradingRelationship.Id.Value));
+        var content = await response.Content.ReadFromJsonAsync<JsonElement>();
+
+        response.StatusCode.Should().Be(System.Net.HttpStatusCode.Unauthorized);
+        content.GetProperty("code").GetString().Should().Be("authentication_required");
+    }
+    [Fact]
+    public async Task Get_ShouldReturnTradingRelationshipResponseModel_OnSuccess()
+    {
+        var application = CreateApplication();
+        var client = application.CreateClient();
+        var organizationId = Guid.NewGuid();
+        client.DefaultRequestHeaders.Add("organization_id", organizationId.ToString());
+        var tradingRelationship = await fixture.CreateTradingRelationShipAsync(_time.GetUtcNow());
+
+        var response = await client.GetAsync(Url(tradingRelationship.Id.Value));
+        var content = await response.Content.ReadFromJsonAsync<TradingRelationshipResponse>();
+
+        response.StatusCode.Should().Be(System.Net.HttpStatusCode.OK);
+        content.Should().NotBeNull();
+        content.Id.Should().Be(tradingRelationship.Id.Value);
+        content.SupplierId.Should().Be(tradingRelationship.SupplierOrganizationId.Value);
+        content.CustomerId.Should().Be(tradingRelationship.CustomerOrganizationId.Value);
+        content.Status.Should().Be("active");
+    }
+
+
     private ApiApplication CreateApplication(bool allowed = true, bool authenticated = true,
         Func<OrganizationId, OrganizationStatusResult>? status = null,
         IReadOnlyCollection<IInterceptor>? interceptors = null, TimeProvider? time = null) => new(

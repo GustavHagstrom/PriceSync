@@ -1,6 +1,7 @@
 ﻿using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
 using PriceSync.Modules.OrganizationAccess.Contracts;
+using PriceSync.Modules.TradingRelationships.Contracts;
 using PriceSync.Modules.TradingRelationships.Features.End;
 using PriceSync.Modules.TradingRelationships.Infrastructure;
 using static System.Runtime.InteropServices.JavaScript.JSType;
@@ -22,7 +23,7 @@ internal class GetEndpoint
         if (tradingRelationshipId == Guid.Empty)
         {
             logger.LogInformation(
-                "GetByIdEndpoint completed with {Outcome}, reason {Reason}",
+                "GetEndpoint completed with {Outcome}, reason {Reason}",
                 "Denied", "ValidationFailed");
             return Results.Problem(
                 statusCode: StatusCodes.Status400BadRequest,
@@ -33,11 +34,35 @@ internal class GetEndpoint
                     { "code", GetErrorCodes.ValidationFailed }
                 });
         }
-        var result = await handler.HandleAsync(tradingRelationshipId, cancellationToken);
+        var result = await handler.HandleAsync(TradingRelationshipId.FromGuid(tradingRelationshipId), cancellationToken);
         var response = result switch
         {
             GetResult.Found found => Results.Ok(found.Response),
-            _ => Results.NotFound()
+            GetResult.NotFound => Results.Problem(
+                statusCode: StatusCodes.Status404NotFound,
+                title: "Not Found",
+                detail: "Trading relationship not found.",
+                extensions: new Dictionary<string, object?>
+                {
+                    { "code", GetErrorCodes.NotFound }
+                }),
+            GetResult.NotCapable => Results.Problem(
+                statusCode: StatusCodes.Status403Forbidden,
+                title: "Forbidden",
+                detail: "You are missing capability to access this trading relationship.",
+                extensions: new Dictionary<string, object?>
+                {
+                    { "code", GetErrorCodes.Forbidden }
+                }),
+            GetResult.OrganizationMissing => Results.Problem(
+                statusCode: StatusCodes.Status400BadRequest,
+                title: "Bad Request",
+                detail: "The organization is missing.",
+                extensions: new Dictionary<string, object?>
+                {
+                    { "code", OrganizationContextErrors.Required}
+                }),
+            _ => Results.StatusCode(StatusCodes.Status500InternalServerError)
         };
 
         return response;

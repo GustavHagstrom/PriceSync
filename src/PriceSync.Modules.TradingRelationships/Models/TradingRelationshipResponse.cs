@@ -1,29 +1,33 @@
-﻿using PriceSync.Modules.TradingRelationships.Domain;
+﻿using System.Text.Json.Serialization;
+using PriceSync.Modules.TradingRelationships.Domain;
 
 namespace PriceSync.Modules.TradingRelationships.Models;
 
-internal sealed record class TradingRelationshipResponse
+[method: JsonConstructor]
+internal sealed record TradingRelationshipResponse(
+    Guid Id,
+    Guid SupplierId,
+    Guid CustomerId,
+    DateTimeOffset CreatedAt,
+    DateTimeOffset? EndedAt,
+    string Status)
 {
-    public TradingRelationshipResponse(TradingRelationship tradingRelationship)
+    public TradingRelationshipResponse(TradingRelationship relationship)
+        : this(
+            relationship.Id.Value,
+            relationship.SupplierOrganizationId.Value,
+            relationship.CustomerOrganizationId.Value,
+            relationship.CreatedAt,
+            relationship.EndedAt,
+            relationship.Status switch
+            {
+                TradingRelationshipStatus.Active => "active",
+                TradingRelationshipStatus.Ended => "ended",
+                _ => throw new ArgumentOutOfRangeException(
+                    nameof(relationship.Status),
+                    relationship.Status,
+                    null)
+            })
     {
-        Id = tradingRelationship.Id.Value;
-        SupplierId = tradingRelationship.SupplierOrganizationId.Value;
-        CustomerId = tradingRelationship.CustomerOrganizationId.Value;
-        CreatedAt = tradingRelationship.CreatedAt;
-        EndedAt = tradingRelationship.EndedAt;
-        var status = tradingRelationship.Status switch
-        {
-            TradingRelationshipStatus.Active => "active",
-            TradingRelationshipStatus.Ended => "ended",
-            _ => throw new ArgumentOutOfRangeException(nameof(tradingRelationship.Status), tradingRelationship.Status, null)
-        };
-        Status = status;
     }
-
-    public Guid Id { get; }
-    public Guid SupplierId { get; }
-    public Guid CustomerId { get; }
-    public DateTimeOffset CreatedAt { get; }
-    public DateTimeOffset? EndedAt { get; }
-    public string Status { get; }
 }

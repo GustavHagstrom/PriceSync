@@ -1,8 +1,7 @@
 using Microsoft.AspNetCore.Http;
-using PriceSync.Modules.TradingRelationships.Contracts;
 using Microsoft.Extensions.Logging;
 using PriceSync.Modules.OrganizationAccess.Contracts;
-using System.Diagnostics;
+using PriceSync.Modules.TradingRelationships.Contracts;
 using PriceSync.Modules.TradingRelationships.Infrastructure;
 
 namespace PriceSync.Modules.TradingRelationships.Features.End;
@@ -56,7 +55,7 @@ internal class EndEndpoint
                 statusCode: StatusCodes.Status400BadRequest,
                 extensions: new Dictionary<string, object?>
                 {
-                    { "code", EndErrorCodes.ActingOrganizationRequired }
+                    { "code", OrganizationContextErrors.Required }
                 }),
 
             EndResult.Forbidden => Results.Problem(

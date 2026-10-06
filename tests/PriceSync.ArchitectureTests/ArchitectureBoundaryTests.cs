@@ -96,6 +96,7 @@ public sealed class ArchitectureBoundaryTests
                     "PriceSync.Modules.OrganizationAccess.Contracts.IOrganizationStatusReader",
                     "PriceSync.Modules.OrganizationAccess.Contracts.OrganizationCapability",
                     "PriceSync.Modules.OrganizationAccess.Contracts.OrganizationStatusResult",
+                    "PriceSync.Modules.OrganizationAccess.Contracts.OrganizationContextErrors",
                 ]);
     }
 
