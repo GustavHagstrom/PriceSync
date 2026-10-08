@@ -43,12 +43,12 @@ public sealed class GetApiTests(PostgreSqlFixture fixture) : IAsyncLifetime
     }
 
     [Fact]
-    public async Task Get_ShouldReturnForbidden_WhenUserLacksCapability()
+    public async Task Get_ShouldReturnForbidden_WhenUserLacksCapabilityAndIsPartOfTradingRelationship()
     {
         var application = CreateApplication(allowed: false);
         var client = application.CreateClient();
-        client.DefaultRequestHeaders.Add("organization_id", Guid.NewGuid().ToString());
         var tradingRelationship = await fixture.CreateTradingRelationShipAsync(_time.GetUtcNow());
+        client.DefaultRequestHeaders.Add("organization_id", tradingRelationship.CustomerOrganizationId.ToString());
 
         var response = await client.GetAsync(Url(tradingRelationship.Id.Value));
         var content = await response.Content.ReadFromJsonAsync<JsonElement>();
@@ -153,7 +153,7 @@ public sealed class GetApiTests(PostgreSqlFixture fixture) : IAsyncLifetime
     [Fact]
     public async Task Get_ShouldReturnNotFound_WhenTRIsFoundButOrganizationIsNotPartOfIt()
     {
-        var application = CreateApplication();
+        var application = CreateApplication(allowed: false);
         var client = application.CreateClient();
         var otherOrganizationId = Guid.NewGuid();
         client.DefaultRequestHeaders.Add("organization_id", otherOrganizationId.ToString());
