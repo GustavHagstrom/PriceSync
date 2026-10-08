@@ -58,7 +58,7 @@ public sealed class PostgreSqlFixture : IAsyncLifetime
         await using var command = new NpgsqlCommand(sql, connection);
         await command.ExecuteNonQueryAsync();
     }
-    internal async Task<TradingRelationship> CreateTradingRelationShipAsync(DateTimeOffset time)
+    internal async Task<TradingRelationship> CreateTradingRelationshipAsync(DateTimeOffset time)
     {
         var tradingRelationship = TradingRelationship.Create(OrganizationId.Create(), OrganizationId.Create(), time);
         await using var context = new TradingRelationshipsDbContext(CreateOptions());

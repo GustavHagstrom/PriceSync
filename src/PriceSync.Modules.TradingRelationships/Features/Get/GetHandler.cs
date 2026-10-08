@@ -67,6 +67,6 @@ internal class GetHandler
     }
     private void LogOutcome(string outcome, string reason) =>
         _logger.LogInformation(
-            "EndTradingRelationship completed with {Outcome}, reason {Reason}",
+            "GetTradingRelationship completed with {Outcome}, reason {Reason}",
             outcome, reason);
 }

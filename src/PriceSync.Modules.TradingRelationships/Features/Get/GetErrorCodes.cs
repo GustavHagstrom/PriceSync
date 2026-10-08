@@ -2,8 +2,8 @@
 
 internal static class GetErrorCodes
 {
-    public const string ValidationFailed = "ValidationFailed";
-    public const string Forbidden = "Forbidden";
-    public const string NotFound = "NotFound";
+    public const string ValidationFailed = "validation_failed";
+    public const string Forbidden = "forbidden";
+    public const string NotFound = "not_found";
 
 }

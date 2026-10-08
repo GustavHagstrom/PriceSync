@@ -49,7 +49,7 @@ public sealed class GetApiTests(PostgreSqlFixture fixture) : IAsyncLifetime
     {
         await using var application = CreateApplication(allowed: false);
         using var client = application.CreateClient();
-        var tradingRelationship = await fixture.CreateTradingRelationShipAsync(_time.GetUtcNow());
+        var tradingRelationship = await fixture.CreateTradingRelationshipAsync(_time.GetUtcNow());
         client.DefaultRequestHeaders.Add("organization_id", tradingRelationship.CustomerOrganizationId.ToString());
 
         using var response = await client.GetAsync(Url(tradingRelationship.Id.Value));
@@ -64,7 +64,7 @@ public sealed class GetApiTests(PostgreSqlFixture fixture) : IAsyncLifetime
         await using var application = CreateApplication(allowed: false);
         using var client = application.CreateClient();
 
-        var relationship = await fixture.CreateTradingRelationShipAsync(_time.GetUtcNow());
+        var relationship = await fixture.CreateTradingRelationshipAsync(_time.GetUtcNow());
         client.DefaultRequestHeaders.Add(
             "organization_id",
             relationship.CustomerOrganizationId.ToString());
@@ -82,7 +82,7 @@ public sealed class GetApiTests(PostgreSqlFixture fixture) : IAsyncLifetime
         using var client = application.CreateClient();
         var organizationId = Guid.NewGuid();
         client.DefaultRequestHeaders.Add("organization_id", organizationId.ToString());
-        var tradingRelationship = await fixture.CreateTradingRelationShipAsync(_time.GetUtcNow());
+        var tradingRelationship = await fixture.CreateTradingRelationshipAsync(_time.GetUtcNow());
 
         using var response = await client.GetAsync(Url(tradingRelationship.Id.Value));
         var content = await response.Content.ReadFromJsonAsync<JsonElement>();
@@ -97,7 +97,7 @@ public sealed class GetApiTests(PostgreSqlFixture fixture) : IAsyncLifetime
     {
         await using var application = CreateApplication(status: _ => statusResult);
         using var client = application.CreateClient();
-        var tradingRelationship = await fixture.CreateTradingRelationShipAsync(_time.GetUtcNow());
+        var tradingRelationship = await fixture.CreateTradingRelationshipAsync(_time.GetUtcNow());
         client.DefaultRequestHeaders.Add("organization_id", tradingRelationship.CustomerOrganizationId.ToString());
 
         using var response = await client.GetAsync(Url(tradingRelationship.Id.Value));
@@ -110,7 +110,7 @@ public sealed class GetApiTests(PostgreSqlFixture fixture) : IAsyncLifetime
     {
         await using var application = CreateApplication(authenticated: false);
         using var client = application.CreateClient();
-        var tradingRelationship = await fixture.CreateTradingRelationShipAsync(_time.GetUtcNow());
+        var tradingRelationship = await fixture.CreateTradingRelationshipAsync(_time.GetUtcNow());
 
         using var response = await client.GetAsync(Url(tradingRelationship.Id.Value));
         var content = await response.Content.ReadFromJsonAsync<JsonElement>();
@@ -123,7 +123,7 @@ public sealed class GetApiTests(PostgreSqlFixture fixture) : IAsyncLifetime
     {
         await using var application = CreateApplication();
         using var client = application.CreateClient();
-        var tradingRelationship = await fixture.CreateTradingRelationShipAsync(_time.GetUtcNow());
+        var tradingRelationship = await fixture.CreateTradingRelationshipAsync(_time.GetUtcNow());
         client.DefaultRequestHeaders.Add("organization_id", tradingRelationship.CustomerOrganizationId.ToString());
 
         using var response = await client.GetAsync(Url(tradingRelationship.Id.Value));
@@ -143,7 +143,7 @@ public sealed class GetApiTests(PostgreSqlFixture fixture) : IAsyncLifetime
     {
         await using var application = CreateApplication();
         using var client = application.CreateClient();
-        var tradingRelationship = await fixture.CreateTradingRelationShipAsync(_time.GetUtcNow());
+        var tradingRelationship = await fixture.CreateTradingRelationshipAsync(_time.GetUtcNow());
         client.DefaultRequestHeaders.Add("organization_id", tradingRelationship.SupplierOrganizationId.ToString());
 
         using var response = await client.GetAsync(Url(tradingRelationship.Id.Value));
@@ -180,7 +180,7 @@ public sealed class GetApiTests(PostgreSqlFixture fixture) : IAsyncLifetime
         using var client = application.CreateClient();
         var otherOrganizationId = Guid.NewGuid();
         client.DefaultRequestHeaders.Add("organization_id", otherOrganizationId.ToString());
-        var tradingRelationship = await fixture.CreateTradingRelationShipAsync(_time.GetUtcNow());
+        var tradingRelationship = await fixture.CreateTradingRelationshipAsync(_time.GetUtcNow());
         
         using var response = await client.GetAsync(Url(tradingRelationship.Id.Value));
         var content = await response.Content.ReadFromJsonAsync<JsonElement>();
@@ -197,7 +197,7 @@ public sealed class GetApiTests(PostgreSqlFixture fixture) : IAsyncLifetime
         var authorizer = new StubOrganizationAuthorizer();
         await using var application = CreateApplication(authorizer: authorizer);
         using var client = application.CreateClient();
-        var relationship = await fixture.CreateTradingRelationShipAsync(_time.GetUtcNow());
+        var relationship = await fixture.CreateTradingRelationshipAsync(_time.GetUtcNow());
         var actingOrganizationId = supplierActs
             ? relationship.SupplierOrganizationId
             : relationship.CustomerOrganizationId;
