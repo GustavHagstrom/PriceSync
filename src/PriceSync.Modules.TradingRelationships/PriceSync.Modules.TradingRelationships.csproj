@@ -1,12 +1,28 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <ItemGroup>
+    <ProjectReference Include="..\PriceSync.BuildingBlocks\PriceSync.BuildingBlocks.csproj" />
+    <ProjectReference Include="..\PriceSync.Modules.OrganizationAccess.Contracts\PriceSync.Modules.OrganizationAccess.Contracts.csproj" />
     <ProjectReference Include="..\PriceSync.SharedKernel\PriceSync.SharedKernel.csproj" />
     <ProjectReference Include="..\PriceSync.Modules.TradingRelationships.Contracts\PriceSync.Modules.TradingRelationships.Contracts.csproj" />
   </ItemGroup>
 
   <ItemGroup>
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.EntityFrameworkCore" Version="10.0.12" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.12">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" Version="10.0.12" />
+    <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.3" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Folder Include="Persistence\Migrations\" />
   </ItemGroup>
 
   <PropertyGroup>

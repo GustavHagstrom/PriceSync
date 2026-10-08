@@ -14,6 +14,8 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddPriceSyncApplication();
 builder.Services.AddProblemDetails();
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen();
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddAuthentication(UnavailableAuthenticationHandler.SchemeName)
     .AddScheme<AuthenticationSchemeOptions, UnavailableAuthenticationHandler>(
@@ -21,8 +23,10 @@ builder.Services.AddAuthentication(UnavailableAuthenticationHandler.SchemeName)
         options => { });
 builder.Services.AddAuthorization();
 builder.Services.AddScoped<ICurrentPerson, ClaimsCurrentPerson>();
+builder.Services.AddScoped<ICurrentOrganization, CurrentOrganization>();
 builder.Services.AddOrganizationAccessModule(builder.Configuration);
-builder.Services.AddTradingRelationshipsModule();
+builder.Services.AddTradingRelationshipsModule(builder.Configuration);
+builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddAgreementsModule();
 builder.Services.AddPricePublicationModule();
 builder.Services.AddCustomerPricingModule();
@@ -30,6 +34,12 @@ builder.Services.AddRetrievalConsumptionModule();
 builder.Services.AddIntegrationConfigurationModule();
 
 var app = builder.Build();
+
+if (app.Environment.IsDevelopment())
+{
+    app.UseSwagger();
+    app.UseSwaggerUI();
+}
 
 app.UseExceptionHandler(exceptionHandler =>
 {
@@ -63,8 +73,8 @@ app.UseStatusCodePages(async statusCodeContext =>
 app.UseAuthentication();
 app.UseAuthorization();
 
-app.MapGet("/", () => Results.Ok(new { service = "PriceSync.Api" }));
 app.MapOrganizationAccessEndpoints();
+app.MapTradingRelationshipsEndpoints();
 
 app.Run();
 

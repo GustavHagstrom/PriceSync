@@ -1,6 +1,10 @@
 <Project Sdk="Microsoft.NET.Sdk.Web">
 
   <ItemGroup>
+    <PackageReference Include="Swashbuckle.AspNetCore" Version="10.2.3" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\PriceSync.Application\PriceSync.Application.csproj" />
     <ProjectReference Include="..\PriceSync.Modules.OrganizationAccess\PriceSync.Modules.OrganizationAccess.csproj" />
     <ProjectReference Include="..\PriceSync.Modules.TradingRelationships\PriceSync.Modules.TradingRelationships.csproj" />
@@ -15,6 +19,7 @@
     <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
+    <UserSecretsId>cfc2efa1-017f-4e4c-9a0e-d3481224786a</UserSecretsId>
   </PropertyGroup>
 
 </Project>
