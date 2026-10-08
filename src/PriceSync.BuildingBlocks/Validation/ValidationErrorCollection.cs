@@ -1,6 +1,6 @@
 ﻿namespace PriceSync.BuildingBlocks.Validation;
 
-public class ValidationErrors
+public class ValidationErrorCollection
 {
     private Dictionary<string, List<string>> Errors { get; } = new Dictionary<string, List<string>>();
     public IReadOnlyDictionary<string, string[]> GetErrors() => Errors.ToDictionary(kvp => kvp.Key, kvp => kvp.Value.ToArray());

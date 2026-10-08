@@ -1,5 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
+using PriceSync.Modules.OrganizationAccess.Contracts;
+using PriceSync.Modules.TradingRelationships.Domain;
 using PriceSync.Modules.TradingRelationships.Persistence;
 using Testcontainers.PostgreSql;
 
@@ -55,5 +57,13 @@ public sealed class PostgreSqlFixture : IAsyncLifetime
         await connection.OpenAsync();
         await using var command = new NpgsqlCommand(sql, connection);
         await command.ExecuteNonQueryAsync();
+    }
+    internal async Task<TradingRelationship> CreateTradingRelationshipAsync(DateTimeOffset time)
+    {
+        var tradingRelationship = TradingRelationship.Create(OrganizationId.Create(), OrganizationId.Create(), time);
+        await using var context = new TradingRelationshipsDbContext(CreateOptions());
+        context.TradingRelationships.Add(tradingRelationship);
+        await context.SaveChangesAsync();
+        return tradingRelationship;
     }
 }

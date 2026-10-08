@@ -37,15 +37,6 @@ internal class EndHandler
     }
     internal async Task<EndResult> HandleAsync(EndCommand command, CancellationToken cancellationToken)
     {
-        using var scope = _logger.BeginScope(new Dictionary<string, object?>
-        {
-            ["Operation"] = "EndTradingRelationship",
-            ["PersonId"] = _currentPerson.PersonId.Value,
-            ["OrganizationId"] = _currentOrganization.OrganizationId?.Value,
-            ["TradingRelationshipId"] = command.TradingRelationshipId.Value,
-            ["TraceId"] = Activity.Current?.TraceId.ToString(),
-        });
-
         try
         {
             if (_currentOrganization.OrganizationId is null || _currentOrganization.OrganizationId.Value.Value == Guid.Empty)

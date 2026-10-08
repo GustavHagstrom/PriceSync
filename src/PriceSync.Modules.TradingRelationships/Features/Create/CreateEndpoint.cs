@@ -1,4 +1,5 @@
 ﻿using Microsoft.AspNetCore.Http;
+using PriceSync.Modules.OrganizationAccess.Contracts;
 
 namespace PriceSync.Modules.TradingRelationships.Features.Create;
 
@@ -37,7 +38,7 @@ internal class CreateEndpoint
                 title: "Current organization is missing",
                 extensions: new Dictionary<string, object?>
                 {
-                    { "code", CreateErrorCodes.ActingOrganizationRequired }
+                    { "code", OrganizationContextErrors.Required }
                 }),
 
             CreateResult.Forbidden => Results.Problem(

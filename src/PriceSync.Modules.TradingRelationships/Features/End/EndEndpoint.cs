@@ -1,8 +1,8 @@
 using Microsoft.AspNetCore.Http;
-using PriceSync.Modules.TradingRelationships.Contracts;
 using Microsoft.Extensions.Logging;
 using PriceSync.Modules.OrganizationAccess.Contracts;
-using System.Diagnostics;
+using PriceSync.Modules.TradingRelationships.Contracts;
+using PriceSync.Modules.TradingRelationships.Infrastructure;
 
 namespace PriceSync.Modules.TradingRelationships.Features.End;
 
@@ -17,20 +17,13 @@ internal class EndEndpoint
         ICurrentOrganization currentOrganization,
         CancellationToken cancellationToken)
     {
+        using var scope = LogScope.BeginScope(logger, "EndTradingRelationship", tradingRelationshipId, currentPerson.PersonId.Value, currentOrganization.OrganizationId?.Value);
         var command = new EndCommand(tradingRelationshipId == Guid.Empty
             ? default
             : TradingRelationshipId.FromGuid(tradingRelationshipId));
         var errors = validator.Validate(command);
         if (errors.HasErrors)
         {
-            using var scope = logger.BeginScope(new Dictionary<string, object?>
-            {
-                ["Operation"] = "EndTradingRelationship",
-                ["PersonId"] = currentPerson.PersonId.Value,
-                ["OrganizationId"] = currentOrganization.OrganizationId?.Value,
-                ["TradingRelationshipId"] = tradingRelationshipId,
-                ["TraceId"] = Activity.Current?.TraceId.ToString(),
-            });
             logger.LogInformation(
                 "EndTradingRelationship completed with {Outcome}, reason {Reason}",
                 "Denied", "ValidationFailed");
@@ -62,7 +55,7 @@ internal class EndEndpoint
                 statusCode: StatusCodes.Status400BadRequest,
                 extensions: new Dictionary<string, object?>
                 {
-                    { "code", EndErrorCodes.ActingOrganizationRequired }
+                    { "code", OrganizationContextErrors.Required }
                 }),
 
             EndResult.Forbidden => Results.Problem(

@@ -1,20 +1,19 @@
 using PriceSync.Modules.OrganizationAccess.Contracts;
 
-namespace PriceSync.Modules.TradingRelationships.IntegrationTests;
+namespace PriceSync.Modules.TradingRelationships.IntegrationTests.TestSupport;
 
-public sealed partial class CreateApiTests
+
+public sealed class StubOrganizationStatusReader(
+    Func<OrganizationId, OrganizationStatusResult>? getStatus = null) : IOrganizationStatusReader
 {
-    private sealed class StubOrganizationStatusReader(
-        Func<OrganizationId, OrganizationStatusResult>? getStatus = null) : IOrganizationStatusReader
-    {
-        public List<OrganizationId> Calls { get; } = [];
+    public List<OrganizationId> Calls { get; } = [];
 
-        public Task<OrganizationStatusResult> GetStatusAsync(
-            OrganizationId organizationId,
-            CancellationToken cancellationToken)
-        {
-            Calls.Add(organizationId);
-            return Task.FromResult(getStatus?.Invoke(organizationId) ?? OrganizationStatusResult.Active);
-        }
+    public Task<OrganizationStatusResult> GetStatusAsync(
+        OrganizationId organizationId,
+        CancellationToken cancellationToken)
+    {
+        Calls.Add(organizationId);
+        return Task.FromResult(getStatus?.Invoke(organizationId) ?? OrganizationStatusResult.Active);
     }
 }
+
