@@ -4,6 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 using PriceSync.Modules.TradingRelationships.Features.Create;
 using PriceSync.Modules.TradingRelationships.Features.End;
 using PriceSync.Modules.TradingRelationships.Features.Get;
+using PriceSync.Modules.TradingRelationships.Features.ListSupplier;
 using PriceSync.Modules.TradingRelationships.Persistence;
 
 namespace PriceSync.Modules.TradingRelationships;
@@ -31,6 +32,8 @@ public static class DependencyInjection
         services.AddScoped<EndValidator>();
 
         services.AddScoped<GetHandler>();
+
+        services.AddScoped<ListSupplierHandler>();
 
         return services;
     }

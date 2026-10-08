@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Routing;
 using PriceSync.Modules.TradingRelationships.Features.Create;
 using PriceSync.Modules.TradingRelationships.Features.End;
 using PriceSync.Modules.TradingRelationships.Features.Get;
+using PriceSync.Modules.TradingRelationships.Features.ListSupplier;
 
 namespace PriceSync.Modules.TradingRelationships;
 
@@ -17,8 +18,9 @@ public static class Endpoints
             .RequireAuthorization();
 
         api.MapPost("", CreateEndpoint.HandleAsync).WithName(Routes.Names.Create).WithSummary("Creates a new trading relationship.");
-        api.MapDelete("{tradingRelationshipId:guid}", EndEndpoint.HandleAsync).WithName(Routes.Names.End).WithSummary("Ends an existing trading relationship.");
+        api.MapPost("{tradingRelationshipId:guid}/end", EndEndpoint.HandleAsync).WithName(Routes.Names.End).WithSummary("Ends an existing trading relationship.");
         api.MapGet("{tradingRelationshipId:guid}", GetEndpoint.HandleAsync).WithName(Routes.Names.Get).WithSummary("Retrieves a trading relationship by its ID.");
+        api.MapGet("/supplier", ListSupplierEndpoint.HandleAsync).WithName(Routes.Names.ListSuppliers).WithSummary("Lists all trading relationships where the current organization is the supplier.");
 
         return endpoints;
     }
