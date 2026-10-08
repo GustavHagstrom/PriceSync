@@ -60,10 +60,15 @@ internal class GetHandler
             LogOutcome("Denied", "NotFound");
             return new GetResult.NotFound();
         }
+        if(tradingRelationship.SupplierOrganizationId != _currentOrganization.OrganizationId.Value && tradingRelationship.CustomerOrganizationId != _currentOrganization.OrganizationId.Value)
+        {
+            LogOutcome("Denied", "ActingOrganizationNotPartOfTradingRelationship");
+            return new GetResult.NotFound();
+        }
         return new GetResult.Found(new TradingRelationshipResponse(tradingRelationship));
     }
-    private void LogOutcome(string outcome, string reason, DateTimeOffset? endedAt = null) =>
+    private void LogOutcome(string outcome, string reason) =>
         _logger.LogInformation(
-            "EndTradingRelationship completed with {Outcome}, reason {Reason}, EndedAt {EndedAt}",
-            outcome, reason, endedAt);
+            "EndTradingRelationship completed with {Outcome}, reason {Reason}",
+            outcome, reason);
 }

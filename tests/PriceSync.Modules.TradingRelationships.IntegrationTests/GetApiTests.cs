@@ -1,6 +1,5 @@
 ﻿using FluentAssertions;
 using Microsoft.EntityFrameworkCore.Diagnostics;
-using PriceSync.Application;
 using PriceSync.Modules.OrganizationAccess.Contracts;
 using PriceSync.Modules.TradingRelationships.Features.Get;
 using PriceSync.Modules.TradingRelationships.IntegrationTests.TestSupport;
@@ -79,9 +78,8 @@ public sealed class GetApiTests(PostgreSqlFixture fixture) : IAsyncLifetime
     {
         var application = CreateApplication(status: _ => statusResult);
         var client = application.CreateClient();
-        var organizationId = Guid.NewGuid();
-        client.DefaultRequestHeaders.Add("organization_id", organizationId.ToString());
         var tradingRelationship = await fixture.CreateTradingRelationShipAsync(_time.GetUtcNow());
+        client.DefaultRequestHeaders.Add("organization_id", tradingRelationship.CustomerOrganizationId.ToString());
 
         var response = await client.GetAsync(Url(tradingRelationship.Id.Value));
         var content = await response.Content.ReadFromJsonAsync<JsonElement>();
@@ -102,13 +100,12 @@ public sealed class GetApiTests(PostgreSqlFixture fixture) : IAsyncLifetime
         content.GetProperty("code").GetString().Should().Be("authentication_required");
     }
     [Fact]
-    public async Task Get_ShouldReturnTradingRelationshipResponseModel_OnSuccess()
+    public async Task Get_ShouldReturnTradingRelationshipResponseModelIfOrganizationIsCuromter_OnSuccess()
     {
         var application = CreateApplication();
         var client = application.CreateClient();
-        var organizationId = Guid.NewGuid();
-        client.DefaultRequestHeaders.Add("organization_id", organizationId.ToString());
         var tradingRelationship = await fixture.CreateTradingRelationShipAsync(_time.GetUtcNow());
+        client.DefaultRequestHeaders.Add("organization_id", tradingRelationship.CustomerOrganizationId.ToString());
 
         var response = await client.GetAsync(Url(tradingRelationship.Id.Value));
         var content = await response.Content.ReadFromJsonAsync<TradingRelationshipResponse>();
@@ -120,7 +117,54 @@ public sealed class GetApiTests(PostgreSqlFixture fixture) : IAsyncLifetime
         content.CustomerId.Should().Be(tradingRelationship.CustomerOrganizationId.Value);
         content.Status.Should().Be("active");
     }
+    [Fact]
+    public async Task Get_ShouldReturnTradingRelationshipResponseModelIfOrganizationIsSupplier_OnSuccess()
+    {
+        var application = CreateApplication();
+        var client = application.CreateClient();
+        var tradingRelationship = await fixture.CreateTradingRelationShipAsync(_time.GetUtcNow());
+        client.DefaultRequestHeaders.Add("organization_id", tradingRelationship.SupplierOrganizationId.ToString());
 
+        var response = await client.GetAsync(Url(tradingRelationship.Id.Value));
+        var content = await response.Content.ReadFromJsonAsync<TradingRelationshipResponse>();
+
+        response.StatusCode.Should().Be(System.Net.HttpStatusCode.OK);
+        content.Should().NotBeNull();
+        content.Id.Should().Be(tradingRelationship.Id.Value);
+        content.SupplierId.Should().Be(tradingRelationship.SupplierOrganizationId.Value);
+        content.CustomerId.Should().Be(tradingRelationship.CustomerOrganizationId.Value);
+        content.Status.Should().Be("active");
+    }
+    [Fact]
+    public async Task Get_ShouldReturnNotFound_WhenTradingRelationshipNotFound()
+    {
+        var application = CreateApplication();
+        var client = application.CreateClient();
+        var organizationId = Guid.NewGuid();
+        client.DefaultRequestHeaders.Add("organization_id", organizationId.ToString());
+        var nonExistentId = Guid.NewGuid();
+
+        var response = await client.GetAsync(Url(nonExistentId));
+        var content = await response.Content.ReadFromJsonAsync<JsonElement>();
+
+        response.StatusCode.Should().Be(System.Net.HttpStatusCode.NotFound);
+        content.GetProperty("code").GetString().Should().Be(GetErrorCodes.NotFound);
+    }
+    [Fact]
+    public async Task Get_ShouldReturnNotFound_WhenTRIsFoundButOrganizationIsNotPartOfIt()
+    {
+        var application = CreateApplication();
+        var client = application.CreateClient();
+        var otherOrganizationId = Guid.NewGuid();
+        client.DefaultRequestHeaders.Add("organization_id", otherOrganizationId.ToString());
+        var tradingRelationship = await fixture.CreateTradingRelationShipAsync(_time.GetUtcNow());
+        
+        var response = await client.GetAsync(Url(tradingRelationship.Id.Value));
+        var content = await response.Content.ReadFromJsonAsync<JsonElement>();
+
+        response.StatusCode.Should().Be(System.Net.HttpStatusCode.NotFound);
+        content.GetProperty("code").GetString().Should().Be(GetErrorCodes.NotFound);
+    }
 
     private ApiApplication CreateApplication(bool allowed = true, bool authenticated = true,
         Func<OrganizationId, OrganizationStatusResult>? status = null,
