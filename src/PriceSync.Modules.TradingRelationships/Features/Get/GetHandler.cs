@@ -45,6 +45,12 @@ internal class GetHandler
             LogOutcome("Denied", "OrganizationNotFound");
             return new GetResult.OrganizationMissing();
         }
+        var hasCapability = await _organizationAuthorizer.HasCapabilityAsync(_currentPerson.PersonId, _currentOrganization.OrganizationId.Value, OrganizationCapability.ReadTradingRelationships, cancellationToken);
+        if (!hasCapability)
+        {
+            LogOutcome("Denied", "Unauthorized");
+            return new GetResult.NotCapable();
+        }
         var tradingRelationship = await _dbContext.TradingRelationships.AsNoTracking().SingleOrDefaultAsync(tr => tr.Id == tradingRelationshipId, cancellationToken);
         if (tradingRelationship is null)
         {
@@ -56,12 +62,7 @@ internal class GetHandler
             LogOutcome("Denied", "ActingOrganizationNotPartOfTradingRelationship");
             return new GetResult.NotFound();
         }
-        var hasCapability = await _organizationAuthorizer.HasCapabilityAsync(_currentPerson.PersonId, _currentOrganization.OrganizationId.Value, OrganizationCapability.ReadTradingRelationships, cancellationToken);
-        if (!hasCapability)
-        {
-            LogOutcome("Denied", "Unauthorized");
-            return new GetResult.NotCapable();
-        }
+        
         return new GetResult.Found(new TradingRelationshipResponse(tradingRelationship));
     }
     private void LogOutcome(string outcome, string reason) =>
