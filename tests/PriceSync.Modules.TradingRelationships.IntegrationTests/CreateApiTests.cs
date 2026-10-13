@@ -13,7 +13,7 @@ using PriceSync.Modules.TradingRelationships.IntegrationTests.TestSupport;
 namespace PriceSync.Modules.TradingRelationships.IntegrationTests;
 
 [Collection(TradingRelationshipsPostgreSqlCollection.Name)]
-public sealed partial class CreateApiTests(PostgreSqlFixture fixture) : IAsyncLifetime
+public sealed class CreateApiTests(PostgreSqlFixture fixture) : IAsyncLifetime
 {
     private static readonly DateTimeOffset CreatedAt = new(2026, 9, 24, 8, 30, 0, TimeSpan.Zero);
 
