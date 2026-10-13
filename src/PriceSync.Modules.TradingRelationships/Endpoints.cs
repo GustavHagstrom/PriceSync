@@ -20,7 +20,9 @@ public static class Endpoints
         api.MapPost("", CreateEndpoint.HandleAsync).WithName(Routes.Names.Create).WithSummary("Creates a new trading relationship.");
         api.MapPost("{tradingRelationshipId:guid}/end", EndEndpoint.HandleAsync).WithName(Routes.Names.End).WithSummary("Ends an existing trading relationship.");
         api.MapGet("{tradingRelationshipId:guid}", GetEndpoint.HandleAsync).WithName(Routes.Names.Get).WithSummary("Retrieves a trading relationship by its ID.");
-        api.MapGet("/supplier", ListSupplierEndpoint.HandleAsync).WithName(Routes.Names.ListSuppliers).WithSummary("Lists all trading relationships where the current organization is the supplier.");
+        api.MapGet("/supplier", ListSupplierEndpoint.HandleAsync).WithName(Routes.Names.ListSuppliers)
+            .WithSummary("Lists all trading relationships where the current organization is the supplier.")
+            .WithDescription("Optional status filter: active, ended or all. Omit status to include only active. Invalid status is treated as active.");
 
         return endpoints;
     }
