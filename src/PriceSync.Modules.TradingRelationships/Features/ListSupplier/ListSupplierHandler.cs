@@ -23,7 +23,7 @@ internal class ListSupplierHandler
         _organizationAuthorizer = organizationAuthorizer;
         _organizationStatusReader = organizationStatusReader;
     }
-    public async Task<ListSupplierHandlerResult> HandleAsync(CancellationToken cancellationToken)
+    public async Task<ListSupplierHandlerResult> HandleAsync(ListSupplierQuery query, CancellationToken cancellationToken)
     {
         throw new NotImplementedException();
     }

@@ -37,6 +37,13 @@ internal sealed class ApiApplication(
             });
         });
 
+        builder.ConfigureLogging(logging =>
+        {
+            logging.ClearProviders();
+            logging.AddConsole();
+            logging.SetMinimumLevel(LogLevel.Debug);
+        });
+
         builder.ConfigureServices(services =>
         {
             services.RemoveAll<DbContextOptions<TradingRelationshipsDbContext>>();
@@ -66,6 +73,7 @@ internal sealed class ApiApplication(
                     TestAuthenticationHandler.SchemeName,
                     options => options.PersonId = personId);
         });
+        
     }
 }
 

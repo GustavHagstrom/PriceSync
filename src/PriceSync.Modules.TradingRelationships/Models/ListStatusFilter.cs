@@ -3,7 +3,7 @@
 namespace PriceSync.Modules.TradingRelationships.Models;
 
 [JsonConverter(typeof(JsonStringEnumConverter<ListStatusFilter>))]
-internal enum ListStatusFilter
+public enum ListStatusFilter
 {
     Active,
     Ended,
