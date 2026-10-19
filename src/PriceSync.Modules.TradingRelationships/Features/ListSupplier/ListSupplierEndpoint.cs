@@ -1,8 +1,8 @@
 ﻿using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
+using PriceSync.Modules.OrganizationAccess.Contracts;
 using PriceSync.Modules.TradingRelationships.Infrastructure;
-using PriceSync.Modules.TradingRelationships.Models;
 namespace PriceSync.Modules.TradingRelationships.Features.ListSupplier;
 
 internal class ListSupplierEndpoint
@@ -12,53 +12,48 @@ internal class ListSupplierEndpoint
         [FromQuery] string? cursor,
         ILogger<ListSupplierEndpoint> logger,
         ListSupplierHandler handler,
+        ListSupplierValidator validator,
         CancellationToken cancellationToken)
     {
         using var scope = LogScope.BeginScope(logger, "ListSupplier", tradingRelationshipId: null, personId: null, organizationId: null);
-        status = status ?? ListStatusFilter.Active.ToString();
-        if (!Enum.TryParse<ListStatusFilter>(status, ignoreCase: true, out var parsedStatus))
+
+        var validation = validator.Validate(status, cursor, out var query);
+        if(validation.HasErrors)
         {
-            logger.LogInformation("Invalid status '{Status}' provided", status);
-            return Results.Problem(
-                statusCode: StatusCodes.Status400BadRequest,
-                title: "Invalid status",
-                detail: $"The status '{status}' is not valid.",
-                extensions: new Dictionary<string, object?>
-                {
-                    { "code", ListSupplierErrorCodes.InvalidStatus }
-                });
+            logger.LogInformation("Validation failed");
+            return Results.ValidationProblem(
+                 validation.GetErrors(),
+                 title: "Validation errors occurred",
+                 statusCode: StatusCodes.Status400BadRequest,
+                 extensions: new Dictionary<string, object?>
+                 {
+                    { "code", ListSupplierErrorCodes.ValidationFailed }
+                 });
         }
 
-        ListKeyset? keyset = null;
-        if (cursor is not null)
-        {
-            try
-            {
-                keyset = ListKeyset.FromCursor(cursor);
-            }
-            catch (ArgumentException)
-            {
-                logger.LogInformation("Invalid cursor '{Cursor}' provided", cursor);
-                return Results.Problem(
-                    statusCode: StatusCodes.Status400BadRequest,
-                    title: "Invalid cursor",
-                    detail: $"The cursor '{cursor}' is not valid.",
-                    extensions: new Dictionary<string, object?>
-                    {
-                        { "code", ListSupplierErrorCodes.InvalidCursor }
-                    });
-            }
-        }
-        var query = new ListSupplierQuery(parsedStatus, keyset);
+
         var result = await handler.HandleAsync(query, cancellationToken);
         var response = result switch
         {
-            ListSupplierHandlerResult.Succes succes => Results.Ok(succes.Response),
-            _ => Results.InternalServerError()
+            ListSupplierResult.Success success => Results.Ok(success.Response),
+            ListSupplierResult.NotCapable notCapable => Results.Problem(
+                title: "Forbidden",
+                statusCode: StatusCodes.Status403Forbidden,
+                extensions: new Dictionary<string, object?>
+                {
+                    { "code", ListSupplierErrorCodes.Forbidden }
+                }),
+            ListSupplierResult.ActingOrganizationMissing actingOrganizationMissing => Results.Problem(
+                title: "Acting organization is missing",
+                statusCode: StatusCodes.Status400BadRequest,
+                extensions: new Dictionary<string, object?>
+                {
+                    { "code", OrganizationContextErrors.Required }
+                }),
+            _ => throw new NotImplementedException()
         };
 
-
-        throw new NotImplementedException();
+        return response;
     }
 }
 

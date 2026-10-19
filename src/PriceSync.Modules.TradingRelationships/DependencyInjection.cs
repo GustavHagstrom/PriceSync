@@ -34,6 +34,7 @@ public static class DependencyInjection
         services.AddScoped<GetHandler>();
 
         services.AddScoped<ListSupplierHandler>();
+        services.AddScoped<ListSupplierValidator>();
 
         return services;
     }

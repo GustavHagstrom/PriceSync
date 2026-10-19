@@ -1,4 +1,4 @@
-﻿using FluentAssertions;
+using FluentAssertions;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using PriceSync.Modules.OrganizationAccess.Contracts;
 using PriceSync.Modules.TradingRelationships.Domain;
@@ -15,7 +15,7 @@ namespace PriceSync.Modules.TradingRelationships.IntegrationTests;
 public class ListSupplierTests(PostgreSqlFixture fixture) : IAsyncLifetime
 {
     private static readonly DateTimeOffset CreatedAt = new(2026, 9, 24, 8, 30, 0, TimeSpan.Zero);
-    private static readonly OrganizationId CustomerId = OrganizationId.Create();
+    private static readonly OrganizationId SupplierId = OrganizationId.Create();
     public Task DisposeAsync() => Task.CompletedTask;
     public Task InitializeAsync() => fixture.ResetAsync();
 
@@ -33,7 +33,7 @@ public class ListSupplierTests(PostgreSqlFixture fixture) : IAsyncLifetime
 
         // Assert
         result.StatusCode.Should().Be(System.Net.HttpStatusCode.BadRequest);
-        jsonContent.GetProperty("code").GetString().Should().Be("invalid_cursor");
+        jsonContent.GetProperty("code").GetString().Should().Be("validation_failed");
     }
     [Fact]
     public async Task ListSupplier_ShouldReturnBadRequest_ForInvalidStatus()
@@ -49,7 +49,7 @@ public class ListSupplierTests(PostgreSqlFixture fixture) : IAsyncLifetime
 
         // Assert
         result.StatusCode.Should().Be(System.Net.HttpStatusCode.BadRequest);
-        jsonContent.GetProperty("code").GetString().Should().Be("invalid_status");
+        jsonContent.GetProperty("code").GetString().Should().Be("validation_failed");
     }
 
 
@@ -93,7 +93,7 @@ public class ListSupplierTests(PostgreSqlFixture fixture) : IAsyncLifetime
         int numberOfRelationships = 50;
         for(int i = 0; i < numberOfRelationships; i++)
         {
-            await fixture.CreateTradingRelationshipAsync(CreatedAt.AddMinutes(i), OrganizationId.Create(), CustomerId);
+            await fixture.CreateTradingRelationshipAsync(CreatedAt.AddMinutes(i), SupplierId, OrganizationId.Create());
         }
         var application = CreateApplication();
         var client = CreateClient(application);
@@ -112,7 +112,7 @@ public class ListSupplierTests(PostgreSqlFixture fixture) : IAsyncLifetime
         var relationships = new List<TradingRelationship>();
         for (int i = 0; i < numberOfRelationships; i++)
         {
-            relationships.Add(await fixture.CreateTradingRelationshipAsync(CreatedAt.AddMinutes(i), OrganizationId.Create(), CustomerId));
+            relationships.Add(await fixture.CreateTradingRelationshipAsync(CreatedAt.AddMinutes(i), SupplierId, OrganizationId.Create()));
         }
         relationships.Reverse();
         var application = CreateApplication();
@@ -133,7 +133,7 @@ public class ListSupplierTests(PostgreSqlFixture fixture) : IAsyncLifetime
         var relationships = new List<TradingRelationship>();
         for (int i = 0; i < numberOfRelationships; i++)
         {
-            relationships.Add(await fixture.CreateTradingRelationshipAsync(CreatedAt.AddMinutes(i), OrganizationId.Create(), CustomerId));
+            relationships.Add(await fixture.CreateTradingRelationshipAsync(CreatedAt.AddMinutes(i), SupplierId, OrganizationId.Create()));
         }
         relationships.Reverse();
         var application = CreateApplication();
@@ -158,12 +158,12 @@ public class ListSupplierTests(PostgreSqlFixture fixture) : IAsyncLifetime
         for (var i = 0; i < 51; i++)
         {
             relationships.Add(await fixture.CreateTradingRelationshipAsync(
-                CreatedAt, OrganizationId.Create(), CustomerId));
+                CreatedAt, SupplierId, OrganizationId.Create()));
         }
 
-        // Neither another customer's suppliers nor our customers belong in this list.
+        // Neither another supplier's customers nor our suppliers belong in this list.
         await fixture.CreateTradingRelationshipAsync(CreatedAt, OrganizationId.Create(), OrganizationId.Create());
-        await fixture.CreateTradingRelationshipAsync(CreatedAt, CustomerId, OrganizationId.Create());
+        await fixture.CreateTradingRelationshipAsync(CreatedAt, OrganizationId.Create(), SupplierId);
 
         var expectedIds = relationships.OrderByDescending(x => x.Id.Value)
             .Select(x => x.Id.Value).ToArray();
@@ -216,8 +216,8 @@ public class ListSupplierTests(PostgreSqlFixture fixture) : IAsyncLifetime
         var ended = await SeedSupplierAsync(CreatedAt.AddMinutes(2), ended: true);
         var expected = status switch
         {
-            "ended" => new[] { ended },
-            "all" => new[] { newestActive, ended, oldestActive },
+            "ended" => [ended],
+            "all" => [newestActive, ended, oldestActive],
             _ => new[] { newestActive, oldestActive }
         };
         using var application = CreateApplication();
@@ -304,7 +304,7 @@ public class ListSupplierTests(PostgreSqlFixture fixture) : IAsyncLifetime
     [Fact]
     public async Task ListSupplier_ShouldAuthorizeReadCapability_ForActingOrganization()
     {
-        var authorizer = new StubOrganizationAuthorizer();
+        var authorizer = new StubOrganizationAuthorizer(allowed: true);
         using var application = CreateApplication(authorizer: authorizer);
         using var client = CreateClient(application);
 
@@ -312,12 +312,12 @@ public class ListSupplierTests(PostgreSqlFixture fixture) : IAsyncLifetime
 
         result.StatusCode.Should().Be(System.Net.HttpStatusCode.OK);
         authorizer.Calls.Should().ContainSingle()
-            .Which.Should().Be((CustomerId, OrganizationCapability.ReadTradingRelationships));
+            .Which.Should().Be((SupplierId, OrganizationCapability.ReadTradingRelationships));
     }
 
     private async Task<TradingRelationship> SeedSupplierAsync(DateTimeOffset createdAt, bool ended = false)
     {
-        var relationship = TradingRelationship.Create(OrganizationId.Create(), CustomerId, createdAt);
+        var relationship = TradingRelationship.Create(SupplierId, OrganizationId.Create(), createdAt);
         if (ended)
         {
             relationship.End(createdAt.AddMinutes(1));
@@ -332,7 +332,7 @@ public class ListSupplierTests(PostgreSqlFixture fixture) : IAsyncLifetime
     private static HttpClient CreateClient(ApiApplication application)
     {
         var client = application.CreateClient();
-        client.DefaultRequestHeaders.Add("organization_id", CustomerId.Value.ToString());
+        client.DefaultRequestHeaders.Add("organization_id", SupplierId.Value.ToString());
         return client;
     }
 
