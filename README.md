@@ -88,10 +88,17 @@ Use the URL printed at startup. `GET /` returns the service name. The protected 
 
 For database-backed development, configure `ConnectionStrings:OrganizationAccess` for your PostgreSQL instance. The default configuration points to a local `pricesync` database; the API host does not automatically apply migrations or seed data.
 
-## Further reading
+## How to read the documentation
 
-- [Documentation index](docs/readme.md)
-- [Domain model and bounded contexts](docs/Domain/readme.md)
-- [Domain glossary](docs/Context.md)
-- [Product vision and onboarding approach](docs/product-vision.md)
-- [Validation hypotheses](research/hypotheses.md)
+For a quick technical review, start with the code highlights above, then read the [architecture decisions](docs/adr/) alongside the linked code and tests.
+
+For a fuller understanding, follow this order:
+
+1. [Product vision](docs/product-vision.md) — the intended workflow, product boundaries, and approach to onboarding.
+2. [Domain map](docs/Domain/readme.md) — ownership and relationships between business areas. Follow the Organization & Access and Trading Relationships pages for the areas currently being implemented.
+3. [Architecture](docs/architecture.md) and [decision records](docs/adr/) — module boundaries, persistence ownership, and the reasoning behind technical choices.
+4. [Validation hypotheses](research/hypotheses.md) and [business model](docs/business-model.md) — assumptions about adoption and value that still need evidence.
+
+Use the [domain glossary](docs/Context.md) as a reference when a business term is unfamiliar; it does not need to be read from start to finish. The [documentation index](docs/readme.md) explains the documentation structure and conventions.
+
+Domain documentation describes the intended business rules, including areas not yet implemented. Architecture documentation includes both accepted decisions and explicitly labelled proposals. Use the current implementation table above and the linked PRs to distinguish design from working code. The files under `docs/planning/` are detailed implementation plans and are optional for an initial review.
