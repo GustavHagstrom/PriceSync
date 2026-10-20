@@ -1,113 +1,97 @@
 # PriceSync
 
-PriceSync is a product concept for a **neutral integration hub for B2B price synchronization between trading partners**.
+A .NET backend project for standardizing and synchronizing customer-specific B2B prices between suppliers and their customers. Under active development.
 
-The core idea is simple:
+## Why I am building this
 
-> A supplier publishes customer-specific prices once, and each customer can consume those prices in a standardized way from their own systems.
+The idea grew out of my work at a house manufacturer, where the organization manages around 100 or more B2B price lists. I spend significant time transferring supplier prices into our internal digital systems. Each supplier uses a different format, making the process largely manual.
 
-PriceSync is intended to sit between supplier and customer systems and replace many bespoke point-to-point price integrations with one common integration layer.
+PriceSync aims to turn those varying formats into standardized price data that customer systems can import consistently, with automation as a next step.
 
-## Problem
-
-B2B suppliers commonly distribute price updates through Excel, CSV, portals, email, EDI or bespoke integrations. Customers then manually import, map or re-enter this data into ERP, estimation, procurement and other internal systems.
-
-This creates:
-
-- manual administration
-- stale prices
-- duplicated integrations
-- inconsistent formats
-- mapping errors
-- weak traceability of historical prices
-- an N × M integration problem between suppliers and customers
-
-Without a hub, every supplier/customer pair may need its own workflow or integration. With PriceSync, suppliers and customers integrate with the hub instead.
+The broader vision is a neutral integration hub: suppliers publish prices once, and customers consume them through a common interface rather than maintaining separate integrations for every supplier.
 
 ```text
-Without PriceSync                 With PriceSync
-
-Supplier A ── Customer 1          Suppliers ──► PriceSync ──► Customers
-Supplier A ── Customer 2
-Supplier B ── Customer 1
-Supplier B ── Customer 2
-...
+Supplier Excel / CSV / API
+           |
+           v
+       PriceSync
+  Normalize and validate
+  Version and authorize
+           |
+           v
+Customer ERP / estimation / purchasing systems
 ```
 
-## Product vision
+Suppliers should be able to start with their existing files. Format-specific mappings belong at the system boundary, keeping the core price model independent of individual spreadsheets and ERP systems.
 
-```text
-Supplier ERP / Excel / API / SFTP
-                |
-                v
-        +----------------+
-        |   PriceSync    |
-        |----------------|
-        | Ingest         |
-        | Map            |
-        | Normalize      |
-        | Validate       |
-        | Version        |
-        | Authorize      |
-        | Transform      |
-        | Distribute     |
-        +----------------+
-                |
-                v
- Customer ERP / Estimation / Procurement
+The manual import problem comes from my own experience. The proposed solution, its time savings, and its value to other organizations remain hypotheses to validate. See the [product vision](docs/product-vision.md) and [validation hypotheses](research/hypotheses.md).
+
+## Current implementation
+
+The repository currently contains the backend foundation. Price import, publication, and synchronization are planned functionality.
+
+| Area | Status |
+| --- | --- |
+| Modular monolith | Module projects, separate contracts, and architecture tests on `main` |
+| Organization & Access | Domain rules, PostgreSQL persistence and migrations, and two read endpoints on `main` |
+| Trading Relationships | Create, End, and Get implemented on the work branch in [PR #50](https://github.com/GustavHagstrom/PriceSync/pull/50); supplier list implementation in [PR #53](https://github.com/GustavHagstrom/PriceSync/pull/53) |
+| Price ingestion, agreements, publication, and consumption | Domain documentation and module scaffolding; workflows remain to be implemented |
+| Production authentication | Pending; the default host does not authenticate users, so protected endpoints return `401` |
+
+## Technology and architecture
+
+C# and .NET 10, ASP.NET Core Minimal APIs, PostgreSQL, EF Core/Npgsql, xUnit, and Testcontainers.
+
+PriceSync starts as a modular monolith. Modules own their domain logic, HTTP endpoints, and persistence. Cross-module collaboration uses explicit contracts rather than shared entities or direct access to another module's tables.
+
+This keeps domain ownership explicit within one deployable application. The reasoning is recorded in the [architecture decisions](docs/adr/), with more detail in the [architecture overview](docs/architecture.md).
+
+## Code highlights
+
+### Enforced module boundaries — on main
+
+[Architecture tests](tests/PriceSync.ArchitectureTests/ArchitectureBoundaryTests.cs) check project dependency rules, the public Organization & Access contracts, and ownership of its persistence schema. Modules can depend on other modules' contracts, while implementation projects remain isolated.
+
+### Organization-scoped access — on main
+
+The [Get Organization handler](src/PriceSync.Modules.OrganizationAccess/Features/GetOrganization/GetOrganizationHandler.cs) scopes its query to the current person's active membership. The corresponding [API tests](tests/PriceSync.Modules.OrganizationAccess.IntegrationTests/GetOrganizationApiTests.cs) exercise access behavior using PostgreSQL and a test authentication handler.
+
+### Database guarantees under concurrent requests — in PR #50
+
+Trading Relationships uses a partial unique index to allow only one active relationship per supplier/customer pair. Create handles a competing insert by returning the existing relationship. Ending a relationship preserves its history and original end timestamp on repeated requests.
+
+See the [Create handler](https://github.com/GustavHagstrom/PriceSync/blob/issue-12-trading-relationships/src/PriceSync.Modules.TradingRelationships/Features/Create/CreateHandler.cs), [database constraints](https://github.com/GustavHagstrom/PriceSync/blob/issue-12-trading-relationships/src/PriceSync.Modules.TradingRelationships/Persistence/Configurations/TradingRelationshipConfiguration.cs), and integration tests for [Create](https://github.com/GustavHagstrom/PriceSync/blob/issue-12-trading-relationships/tests/PriceSync.Modules.TradingRelationships.IntegrationTests/CreateApiTests.cs) and [End](https://github.com/GustavHagstrom/PriceSync/blob/issue-12-trading-relationships/tests/PriceSync.Modules.TradingRelationships.IntegrationTests/EndApiTests.cs).
+
+## Build and test
+
+From the repository root, with the .NET 10 SDK installed:
+
+```sh
+dotnet build PriceSync.slnx
+dotnet test tests/PriceSync.ArchitectureTests
+dotnet test tests/PriceSync.Modules.OrganizationAccess.UnitTests
 ```
 
-The long-term goal is that systems can ask a simple question:
+Integration tests require a running Docker-compatible container runtime. Testcontainers starts PostgreSQL 16 and applies migrations; a separately configured database is not required for these tests.
 
-> What is Supplier X's agreed price for Customer Y for article Z, and when is that price valid?
-
-## Product principles
-
-1. **Integration hub for B2B prices**  
-   PriceSync connects supplier and customer systems and reduces the need for bespoke point-to-point integrations.
-
-2. **Price synchronization only**  
-   Avoid becoming a PIM, ERP, webshop, document portal or product catalog.
-
-3. **API-first**  
-   The canonical platform should be technical infrastructure that other systems integrate with.
-
-4. **Extremely low supplier onboarding friction**  
-   Suppliers should not need a complete product model. Existing Excel/CSV exports should be enough to start.
-
-5. **Coexists with existing tools**  
-   Tradeplace, GS1, ETIM, PIM systems and ERP systems can remain in place.
-
-6. **Minimal canonical model**  
-   Store only the commercial data required to synchronize prices.
-
-7. **Versioning is first-class**  
-   It should always be possible to determine which price was published and valid at a specific point in time.
-
-8. **Do not require integration on day one**  
-   Supplier maturity may progress from Excel/CSV → SFTP → API → native ERP integration.
-
-9. **Adapters isolate external formats**  
-   Supplier and customer formats should be translated at the platform boundary rather than leaking into the canonical price model.
-
-## Candidate minimal model
-
-```json
-{
-  "articleId": "ABC-123",
-  "price": 42.73,
-  "currency": "SEK",
-  "unit": "ST",
-  "validFrom": "2026-09-01"
-}
+```sh
+dotnet test tests/PriceSync.Modules.OrganizationAccess.IntegrationTests
 ```
 
-Relationship-level metadata can identify supplier, customer, agreement and price-set version.
+## Run the API host
 
-## Current stage
+```sh
+dotnet run --project src/PriceSync.Api
+```
 
-**Idea / market validation.**
+Use the URL printed at startup. `GET /` returns the service name. The protected organization endpoints require authentication that is currently supplied only by the integration-test host; there is no interactive authenticated demo yet.
 
-No implementation decisions should be treated as fixed yet. The highest-risk questions are market and adoption related, not technical.
+For database-backed development, configure `ConnectionStrings:OrganizationAccess` for your PostgreSQL instance. The default configuration points to a local `pricesync` database; the API host does not automatically apply migrations or seed data.
 
-See [`docs/product-vision.md`](docs/product-vision.md), [`docs/business-model.md`](docs/business-model.md), [`docs/architecture.md`](docs/architecture.md) and [`research/hypotheses.md`](research/hypotheses.md).
+## Further reading
+
+- [Documentation index](docs/readme.md)
+- [Domain model and bounded contexts](docs/Domain/readme.md)
+- [Domain glossary](docs/Context.md)
+- [Product vision and onboarding approach](docs/product-vision.md)
+- [Validation hypotheses](research/hypotheses.md)
