@@ -1,8 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text;
-
-namespace PriceSync.Modules.TradingRelationships;
+﻿namespace PriceSync.Modules.TradingRelationships;
 
 internal static class Routes
 {
@@ -12,5 +8,6 @@ internal static class Routes
         public const string Create = "CreateTradingRelationship";
         public const string Get = "GetTradingRelationship";
         public const string End = "EndTradingRelationship";
+        public const string ListSuppliers = "ListSuppliers";
     }
 }

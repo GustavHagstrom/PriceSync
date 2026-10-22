@@ -34,7 +34,7 @@ public sealed partial class EndApiTests(PostgreSqlFixture fixture) : IAsyncLifet
         client.DefaultRequestHeaders.Add("organization_id", (supplierActs ? supplier : customer).ToString());
         _clock.UtcNow = CreatedAt.AddDays(1);
 
-        var response = await client.DeleteAsync(Url(created.GetProperty("id").GetGuid()));
+        var response = await client.PostAsync(Url(created.GetProperty("id").GetGuid()), null);
 
         response.StatusCode.Should().Be(HttpStatusCode.OK, await response.Content.ReadAsStringAsync());
         var ended = await response.Content.ReadFromJsonAsync<JsonElement>();
@@ -56,12 +56,12 @@ public sealed partial class EndApiTests(PostgreSqlFixture fixture) : IAsyncLifet
         var created = await CreateRelationshipAsync(client, supplier, Guid.CreateVersion7());
         var url = Url(created.GetProperty("id").GetGuid());
         _clock.UtcNow = CreatedAt.AddDays(1);
-        var firstResponse = await client.DeleteAsync(url);
+        var firstResponse = await client.PostAsync(url, null);
         firstResponse.StatusCode.Should().Be(HttpStatusCode.OK);
         var first = await firstResponse.Content.ReadFromJsonAsync<JsonElement>();
         _clock.UtcNow = CreatedAt.AddDays(2);
 
-        var secondResponse = await client.DeleteAsync(url);
+        var secondResponse = await client.PostAsync(url, null);
 
         secondResponse.StatusCode.Should().Be(HttpStatusCode.OK);
         var second = await secondResponse.Content.ReadFromJsonAsync<JsonElement>();
@@ -91,7 +91,7 @@ public sealed partial class EndApiTests(PostgreSqlFixture fixture) : IAsyncLifet
         if (scenario != "no_organization")
             denied.DefaultRequestHeaders.Add("organization_id", (scenario == "unrelated" ? Guid.CreateVersion7() : supplier).ToString());
 
-        var response = await denied.DeleteAsync(url);
+        var response = await denied.PostAsync(url, null);
 
         await ApiAssertions.AssertProblemAsync(response, expectedStatus, code);
         var stillActiveResponse = await owner.PostAsJsonAsync("/api/v1/trading-relationships", new
@@ -110,7 +110,7 @@ public sealed partial class EndApiTests(PostgreSqlFixture fixture) : IAsyncLifet
         await using var application = CreateApplication();
         using var client = application.CreateClient();
         client.DefaultRequestHeaders.Add("organization_id", Guid.CreateVersion7().ToString());
-        var response = await client.DeleteAsync(Url(empty ? Guid.Empty : Guid.CreateVersion7()));
+        var response = await client.PostAsync(Url(empty ? Guid.Empty : Guid.CreateVersion7()), null);
         await ApiAssertions.AssertProblemAsync(response, expectedStatus, code);
     }
     [Fact]
@@ -127,7 +127,7 @@ public sealed partial class EndApiTests(PostgreSqlFixture fixture) : IAsyncLifet
         using var client = application.CreateClient();
         client.DefaultRequestHeaders.Add("organization_id", supplier.ToString());
 
-        var response = await client.DeleteAsync(Url(created.GetProperty("id").GetGuid()));
+        var response = await client.PostAsync(Url(created.GetProperty("id").GetGuid()), null);
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         var ended = await response.Content.ReadFromJsonAsync<JsonElement>();
@@ -153,7 +153,7 @@ public sealed partial class EndApiTests(PostgreSqlFixture fixture) : IAsyncLifet
         firstClient.DefaultRequestHeaders.Add("organization_id", supplier.ToString());
         secondClient.DefaultRequestHeaders.Add("organization_id", customer.ToString());
 
-        var responses = await Task.WhenAll(firstClient.DeleteAsync(url), secondClient.DeleteAsync(url));
+        var responses = await Task.WhenAll(firstClient.PostAsync(url, null), secondClient.PostAsync(url, null));
 
         foreach (var response in responses)
             response.StatusCode.Should().Be(HttpStatusCode.OK, await response.Content.ReadAsStringAsync());
@@ -162,7 +162,7 @@ public sealed partial class EndApiTests(PostgreSqlFixture fixture) : IAsyncLifet
         var timestamp = representations[0].GetProperty("endedAt").GetDateTimeOffset();
         timestamp.Should().BeOneOf(firstTime, secondTime);
         _clock.UtcNow = CreatedAt.AddDays(3);
-        var repeatedResponse = await setup.DeleteAsync(url);
+        var repeatedResponse = await setup.PostAsync(url, null);
         repeatedResponse.StatusCode.Should().Be(HttpStatusCode.OK);
         var repeated = await repeatedResponse.Content.ReadFromJsonAsync<JsonElement>();
         repeated.GetProperty("endedAt").GetDateTimeOffset().Should().Be(timestamp);
@@ -199,7 +199,7 @@ public sealed partial class EndApiTests(PostgreSqlFixture fixture) : IAsyncLifet
         var original = await CreateRelationshipAsync(client, supplier, customer);
         var originalUrl = Url(original.GetProperty("id").GetGuid());
         _clock.UtcNow = CreatedAt.AddDays(1);
-        var endResponse = await client.DeleteAsync(originalUrl);
+        var endResponse = await client.PostAsync(originalUrl, null);
         endResponse.StatusCode.Should().Be(HttpStatusCode.OK);
         var ended = await endResponse.Content.ReadFromJsonAsync<JsonElement>();
         _clock.UtcNow = CreatedAt.AddDays(2);
@@ -208,7 +208,7 @@ public sealed partial class EndApiTests(PostgreSqlFixture fixture) : IAsyncLifet
 
         reestablished.GetProperty("id").GetGuid().Should().NotBe(original.GetProperty("id").GetGuid());
         reestablished.GetProperty("status").GetString().Should().Be("active");
-        var historyResponse = await client.DeleteAsync(originalUrl);
+        var historyResponse = await client.PostAsync(originalUrl, null);
         historyResponse.StatusCode.Should().Be(HttpStatusCode.OK);
         var history = await historyResponse.Content.ReadFromJsonAsync<JsonElement>();
         history.GetRawText().Should().Be(ended.GetRawText());
@@ -227,8 +227,8 @@ public sealed partial class EndApiTests(PostgreSqlFixture fixture) : IAsyncLifet
         var relationshipId = created.GetProperty("id").GetGuid();
         _clock.UtcNow = CreatedAt.AddDays(1);
 
-        var first = await client.DeleteAsync(Url(relationshipId));
-        var repeated = await client.DeleteAsync(Url(relationshipId));
+        var first = await client.PostAsync(Url(relationshipId), null);
+        var repeated = await client.PostAsync(Url(relationshipId), null);
 
         first.StatusCode.Should().Be(HttpStatusCode.OK);
         repeated.StatusCode.Should().Be(HttpStatusCode.OK);
@@ -264,7 +264,7 @@ public sealed partial class EndApiTests(PostgreSqlFixture fixture) : IAsyncLifet
         using var client = loggedApplication.CreateClient();
         client.DefaultRequestHeaders.Add("organization_id", organizationId.ToString());
 
-        var response = await client.DeleteAsync(Url(relationshipId));
+        var response = await client.PostAsync(Url(relationshipId), null);
 
         response.StatusCode.Should().Be(expectedStatus);
         var entry = logs.Entries.Should().ContainSingle().Subject;
@@ -293,7 +293,7 @@ public sealed partial class EndApiTests(PostgreSqlFixture fixture) : IAsyncLifet
         using var client = application.CreateClient();
         client.DefaultRequestHeaders.Add("organization_id", supplier.ToString());
 
-        var response = await client.DeleteAsync(Url(created.GetProperty("id").GetGuid()));
+        var response = await client.PostAsync(Url(created.GetProperty("id").GetGuid()), null);
 
         await ApiAssertions.AssertProblemAsync(response, HttpStatusCode.Forbidden, "forbidden");
         var existingResponse = await setup.PostAsJsonAsync("/api/v1/trading-relationships", new
@@ -316,8 +316,8 @@ public sealed partial class EndApiTests(PostgreSqlFixture fixture) : IAsyncLifet
         using var outsider = application.CreateClient();
         outsider.DefaultRequestHeaders.Add("organization_id", Guid.CreateVersion7().ToString());
 
-        var knownResponse = await outsider.DeleteAsync(Url(created.GetProperty("id").GetGuid()));
-        var unknownResponse = await outsider.DeleteAsync(Url(Guid.CreateVersion7()));
+        var knownResponse = await outsider.PostAsync(Url(created.GetProperty("id").GetGuid()), null);
+        var unknownResponse = await outsider.PostAsync(Url(Guid.CreateVersion7()), null);
 
         knownResponse.StatusCode.Should().Be(HttpStatusCode.NotFound);
         unknownResponse.StatusCode.Should().Be(HttpStatusCode.NotFound);
@@ -341,7 +341,7 @@ public sealed partial class EndApiTests(PostgreSqlFixture fixture) : IAsyncLifet
         using var client = loggedApplication.CreateClient();
         client.DefaultRequestHeaders.Add("organization_id", organizationId.ToString());
 
-        var response = await client.DeleteAsync(Url(Guid.Empty));
+        var response = await client.PostAsync(Url(Guid.Empty), null);
 
         await ApiAssertions.AssertProblemAsync(response, HttpStatusCode.BadRequest, "validation_failed");
         var entry = logs.Entries.Should().ContainSingle().Subject;
@@ -361,7 +361,7 @@ public sealed partial class EndApiTests(PostgreSqlFixture fixture) : IAsyncLifet
         authenticated ? new PersonId(Guid.CreateVersion7()) : null,
         new StubOrganizationAuthorizer(allowed), new StubOrganizationStatusReader(status ?? (x => OrganizationStatusResult.Active)), clock ?? _clock, interceptors);
 
-    private static string Url(Guid id) => $"/api/v1/trading-relationships/{id}";
+    private static string Url(Guid id) => $"/api/v1/trading-relationships/{id}/end";
 
     private static async Task<JsonElement> CreateRelationshipAsync(HttpClient client, Guid supplier, Guid customer)
     {

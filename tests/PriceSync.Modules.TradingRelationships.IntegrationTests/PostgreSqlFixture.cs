@@ -66,4 +66,12 @@ public sealed class PostgreSqlFixture : IAsyncLifetime
         await context.SaveChangesAsync();
         return tradingRelationship;
     }
+    internal async Task<TradingRelationship> CreateTradingRelationshipAsync(DateTimeOffset time, OrganizationId supplierId, OrganizationId customer)
+    {
+        var tradingRelationship = TradingRelationship.Create(supplierId, customer, time);
+        await using var context = new TradingRelationshipsDbContext(CreateOptions());
+        context.TradingRelationships.Add(tradingRelationship);
+        await context.SaveChangesAsync();
+        return tradingRelationship;
+    }
 }
