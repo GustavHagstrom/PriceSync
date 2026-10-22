@@ -1,6 +1,5 @@
 using System.Net;
 using System.Net.Http.Json;
-using System.Data.Common;
 using System.Text.Json;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
@@ -298,9 +297,9 @@ public sealed class CreateApiTests(PostgreSqlFixture fixture) : IAsyncLifetime
     {
         var supplierId = NewOrganizationId();
         var customerId = NewOrganizationId();
-        var lookupBarrier = new ConcurrentLookupBarrierInterceptor();
+        var saveBarrier = new ConcurrentCreateSaveBarrierInterceptor();
 
-        await using var application = CreateApplication(interceptors: [lookupBarrier]);
+        await using var application = CreateApplication(interceptors: [saveBarrier]);
         using var firstClient = application.CreateClient();
         using var secondClient = application.CreateClient();
         firstClient.DefaultRequestHeaders.Add("organization_id", supplierId.Value.ToString());
@@ -315,7 +314,17 @@ public sealed class CreateApiTests(PostgreSqlFixture fixture) : IAsyncLifetime
 
         var representations = await Task.WhenAll(
             responses.Select(response => response.Content.ReadFromJsonAsync<JsonElement>()));
-        representations.Select(item => item.GetProperty("id").GetGuid()).Distinct().Should().ContainSingle();
+        var relationshipId = representations.Select(item => item.GetProperty("id").GetGuid())
+            .Distinct().Should().ContainSingle().Which;
+
+        await using var verificationContext = new TradingRelationshipsDbContext(fixture.CreateOptions());
+        var activeRelationships = await verificationContext.TradingRelationships
+            .Where(x => x.SupplierOrganizationId == supplierId &&
+                x.CustomerOrganizationId == customerId &&
+                x.Status == TradingRelationshipStatus.Active)
+            .ToListAsync();
+        activeRelationships.Should().ContainSingle()
+            .Which.Id.Value.Should().Be(relationshipId);
     }
 
     private ApiApplication CreateApplication(
@@ -341,30 +350,33 @@ public sealed class CreateApiTests(PostgreSqlFixture fixture) : IAsyncLifetime
 
     private static OrganizationId NewOrganizationId() => new(Guid.CreateVersion7());
 
-    private sealed class ConcurrentLookupBarrierInterceptor : DbCommandInterceptor
+    private sealed class ConcurrentCreateSaveBarrierInterceptor : SaveChangesInterceptor
     {
-        private readonly TaskCompletionSource _bothLookupsStarted = new(
+        private readonly TaskCompletionSource _bothCreatesReady = new(
             TaskCreationOptions.RunContinuationsAsynchronously);
-        private int _lookupCount;
+        private int _saveCount;
 
-        public override async ValueTask<InterceptionResult<DbDataReader>> ReaderExecutingAsync(
-            DbCommand command,
-            CommandEventData eventData,
-            InterceptionResult<DbDataReader> result,
+        public override async ValueTask<InterceptionResult<int>> SavingChangesAsync(
+            DbContextEventData eventData,
+            InterceptionResult<int> result,
             CancellationToken cancellationToken = default)
         {
-            if (command.CommandText.TrimStart().StartsWith("SELECT", StringComparison.OrdinalIgnoreCase) &&
-                command.CommandText.Contains("TradingRelationships", StringComparison.Ordinal))
+            var isCreatingRelationship = eventData.Context!.ChangeTracker
+                .Entries<TradingRelationship>()
+                .Any(entry => entry.State == EntityState.Added);
+
+            if (isCreatingRelationship)
             {
-                var lookupNumber = Interlocked.Increment(ref _lookupCount);
-                if (lookupNumber <= 2)
+                var saveNumber = Interlocked.Increment(ref _saveCount);
+                if (saveNumber <= 2)
                 {
-                    if (lookupNumber == 2)
+                    if (saveNumber == 2)
                     {
-                        _bothLookupsStarted.SetResult();
+                        _bothCreatesReady.TrySetResult();
                     }
 
-                    await _bothLookupsStarted.Task.WaitAsync(cancellationToken);
+                    // Hold both concurrent creates at the save boundary so their INSERTs race.
+                    await _bothCreatesReady.Task.WaitAsync(TimeSpan.FromSeconds(15), cancellationToken);
                 }
             }
 
