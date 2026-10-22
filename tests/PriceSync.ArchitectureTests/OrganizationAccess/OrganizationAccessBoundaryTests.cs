@@ -93,12 +93,14 @@ public sealed class OrganizationAccessBoundaryTests
             "PriceSync.Modules.OrganizationAccess.Persistence",
         };
 
-        var violations = Directory
-            .EnumerateFiles(sourceRoot, "*.cs", SearchOption.AllDirectories)
-            .Where(path => !Path.GetRelativePath(organizationAccessRoot, path).StartsWith("..", StringComparison.Ordinal))
+        var ownedReferences = Directory
+            .EnumerateFiles(organizationAccessRoot, "*.cs", SearchOption.AllDirectories)
+            .Select(File.ReadAllText)
             .ToArray();
 
-        violations.Should().NotBeEmpty("the Organization & Access module should own the persistence implementation being protected");
+        ownedReferences.Should().Contain(
+            contents => forbiddenReferences.Any(contents.Contains),
+            "the Organization & Access module should own the persistence implementation being protected");
 
         var crossModuleViolations = Directory
             .EnumerateFiles(sourceRoot, "*.cs", SearchOption.AllDirectories)
