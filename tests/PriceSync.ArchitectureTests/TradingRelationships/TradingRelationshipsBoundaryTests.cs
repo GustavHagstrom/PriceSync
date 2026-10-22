@@ -11,6 +11,26 @@ public sealed class TradingRelationshipsBoundaryTests
         .ToDictionary(project => project.Name);
 
     [Fact]
+    public void Other_feature_modules_do_not_reference_trading_relationships_implementation_or_persistence()
+    {
+        const string implementationProject = "PriceSync.Modules.TradingRelationships";
+        var otherModuleProjects = ModuleNames
+            .Where(moduleName => moduleName != "TradingRelationships")
+            .SelectMany(moduleName => new[]
+            {
+                _projects[$"PriceSync.Modules.{moduleName}"],
+                _projects[$"PriceSync.Modules.{moduleName}.Contracts"],
+            });
+
+        foreach (var project in otherModuleProjects)
+        {
+            project.ProjectReferences.Should().NotContain(
+                implementationProject,
+                $"{project.Name} must not reference TradingRelationships implementation, which also contains its persistence");
+        }
+    }
+
+    [Fact]
     public void Trading_relationships_implementation_exports_only_composition_surfaces()
     {
         typeof(PriceSync.Modules.TradingRelationships.DependencyInjection).Assembly.ExportedTypes
