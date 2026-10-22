@@ -31,6 +31,16 @@ public sealed class TradingRelationshipsBoundaryTests
     }
 
     [Fact]
+    public void Api_host_references_trading_relationships_implementation_for_composition()
+    {
+        _projects["PriceSync.Api"].ProjectReferences
+            .Should()
+            .Contain(
+                "PriceSync.Modules.TradingRelationships",
+                "the API host is the composition root and must be allowed to register the module and map its endpoints");
+    }
+
+    [Fact]
     public void Trading_relationships_implementation_exports_only_composition_surfaces()
     {
         typeof(PriceSync.Modules.TradingRelationships.DependencyInjection).Assembly.ExportedTypes
