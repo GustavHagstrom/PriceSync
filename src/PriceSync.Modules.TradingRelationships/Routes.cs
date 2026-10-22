@@ -9,5 +9,6 @@ internal static class Routes
         public const string Get = "GetTradingRelationship";
         public const string End = "EndTradingRelationship";
         public const string ListSuppliers = "ListSuppliers";
+        public const string ListCustomers = "ListCustomers";
     }
 }

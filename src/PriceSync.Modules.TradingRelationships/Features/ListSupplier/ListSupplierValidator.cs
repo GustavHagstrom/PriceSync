@@ -13,7 +13,7 @@ internal class ListSupplierValidator
         var errors = new ValidationErrorCollection();
 
 
-        if (IsAccepteStatusString(status) && Enum.TryParse<ListStatusFilter>(status, ignoreCase: true, out var parsedFilter))
+        if (IsAcceptedStatusString(status) && Enum.TryParse<ListStatusFilter>(status, ignoreCase: true, out var parsedFilter))
         {
             filter = parsedFilter;
         }
@@ -38,7 +38,7 @@ internal class ListSupplierValidator
         query = new ListSupplierQuery(filter, keyset);
         return errors;
     }
-    private bool IsAccepteStatusString(string status)
+    private bool IsAcceptedStatusString(string status)
     {
         if(status == ListStatusFilter.Active.ToString().ToLowerInvariant() ||
             status == ListStatusFilter.Ended.ToString().ToLowerInvariant() ||
