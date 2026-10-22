@@ -5,6 +5,7 @@ using PriceSync.Modules.TradingRelationships.Features.Create;
 using PriceSync.Modules.TradingRelationships.Features.End;
 using PriceSync.Modules.TradingRelationships.Features.Get;
 using PriceSync.Modules.TradingRelationships.Features.ListSupplier;
+using PriceSync.Modules.TradingRelationships.Features.ListCustomer;
 
 namespace PriceSync.Modules.TradingRelationships;
 
@@ -22,6 +23,10 @@ public static class Endpoints
         api.MapGet("{tradingRelationshipId:guid}", GetEndpoint.HandleAsync).WithName(Routes.Names.Get).WithSummary("Retrieves a trading relationship by its ID.");
         api.MapGet("/supplier", ListSupplierEndpoint.HandleAsync).WithName(Routes.Names.ListSuppliers)
             .WithSummary("Lists all trading relationships where the current organization is the supplier.")
+            .WithDescription("Optional status filter: active, ended or all. Omit status to include only active.");
+
+        api.MapGet("/customer", ListCustomerEndpoint.HandleAsync).WithName(Routes.Names.ListCustomers)
+            .WithSummary("Lists all trading relationships where the current organization is the customer.")
             .WithDescription("Optional status filter: active, ended or all. Omit status to include only active.");
 
         return endpoints;
