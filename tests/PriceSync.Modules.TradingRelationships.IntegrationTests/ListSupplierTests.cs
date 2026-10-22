@@ -147,7 +147,7 @@ public class ListSupplierTests(PostgreSqlFixture fixture) : IAsyncLifetime
         response.Should().NotBeNull();
         response!.TradingRelationships.Select(x => x.Id)
             .Should().Equal(relationships.Skip(5).Select(x => x.Id.Value));
-        response.cursor.Should().BeNull();
+        response.Cursor.Should().BeNull();
     }
 
     [Fact]
@@ -175,14 +175,14 @@ public class ListSupplierTests(PostgreSqlFixture fixture) : IAsyncLifetime
         var firstPage = await firstResult.Content.ReadFromJsonAsync<ListSupplierResponse>();
         firstPage.Should().NotBeNull();
         firstPage!.TradingRelationships.Select(x => x.Id).Should().Equal(expectedIds.Take(50));
-        firstPage.cursor.Should().NotBeNullOrEmpty();
+        firstPage.Cursor.Should().NotBeNullOrEmpty();
 
-        using var secondResult = await client.GetAsync(Url(cursor: firstPage.cursor));
+        using var secondResult = await client.GetAsync(Url(cursor: firstPage.Cursor));
         secondResult.StatusCode.Should().Be(System.Net.HttpStatusCode.OK);
         var secondPage = await secondResult.Content.ReadFromJsonAsync<ListSupplierResponse>();
         secondPage.Should().NotBeNull();
         secondPage!.TradingRelationships.Select(x => x.Id).Should().Equal(expectedIds.Skip(50));
-        secondPage.cursor.Should().BeNull();
+        secondPage.Cursor.Should().BeNull();
 
         firstPage.TradingRelationships.Concat(secondPage.TradingRelationships)
             .Select(x => x.Id).Should().Equal(expectedIds).And.OnlyHaveUniqueItems();
@@ -200,7 +200,7 @@ public class ListSupplierTests(PostgreSqlFixture fixture) : IAsyncLifetime
         var response = await result.Content.ReadFromJsonAsync<ListSupplierResponse>();
         response.Should().NotBeNull();
         response!.TradingRelationships.Should().BeEmpty();
-        response.cursor.Should().BeNull();
+        response.Cursor.Should().BeNull();
     }
 
     [Theory]
@@ -230,7 +230,7 @@ public class ListSupplierTests(PostgreSqlFixture fixture) : IAsyncLifetime
         response.Should().NotBeNull();
         response!.TradingRelationships.Should().Equal(
             expected.Select(x => new TradingRelationshipResponse(x)));
-        response.cursor.Should().BeNull();
+        response.Cursor.Should().BeNull();
     }
 
     [Theory]
@@ -262,14 +262,14 @@ public class ListSupplierTests(PostgreSqlFixture fixture) : IAsyncLifetime
         var firstPage = await firstResult.Content.ReadFromJsonAsync<ListSupplierResponse>();
         firstPage.Should().NotBeNull();
         firstPage!.TradingRelationships.Select(x => x.Id).Should().Equal(expectedIds.Take(50));
-        firstPage.cursor.Should().NotBeNullOrEmpty();
+        firstPage.Cursor.Should().NotBeNullOrEmpty();
 
-        using var secondResult = await client.GetAsync(Url(status, firstPage.cursor));
+        using var secondResult = await client.GetAsync(Url(status, firstPage.Cursor));
         secondResult.StatusCode.Should().Be(System.Net.HttpStatusCode.OK);
         var secondPage = await secondResult.Content.ReadFromJsonAsync<ListSupplierResponse>();
         secondPage.Should().NotBeNull();
         secondPage!.TradingRelationships.Select(x => x.Id).Should().Equal(expectedIds.Skip(50));
-        secondPage.cursor.Should().BeNull();
+        secondPage.Cursor.Should().BeNull();
     }
 
     [Fact]
@@ -285,7 +285,7 @@ public class ListSupplierTests(PostgreSqlFixture fixture) : IAsyncLifetime
         var response = await result.Content.ReadFromJsonAsync<ListSupplierResponse>();
         response.Should().NotBeNull();
         response!.TradingRelationships.Should().BeEmpty();
-        response.cursor.Should().BeNull();
+        response.Cursor.Should().BeNull();
     }
 
     [Fact]

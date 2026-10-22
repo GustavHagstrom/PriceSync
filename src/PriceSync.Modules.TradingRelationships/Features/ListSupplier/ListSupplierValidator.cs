@@ -7,13 +7,13 @@ internal class ListSupplierValidator
 {
     public ValidationErrorCollection Validate(string? status, string? cursor, out ListSupplierQuery query)
     {
-        status = status ?? "active";
+        status = status?.ToLowerInvariant() ?? "active";
         ListKeyset? keyset = null;
         ListStatusFilter filter = ListStatusFilter.Active;
         var errors = new ValidationErrorCollection();
 
 
-        if (Enum.TryParse<ListStatusFilter>(status, ignoreCase: true, out var parsedFilter))
+        if (IsAccepteStatusString(status) && Enum.TryParse<ListStatusFilter>(status, ignoreCase: true, out var parsedFilter))
         {
             filter = parsedFilter;
         }
@@ -38,5 +38,14 @@ internal class ListSupplierValidator
         query = new ListSupplierQuery(filter, keyset);
         return errors;
     }
+    private bool IsAccepteStatusString(string status)
+    {
+        if(status == ListStatusFilter.Active.ToString().ToLowerInvariant() ||
+            status == ListStatusFilter.Ended.ToString().ToLowerInvariant() ||
+            status == ListStatusFilter.All.ToString().ToLowerInvariant())
+            return true;
+        return false;
+    }
 }
+
 

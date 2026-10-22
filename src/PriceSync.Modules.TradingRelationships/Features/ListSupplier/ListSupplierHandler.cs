@@ -57,10 +57,10 @@ internal class ListSupplierHandler
         {
             //this should not be possible. Validation should have caught this before it got here. But just in case, we will log and throw an exception.
             LogOutcome("Denied", "Invalid filter value.");
-            throw new ArgumentNullException(nameof(query.Filter), "Invalid filter value.");
+            throw new ArgumentOutOfRangeException(nameof(query.Filter), "Invalid filter value.");
         }
 
-        if (query.keyset is { } keyset)
+        if (query.Keyset is { } keyset)
         {
             var createdAt = keyset.CreatedAt;
             var id = keyset.Id;

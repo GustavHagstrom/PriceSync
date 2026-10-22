@@ -4,6 +4,4 @@ internal static class ListSupplierErrorCodes
 {
     public const string ValidationFailed = "validation_failed";
     public const string Forbidden = "forbidden";
-    public const string NotFound = "not_found";
-    public const string ValidationError = "validation_error";
 }

@@ -22,7 +22,7 @@ public static class Endpoints
         api.MapGet("{tradingRelationshipId:guid}", GetEndpoint.HandleAsync).WithName(Routes.Names.Get).WithSummary("Retrieves a trading relationship by its ID.");
         api.MapGet("/supplier", ListSupplierEndpoint.HandleAsync).WithName(Routes.Names.ListSuppliers)
             .WithSummary("Lists all trading relationships where the current organization is the supplier.")
-            .WithDescription("Optional status filter: active, ended or all. Omit status to include only active. Invalid status is treated as active.");
+            .WithDescription("Optional status filter: active, ended or all. Omit status to include only active.");
 
         return endpoints;
     }

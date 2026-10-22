@@ -15,7 +15,7 @@ public sealed class ListStatusFilterTests
     [InlineData("all", ListStatusFilter.All)]
     [InlineData("All", ListStatusFilter.All)]
     [InlineData("ALL", ListStatusFilter.All)]
-    public void ListStatusFilter_ShouldConvertCaseInsensitive(string input, ListStatusFilter expected)
+    internal void ListStatusFilter_ShouldConvertCaseInsensitive(string input, ListStatusFilter expected)
     {
         // Act
         var actual = Enum.TryParse<ListStatusFilter>(input, ignoreCase: true, out var result) ? result : throw new ArgumentException("Invalid input", nameof(input));
