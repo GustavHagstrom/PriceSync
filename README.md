@@ -34,7 +34,7 @@ The repository currently contains the backend foundation. Price import, publicat
 | --- | --- |
 | Modular monolith | Module projects, separate contracts, and architecture tests on `main` |
 | Organization & Access | Domain rules, PostgreSQL persistence and migrations, and two read endpoints on `main` |
-| Trading Relationships | Create, End, and Get implemented on the work branch in [PR #50](https://github.com/GustavHagstrom/PriceSync/pull/50); supplier list implementation in [PR #53](https://github.com/GustavHagstrom/PriceSync/pull/53) |
+| Trading Relationships | Create, End, Get, and Supplier/Customer lists with PostgreSQL persistence and concurrency tests on `main` |
 | Price ingestion, agreements, publication, and consumption | Domain documentation and module scaffolding; workflows remain to be implemented |
 | Production authentication | Pending; the default host does not authenticate users, so protected endpoints return `401` |
 
@@ -50,17 +50,17 @@ This keeps domain ownership explicit within one deployable application. The reas
 
 ### Enforced module boundaries — on main
 
-[Architecture tests](tests/PriceSync.ArchitectureTests/ArchitectureBoundaryTests.cs) check project dependency rules, the public Organization & Access contracts, and ownership of its persistence schema. Modules can depend on other modules' contracts, while implementation projects remain isolated.
+[Architecture tests](tests/PriceSync.ArchitectureTests/ModuleDependencyTests.cs) check project dependency rules, the public Organization & Access contracts, and ownership of its persistence schema. Modules can depend on other modules' contracts, while implementation projects remain isolated.
 
 ### Organization-scoped access — on main
 
 The [Get Organization handler](src/PriceSync.Modules.OrganizationAccess/Features/GetOrganization/GetOrganizationHandler.cs) scopes its query to the current person's active membership. The corresponding [API tests](tests/PriceSync.Modules.OrganizationAccess.IntegrationTests/GetOrganizationApiTests.cs) exercise access behavior using PostgreSQL and a test authentication handler.
 
-### Database guarantees under concurrent requests — in PR #50
+### Database guarantees under concurrent requests — on main
 
 Trading Relationships uses a partial unique index to allow only one active relationship per supplier/customer pair. Create handles a competing insert by returning the existing relationship. Ending a relationship preserves its history and original end timestamp on repeated requests.
 
-See the [Create handler](https://github.com/GustavHagstrom/PriceSync/blob/issue-12-trading-relationships/src/PriceSync.Modules.TradingRelationships/Features/Create/CreateHandler.cs), [database constraints](https://github.com/GustavHagstrom/PriceSync/blob/issue-12-trading-relationships/src/PriceSync.Modules.TradingRelationships/Persistence/Configurations/TradingRelationshipConfiguration.cs), and integration tests for [Create](https://github.com/GustavHagstrom/PriceSync/blob/issue-12-trading-relationships/tests/PriceSync.Modules.TradingRelationships.IntegrationTests/CreateApiTests.cs) and [End](https://github.com/GustavHagstrom/PriceSync/blob/issue-12-trading-relationships/tests/PriceSync.Modules.TradingRelationships.IntegrationTests/EndApiTests.cs).
+See the [Create handler](src/PriceSync.Modules.TradingRelationships/Features/Create/CreateHandler.cs), [database constraints](src/PriceSync.Modules.TradingRelationships/Persistence/Configurations/TradingRelationshipConfiguration.cs), and integration tests for [Create](tests/PriceSync.Modules.TradingRelationships.IntegrationTests/CreateApiTests.cs) and [End](tests/PriceSync.Modules.TradingRelationships.IntegrationTests/EndApiTests.cs).
 
 ## Build and test
 
@@ -95,10 +95,10 @@ For a quick technical review, start with the code highlights above, then read th
 For a fuller understanding, follow this order:
 
 1. [Product vision](docs/product-vision.md) — the intended workflow, product boundaries, and approach to onboarding.
-2. [Domain map](docs/Domain/readme.md) — ownership and relationships between business areas. Follow the Organization & Access and Trading Relationships pages for the areas currently being implemented.
+2. [Domain map](docs/Domain/readme.md) — ownership and relationships between business areas. Follow the Organization & Access and Trading Relationships pages for the implemented domain areas.
 3. [Architecture](docs/architecture.md) and [decision records](docs/adr/) — module boundaries, persistence ownership, and the reasoning behind technical choices.
 4. [Validation hypotheses](research/hypotheses.md) and [business model](docs/business-model.md) — assumptions about adoption and value that still need evidence.
 
 Use the [domain glossary](docs/Context.md) as a reference when a business term is unfamiliar; it does not need to be read from start to finish. The [documentation index](docs/readme.md) explains the documentation structure and conventions.
 
-Domain documentation describes the intended business rules, including areas not yet implemented. Architecture documentation includes both accepted decisions and explicitly labelled proposals. Use the current implementation table above and the linked PRs to distinguish design from working code. The files under `docs/planning/` are detailed implementation plans and are optional for an initial review.
+Domain documentation describes the intended business rules, including areas not yet implemented. Architecture documentation includes both accepted decisions and explicitly labelled proposals. Use the current implementation table above to distinguish design from working code. Retained business rules and technical decisions live in the domain documentation and architecture overview; the Organization-creation application slice is explicitly marked as planned.

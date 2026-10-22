@@ -39,6 +39,8 @@ Creating a Trading Relationship requires both the Supplier and Customer Organiza
 
 Expected Organization states such as `Active`, `Archived`, and `NotFound` are normal contract results. Technical failures crossing the OrganizationAccess boundary are failures of the operation and must not be interpreted as `NotFound`.
 
+Organization validation is point-in-time, without cross-module transactions or locks. TradingRelationships does not cache or persist Organization status. Although End does not require both referenced Organizations to remain Active, the acting Organization must still be Active and authorized. An Active party may therefore end a relationship whose counterparty is Archived.
+
 ## Lifecycle
 
 PriceSync represents an externally established Supplier–Customer relationship, so a new `TradingRelationship` starts as `Active`. The only lifecycle transition is `Active → Ended`; `Ended` is terminal. There is no `Pending` state because negotiation or acceptance is outside this boundary, and no separate paused/suspended state is currently part of the domain.
@@ -55,6 +57,34 @@ This area is responsible for decisions such as:
 - end the relationship
 
 PriceSync does not negotiate, request, or commercially accept the relationship.
+
+### Authorization and scope
+
+Every operation requires an authenticated Person and an acting Organization. The selected Organization identifies request scope but does not itself grant authority. OrganizationAccess owns membership and role interpretation and exposes `ReadTradingRelationships` and `ManageTradingRelationships` capabilities.
+
+Create and End require management capability; Get and directional lists require read capability. In the current role model, active Owners may manage relationships and active Members (including Owners) may read them. The acting Organization must be Active for either capability. Archived Organizations remain historical references but cannot act through these operations.
+
+Either party may Create or End without counterparty approval. Create rejects an unrelated actor before counterparty validation. Once authorized, Get and End return the same Not Found result for unknown relationships and relationships outside the acting Organization's scope.
+
+### Create and End
+
+Create takes both party IDs. New creation returns `201 Created` with the relationship representation and Location. Repeating Create for an already Active pair returns `200 OK` with the existing representation, after the same authorization and Organization validation. No separate idempotency key is required.
+
+Concurrent Create obeys the same one-Active-per-pair invariant. The losing request returns `200 OK` rather than a uniqueness error. If End completes before conflict readback, the current implementation prefers an Active relationship for the pair, otherwise its latest ended history. The response may therefore be Ended; resolving the conflict does not create another relationship. This is a pair-level resolution rule, not a guarantee to return the exact relationship that caused the conflict if further Create/End operations intervene.
+
+End takes only the relationship ID and returns `200 OK` with the final representation. Repeated or concurrent End preserves the original EndedAt. Timestamps come from PriceSync's application clock. There is no ordinary physical-delete operation.
+
+Missing acting Organization is `400 Bad Request`, authentication failure is `401 Unauthorized`, and capability denials are `403 Forbidden`. Invalid input, including self-relationships, is rejected. After authorization, missing counterparties return Not Found and Archived counterparties prevent creation. Expected failures expose stable machine-readable Problem Details codes; technical failures remain operation failures.
+
+### Reads
+
+Get returns a scoped relationship by identity, including ended history. Directional lists derive scope from the acting Organization: the Supplier list contains relationships where it is Supplier, and the Customer list contains relationships where it is Customer.
+
+Lists default to Active and support Ended or all statuses. Opaque cursor/keyset pagination orders by `CreatedAt DESC, TradingRelationshipId DESC`, with up to 50 results per page in the current API. Clients retain the same status filter while following a cursor. The compact representation contains relationship identity, party IDs, status, CreatedAt and EndedAt.
+
+### Audit
+
+Successful, denied, cancelled and failed Create/End attempts must be auditable with actor and acting-Organization context, the requested pair or relationship identity, and outcome. Create validation failures are included. Correlation/logging mechanisms, a repository-wide telemetry strategy and read-audit policy remain separate technical concerns.
 
 ## Business facts
 
@@ -73,6 +103,10 @@ The area produces facts that a Trading Relationship exists or has ended. Downstr
 - Ending a Trading Relationship does not require its Organizations to remain `Active`.
 - The relationship establishes access for price distribution but contains no Price Agreement terms.
 - Ending the relationship stops future Supplier-backed distribution without deleting prior activation or retrieval history.
+
+## Public module boundary
+
+The current cross-module contract exposes `TradingRelationshipId`, without exposing the aggregate or a generic identity/status reader. Future consumers must define purpose-built contracts from concrete needs. HTTP representations remain internal to the module. No domain/integration event or outbox contract is required by the current implementation.
 
 ## References
 

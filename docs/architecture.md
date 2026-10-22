@@ -274,3 +274,19 @@ The dominant risks are expected to be:
 - trust and audit requirements
 - network adoption
 - operational complexity from supporting many external formats/connectors
+
+## Module consistency decisions
+
+### Trading Relationships
+
+TradingRelationships directly maps its aggregate through EF Core in its own `trading_relationships` schema. A partial unique index enforces one Active relationship per directed pair. CHECK constraints protect distinct parties, valid lowercase statuses and Status/EndedAt consistency. Organization IDs have no cross-module foreign keys. Directional indexes support Organization/status filtering and descending CreatedAt/ID keyset pagination; additional indexes for unfiltered lists require measured need.
+
+Create uses the normal SaveChanges write transaction without an explicit transaction around lookup and insertion. Only a violation of the named Active-pair unique index is translated into idempotent success; other database failures propagate. Conflict readback follows the pair-level rule in the [domain document](Domain/trading-relationships.md). End uses an atomic conditional Active-to-Ended update followed by readback, without a wider transaction; only the first transition writes EndedAt. These guarantees require neither a generic concurrency token nor general retries or pessimistic locking. Real PostgreSQL integration tests protect the constraints and concurrent Create/End behavior.
+
+### Planned Organization creation
+
+OrganizationAccess already owns the persistence foundation; its CreateOrganization application slice remains unimplemented. The retained design uses a reservation-first explicit Read Committed transaction: insert the precomputed replay record with `INSERT ... ON CONFLICT DO NOTHING`, keyed by Person/operation/key. The winner persists Organization and first Owner membership before committing. A matching concurrent request waits for that transaction and replays its completed result; a payload mismatch conflicts. Rollback removes both reservation and domain changes.
+
+The request hash is SHA-256 over deterministically ordered normalized request values. The replay record stores the original HTTP status and JSON response and has no expiration in the initial model. This is operation-specific persistence, not generic idempotency middleware. Named uniqueness constraints arbitrate both key and Legal Organization Identity races. The [Organization & Access domain document](Domain/organization-access.md) records the observable behavior. The first membership-ending or role-removal use case must separately choose concurrency control for the last-Owner invariant.
+
+Production migrations are a separate deployment step; development/test tooling may apply them automatically. A future system-wide logging/observability design must address structured logs, correlation and telemetry; module-specific audit entries do not settle that design.

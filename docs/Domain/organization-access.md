@@ -26,6 +26,24 @@ This area is responsible for decisions such as:
 - create, change, or end an Organization Membership
 - assign or remove Organization-scoped roles/permissions
 
+### Initial application use cases
+
+GetOrganization and ListMyOrganizations are implemented. CreateOrganization remains planned: the current API has no Organization-creation endpoint. Its agreed behavior is retained here independently of the implementation plans.
+
+CreateOrganization creates an Active Organization and the initiating Person's first active Owner membership atomically. The actor comes from trusted `ICurrentPerson`, never a client-supplied Owner ID. Input contains display name, registration country and organization number. Display name is trimmed, preserves internal characters/casing, and is limited to 1–200 characters.
+
+An existing normalized Legal Organization Identity produces Conflict with `organization_legal_identity_conflict`; this neither reveals the existing Organization nor grants membership. Access recovery requires a separate use case.
+
+The planned operation requires a case-sensitive `Idempotency-Key` of 1–200 characters, scoped to Person and operation. Matching normalized requests replay the original successful HTTP status and representation; a different request under the same key returns Conflict. Different keys still obey Legal Organization Identity uniqueness. Successful replay records are retained permanently in the initial model.
+
+Creation returns `201 Created`, a Location and a representation with Organization identity, display name, canonical Legal Organization Identity, Active status and the explicitly assigned Owner role. OrganizationMembershipId remains internal. Missing/invalid keys, invalid fields and unsupported countries are Bad Request; expected failures use stable Problem Details codes.
+
+GetOrganization requires active membership and returns Not Found for both inaccessible and nonexistent Organizations. ListMyOrganizations contains only Organizations where the caller has active membership, includes Archived Organizations, is initially unpaginated and orders Active first, then display name. Responses expose explicitly assigned roles, without adding roles implied by Owner authority.
+
+### Capabilities for Trading Relationships
+
+OrganizationAccess authorizes `ReadTradingRelationships` for active members of an Active Organization and `ManageTradingRelationships` for its active Owners. Archived Organizations are denied both capabilities. The exception allowing an active member to read an Archived Organization's basic details does not extend to Trading Relationships operations.
+
 ## Business facts
 
 This area produces facts about Organization identity/state and membership/authorization changes. Authentication-provider tokens and sessions are not domain facts here.
