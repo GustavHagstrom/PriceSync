@@ -22,4 +22,9 @@
     <ProjectReference Include="..\..\src\PriceSync.Modules.OrganizationAccess\PriceSync.Modules.OrganizationAccess.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="../../src/PriceSync.Modules.TradingRelationships/PriceSync.Modules.TradingRelationships.csproj" />
+    <ProjectReference Include="../../src/PriceSync.Modules.TradingRelationships.Contracts/PriceSync.Modules.TradingRelationships.Contracts.csproj" />
+  </ItemGroup>
+
 </Project>
