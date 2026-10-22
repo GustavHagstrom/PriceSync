@@ -21,11 +21,15 @@ internal sealed class OrganizationAccessApiApplication(
 {
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
+        builder.UseSetting("ConnectionStrings:OrganizationAccess", connectionString);
+        builder.UseSetting("ConnectionStrings:TradingRelationships", "Host=unused");
+
         builder.ConfigureAppConfiguration((_, configuration) =>
         {
             configuration.AddInMemoryCollection(new Dictionary<string, string?>
             {
                 ["ConnectionStrings:OrganizationAccess"] = connectionString,
+                ["ConnectionStrings:TradingRelationships"] = "Host=unused",
             });
         });
 

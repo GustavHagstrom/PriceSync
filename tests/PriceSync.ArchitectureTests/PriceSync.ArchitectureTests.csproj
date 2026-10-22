@@ -8,8 +8,8 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="FluentAssertions" Version="8.10.0" />
-    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.9.0" />
+    <PackageReference Include="FluentAssertions" Version="8.11.0" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.10.1" />
     <PackageReference Include="xunit" Version="2.9.3" />
     <PackageReference Include="xunit.runner.visualstudio" Version="4.0.0">
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
@@ -20,6 +20,11 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\PriceSync.Modules.OrganizationAccess.Contracts\PriceSync.Modules.OrganizationAccess.Contracts.csproj" />
     <ProjectReference Include="..\..\src\PriceSync.Modules.OrganizationAccess\PriceSync.Modules.OrganizationAccess.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../../src/PriceSync.Modules.TradingRelationships/PriceSync.Modules.TradingRelationships.csproj" />
+    <ProjectReference Include="../../src/PriceSync.Modules.TradingRelationships.Contracts/PriceSync.Modules.TradingRelationships.Contracts.csproj" />
   </ItemGroup>
 
 </Project>

@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
 using PriceSync.Modules.OrganizationAccess.Features.GetOrganization;
 using PriceSync.Modules.OrganizationAccess.Features.ListMyOrganizations;
@@ -11,13 +12,16 @@ public static class OrganizationAccessEndpointRouteBuilderExtensions
     {
         var api = endpoints
             .MapGroup("/api/v1/organizations")
+            .WithTags("OrganizationAccess")
             .RequireAuthorization();
 
         api.MapGet("", ListMyOrganizationsEndpoint.HandleAsync)
-            .WithName("ListMyOrganizations");
+            .WithName("ListMyOrganizations")
+            .WithSummary("Lists all organizations the current user has access to.");
 
         api.MapGet("/{organizationId:guid}", GetOrganizationEndpoint.HandleAsync)
-            .WithName("GetOrganization");
+            .WithName("GetOrganization")
+            .WithSummary("Gets the details of a specific organization.");
 
         return endpoints;
     }
