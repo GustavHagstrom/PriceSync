@@ -2,9 +2,7 @@
 using Microsoft.Extensions.Logging;
 using PriceSync.Modules.OrganizationAccess.Contracts;
 using PriceSync.Modules.TradingRelationships.Contracts;
-using PriceSync.Modules.TradingRelationships.Features.End;
 using PriceSync.Modules.TradingRelationships.Infrastructure;
-using static System.Runtime.InteropServices.JavaScript.JSType;
 
 namespace PriceSync.Modules.TradingRelationships.Features.Get;
 

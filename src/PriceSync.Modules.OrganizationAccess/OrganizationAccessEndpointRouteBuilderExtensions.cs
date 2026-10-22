@@ -12,7 +12,7 @@ public static class OrganizationAccessEndpointRouteBuilderExtensions
     {
         var api = endpoints
             .MapGroup("/api/v1/organizations")
-            .WithTags("OraganizationAccess")
+            .WithTags("OrganizationAccess")
             .RequireAuthorization();
 
         api.MapGet("", ListMyOrganizationsEndpoint.HandleAsync)

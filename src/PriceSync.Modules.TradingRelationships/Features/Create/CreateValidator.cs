@@ -1,10 +1,12 @@
+using PriceSync.BuildingBlocks.Validation;
+
 namespace PriceSync.Modules.TradingRelationships.Features.Create;
 
 internal class CreateValidator
 {
-    public ValidationErrors Validate(CreateCommand command)
+    public ValidationErrorCollection Validate(CreateCommand command)
     {
-        var errors = new ValidationErrors();
+        var errors = new ValidationErrorCollection();
 
         if (command.SupplierOrganizationId == command.CustomerOrganizationId)
         {
