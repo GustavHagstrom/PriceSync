@@ -232,7 +232,7 @@ public sealed partial class EndApiTests(PostgreSqlFixture fixture) : IAsyncLifet
 
         first.StatusCode.Should().Be(HttpStatusCode.OK);
         repeated.StatusCode.Should().Be(HttpStatusCode.OK);
-        var entries = logs.Entries.ToArray();
+        var entries = logs.Entries.Where(entry => Equals(entry["Operation"], "EndTradingRelationship")).ToArray();
         entries.Should().HaveCount(2);
         entries.Select(entry => entry["Reason"]).Should().Equal("Ended", "AlreadyEnded");
         foreach (var entry in entries)

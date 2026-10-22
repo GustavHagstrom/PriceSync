@@ -1,4 +1,4 @@
-﻿namespace PriceSync.Modules.TradingRelationships;
+﻿namespace PriceSync.Modules.TradingRelationships.Infrastructure;
 
 internal static class Routes
 {

@@ -54,6 +54,15 @@ public sealed class TradingRelationshipsBoundaryTests
     }
 
     [Fact]
+    public void Trading_relationships_root_namespace_contains_only_composition_surfaces()
+    {
+        typeof(PriceSync.Modules.TradingRelationships.DependencyInjection).Assembly.GetTypes()
+            .Where(type => !type.IsNested && type.Namespace == "PriceSync.Modules.TradingRelationships")
+            .Select(type => type.Name)
+            .Should().BeEquivalentTo(["DependencyInjection", "Endpoints"]);
+    }
+
+    [Fact]
     public void Trading_relationships_contracts_exports_only_the_existing_identifier()
     {
         typeof(PriceSync.Modules.TradingRelationships.Contracts.TradingRelationshipId).Assembly.ExportedTypes

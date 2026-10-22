@@ -1,8 +1,10 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
+using Microsoft.AspNetCore.Hosting;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using PriceSync.Modules.OrganizationAccess.Contracts;
 using PriceSync.Modules.TradingRelationships.Domain;
@@ -325,6 +327,100 @@ public sealed class CreateApiTests(PostgreSqlFixture fixture) : IAsyncLifetime
             .ToListAsync();
         activeRelationships.Should().ContainSingle()
             .Which.Id.Value.Should().Be(relationshipId);
+    }
+
+    [Fact]
+    public async Task Concurrent_create_returns_ok_when_winner_ends_before_conflict_readback()
+    {
+        var supplierId = NewOrganizationId();
+        var customerId = NewOrganizationId();
+        var barrier = new ConcurrentCreateSaveBarrierInterceptor();
+        var endWinner = new EndWinnerOnSaveFailureInterceptor();
+        await using var application = CreateApplication(interceptors: [barrier, endWinner]);
+        using var client = application.CreateClient();
+        client.DefaultRequestHeaders.Add("organization_id", supplierId.Value.ToString());
+        endWinner.EndWinner = async () =>
+        {
+            await using var context = new TradingRelationshipsDbContext(fixture.CreateOptions());
+            var winner = await context.TradingRelationships.SingleAsync();
+            var response = await client.PostAsync($"/api/v1/trading-relationships/{winner.Id.Value}/end", null);
+            response.StatusCode.Should().Be(HttpStatusCode.OK);
+        };
+
+        var responses = await Task.WhenAll(
+            client.PostAsJsonAsync("/api/v1/trading-relationships", CreateRequest(supplierId, customerId)),
+            client.PostAsJsonAsync("/api/v1/trading-relationships", CreateRequest(supplierId, customerId)));
+
+        responses.Select(x => x.StatusCode).Should().BeEquivalentTo([HttpStatusCode.Created, HttpStatusCode.OK]);
+        endWinner.Calls.Should().Be(1);
+        var created = await responses.Single(x => x.StatusCode == HttpStatusCode.Created).Content.ReadFromJsonAsync<JsonElement>();
+        var replay = await responses.Single(x => x.StatusCode == HttpStatusCode.OK).Content.ReadFromJsonAsync<JsonElement>();
+        replay.GetProperty("id").GetGuid().Should().Be(created.GetProperty("id").GetGuid());
+        replay.GetProperty("status").GetString().Should().Be("ended");
+        await using var verification = new TradingRelationshipsDbContext(fixture.CreateOptions());
+        (await verification.TradingRelationships.CountAsync()).Should().Be(1);
+    }
+
+    [Theory]
+    [InlineData("created", "Succeeded", "Created", HttpStatusCode.Created)]
+    [InlineData("existing", "Succeeded", "Existed", HttpStatusCode.OK)]
+    [InlineData("missing-actor", "Denied", "ActingOrganizationRequired", HttpStatusCode.BadRequest)]
+    [InlineData("unrelated", "Denied", "Forbidden", HttpStatusCode.Forbidden)]
+    [InlineData("forbidden", "Denied", "Forbidden", HttpStatusCode.Forbidden)]
+    [InlineData("archived", "Denied", "CustomerOrganizationEnded", HttpStatusCode.BadRequest)]
+    [InlineData("missing", "Denied", "CustomerNotFound", HttpStatusCode.NotFound)]
+    [InlineData("invalid", "Denied", "ValidationFailed", HttpStatusCode.BadRequest)]
+    [InlineData("failure", "Failed", "TechnicalFailure", HttpStatusCode.InternalServerError)]
+    public async Task Create_audits_actor_pair_and_outcome(
+        string scenario, string outcome, string reason, HttpStatusCode expectedStatus)
+    {
+        var supplierId = NewOrganizationId();
+        var customerId = scenario == "invalid" ? supplierId : NewOrganizationId();
+        var personId = new PersonId(Guid.CreateVersion7());
+        var actorId = scenario == "unrelated" ? NewOrganizationId() : supplierId;
+        var logs = new RecordingLogProvider();
+        if (scenario == "existing")
+            await fixture.CreateTradingRelationshipAsync(CreatedAt, supplierId, customerId);
+        await using var application = CreateApplication(
+            authorizer: new StubOrganizationAuthorizer(allowed: scenario != "forbidden"),
+            statusReader: new StubOrganizationStatusReader(id =>
+                scenario == "failure" ? throw new InvalidOperationException("Unavailable") :
+                id == customerId && scenario == "archived" ? OrganizationStatusResult.Archived :
+                id == customerId && scenario == "missing" ? OrganizationStatusResult.NotFound :
+                OrganizationStatusResult.Active),
+            personId: personId);
+        using var loggedApplication = application.WithWebHostBuilder(builder =>
+            builder.ConfigureLogging(logging => logging.AddProvider(logs)));
+        using var client = loggedApplication.CreateClient();
+        if (scenario != "missing-actor")
+            client.DefaultRequestHeaders.Add("organization_id", actorId.Value.ToString());
+
+        var response = await client.PostAsJsonAsync(
+            "/api/v1/trading-relationships", CreateRequest(supplierId, customerId));
+
+        response.StatusCode.Should().Be(expectedStatus);
+        var entry = logs.Entries.Should().ContainSingle().Subject;
+        entry["Operation"].Should().Be("CreateTradingRelationship");
+        entry["PersonId"].Should().Be(personId.Value);
+        entry["OrganizationId"].Should().Be(scenario == "missing-actor" ? null : actorId.Value);
+        entry["SupplierOrganizationId"].Should().Be(supplierId.Value);
+        entry["CustomerOrganizationId"].Should().Be(customerId.Value);
+        entry["Outcome"].Should().Be(outcome);
+        entry["Reason"].Should().Be(reason);
+        entry["TraceId"].Should().BeOfType<string>().Which.Should().NotBeNullOrEmpty();
+    }
+
+    private sealed class EndWinnerOnSaveFailureInterceptor : SaveChangesInterceptor
+    {
+        public Func<Task> EndWinner { get; set; } = null!;
+        public int Calls { get; private set; }
+
+        public override async Task SaveChangesFailedAsync(
+            DbContextErrorEventData eventData, CancellationToken cancellationToken = default)
+        {
+            Calls++;
+            await EndWinner();
+        }
     }
 
     private ApiApplication CreateApplication(

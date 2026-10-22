@@ -1,4 +1,6 @@
-﻿using Microsoft.AspNetCore.Http;
+﻿using Microsoft.Extensions.Logging;
+using PriceSync.Modules.TradingRelationships.Infrastructure;
+using Microsoft.AspNetCore.Http;
 using PriceSync.Modules.OrganizationAccess.Contracts;
 
 namespace PriceSync.Modules.TradingRelationships.Features.Create;
@@ -9,13 +11,26 @@ internal class CreateEndpoint
         CreateRequest request,
         CreateHandler handler,
         CreateValidator validator,
+        ILogger<CreateEndpoint> logger,
+        ICurrentPerson currentPerson,
+        ICurrentOrganization currentOrganization,
         CancellationToken cancellationToken)
     {
+        using var scope = LogScope.BeginScope(logger, "CreateTradingRelationship",
+            personId: currentPerson.PersonId.Value, organizationId: currentOrganization.OrganizationId?.Value);
+        using var pairScope = logger.BeginScope(new Dictionary<string, object?>
+        {
+            ["SupplierOrganizationId"] = request.SupplierOrganizationId,
+            ["CustomerOrganizationId"] = request.CustomerOrganizationId,
+        });
         var command = new CreateCommand(new(request.SupplierOrganizationId), new(request.CustomerOrganizationId));
 
         var errors = validator.Validate(command);
         if (errors.HasErrors)
         {
+            logger.LogInformation(
+                "CreateTradingRelationship completed with {Outcome}, reason {Reason}",
+                "Denied", "ValidationFailed");
             return Results.ValidationProblem(
                 errors.GetErrors(),
                 title: "Validation errors occurred",

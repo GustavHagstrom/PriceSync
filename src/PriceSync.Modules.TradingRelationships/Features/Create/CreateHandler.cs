@@ -1,4 +1,6 @@
 ﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
+using PriceSync.Modules.TradingRelationships.Infrastructure;
 using Npgsql;
 using PriceSync.Modules.OrganizationAccess.Contracts;
 using PriceSync.Modules.TradingRelationships.Domain;
@@ -10,6 +12,7 @@ namespace PriceSync.Modules.TradingRelationships.Features.Create;
 
 internal class CreateHandler
 {
+    private readonly ILogger<CreateHandler> _logger;
     private readonly ICurrentPerson _currentPerson;
     private readonly IOrganizationAuthorizer _organizationAuthorizer;
     private readonly IOrganizationStatusReader _organizationStatusReader;
@@ -23,8 +26,10 @@ internal class CreateHandler
         IOrganizationAuthorizer organizationAuthorizer, 
         IOrganizationStatusReader organizationStatusReader,
         TimeProvider timeProvider,
-        TradingRelationshipsDbContext dbContext)
+        TradingRelationshipsDbContext dbContext,
+        ILogger<CreateHandler> logger)
     {
+        _logger = logger;
         _currentPerson = currentPerson;
         _currentOrganization = currentOrganization;
         _organizationAuthorizer = organizationAuthorizer;
@@ -34,6 +39,40 @@ internal class CreateHandler
     }
 
     internal async Task<CreateResult> HandleAsync(CreateCommand command, CancellationToken cancellationToken)
+    {
+        using var scope = LogScope.BeginScope(_logger, "CreateTradingRelationship",
+            personId: _currentPerson.PersonId.Value, organizationId: _currentOrganization.OrganizationId?.Value);
+        using var pairScope = _logger.BeginScope(new Dictionary<string, object?>
+        {
+            ["SupplierOrganizationId"] = command.SupplierOrganizationId.Value,
+            ["CustomerOrganizationId"] = command.CustomerOrganizationId.Value,
+        });
+        try
+        {
+            var result = await CreateAsync(command, cancellationToken);
+            var outcome = result is CreateResult.Created or CreateResult.Existed ? "Succeeded" : "Denied";
+            _logger.LogInformation(
+                "CreateTradingRelationship completed with {Outcome}, reason {Reason}",
+                outcome, result.GetType().Name);
+            return result;
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            _logger.LogInformation(
+                "CreateTradingRelationship completed with {Outcome}, reason {Reason}",
+                "Cancelled", "RequestCancelled");
+            throw;
+        }
+        catch (Exception exception)
+        {
+            _logger.LogError(
+                "CreateTradingRelationship completed with {Outcome}, reason {Reason}, error type {ErrorType}",
+                "Failed", "TechnicalFailure", exception.GetType().FullName);
+            throw;
+        }
+    }
+
+    private async Task<CreateResult> CreateAsync(CreateCommand command, CancellationToken cancellationToken)
     {
         if(_currentOrganization.OrganizationId is null)
         {
@@ -96,12 +135,17 @@ internal class CreateHandler
         {
             _dbContext.ChangeTracker.Clear();
 
-            var winner = await _dbContext.TradingRelationships
-                .SingleAsync(x =>
+            // End may have completed since the unique-index conflict. Prefer the current
+            // active relationship, otherwise return the latest history for this pair.
+            var winner = await _dbContext.TradingRelationships.AsNoTracking()
+                .Where(x =>
                     x.SupplierOrganizationId == command.SupplierOrganizationId &&
-                    x.CustomerOrganizationId == command.CustomerOrganizationId &&
-                    x.Status == TradingRelationshipStatus.Active,
-                    cancellationToken);
+                    x.CustomerOrganizationId == command.CustomerOrganizationId)
+                .OrderByDescending(x => x.Status == TradingRelationshipStatus.Active)
+                .ThenByDescending(x => x.EndedAt)
+                .ThenByDescending(x => x.CreatedAt)
+                .ThenByDescending(x => x.Id)
+                .FirstAsync(cancellationToken);
 
             return new CreateResult.Existed(new TradingRelationshipResponse(winner));
         }
