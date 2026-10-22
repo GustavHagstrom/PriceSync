@@ -375,7 +375,7 @@ public sealed class CreateApiTests(PostgreSqlFixture fixture) : IAsyncLifetime
                         _bothCreatesReady.TrySetResult();
                     }
 
-                    // Both lookups must finish before either INSERT can reach PostgreSQL.
+                    // Hold both concurrent creates at the save boundary so their INSERTs race.
                     await _bothCreatesReady.Task.WaitAsync(TimeSpan.FromSeconds(15), cancellationToken);
                 }
             }
