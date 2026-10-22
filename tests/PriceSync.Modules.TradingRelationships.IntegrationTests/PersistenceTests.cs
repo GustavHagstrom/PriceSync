@@ -4,6 +4,7 @@ using Npgsql;
 using PriceSync.Modules.OrganizationAccess.Contracts;
 using PriceSync.Modules.TradingRelationships.Domain;
 using PriceSync.Modules.TradingRelationships.Persistence;
+using PriceSync.Modules.TradingRelationships.Persistence.Configurations;
 
 namespace PriceSync.Modules.TradingRelationships.IntegrationTests;
 
@@ -106,10 +107,58 @@ public sealed class PersistenceTests(PostgreSqlFixture fixture) : IAsyncLifetime
 
             var save = () => context.SaveChangesAsync();
 
-            await save.Should().ThrowAsync<DbUpdateException>();
+            var exception = await save.Should().ThrowAsync<DbUpdateException>();
+            var postgres = exception.Which.InnerException.Should().BeOfType<PostgresException>().Which;
+            postgres.SqlState.Should().Be(PostgresErrorCodes.UniqueViolation);
+            postgres.ConstraintName.Should().Be(TradingRelationshipConfiguration.ActiveSupplierCustomerUniqueIndex);
         }
     }
 
+    [Fact]
+    public async Task Ending_an_active_relationship_allows_a_new_active_relationship_for_the_same_direction()
+    {
+        var supplierId = NewOrganizationId();
+        var customerId = NewOrganizationId();
+        var createdAt = new DateTimeOffset(2026, 10, 22, 8, 0, 0, TimeSpan.Zero);
+        var endedAt = createdAt.AddHours(1);
+        var original = TradingRelationship.Create(supplierId, customerId, createdAt);
+
+        await using (var context = NewContext())
+        {
+            context.TradingRelationships.Add(original);
+            await context.SaveChangesAsync();
+        }
+
+        await using (var context = NewContext())
+        {
+            var persisted = await context.TradingRelationships.SingleAsync(x => x.Id == original.Id);
+            persisted.End(endedAt);
+            await context.SaveChangesAsync();
+        }
+
+        var replacement = TradingRelationship.Create(supplierId, customerId, endedAt.AddHours(1));
+        await using (var context = NewContext())
+        {
+            context.TradingRelationships.Add(replacement);
+            await context.SaveChangesAsync();
+        }
+
+        await using var verificationContext = NewContext();
+        var relationships = await verificationContext.TradingRelationships
+            .Where(x => x.SupplierOrganizationId == supplierId &&
+                x.CustomerOrganizationId == customerId)
+            .ToListAsync();
+
+        relationships.Should().HaveCount(2);
+        var historical = relationships.Should().ContainSingle(x => x.Status == TradingRelationshipStatus.Ended).Which;
+        historical.Id.Should().Be(original.Id);
+        historical.EndedAt.Should().Be(endedAt);
+
+        var active = relationships.Should().ContainSingle(x => x.Status == TradingRelationshipStatus.Active).Which;
+        active.Id.Should().Be(replacement.Id);
+        active.Id.Should().NotBe(original.Id);
+        active.EndedAt.Should().BeNull();
+    }
     [Fact]
     public async Task Reverse_directions_can_be_active_at_the_same_time()
     {
@@ -162,14 +211,15 @@ public sealed class PersistenceTests(PostgreSqlFixture fixture) : IAsyncLifetime
     }
 
     [Theory]
-    [InlineData("suspended", "null", false)]
-    [InlineData("active", "now()", false)]
-    [InlineData("ended", "null", false)]
-    [InlineData("active", "null", true)]
+    [InlineData("suspended", "null", false, "ck_trading_relationships_status")]
+    [InlineData("active", "now()", false, "ck_trading_relationships_status_ended_at")]
+    [InlineData("ended", "null", false, "ck_trading_relationships_status_ended_at")]
+    [InlineData("active", "null", true, "ck_trading_relationships_distinct_organizations")]
     public async Task Database_constraints_reject_invalid_status_lifecycle_and_party_state(
         string status,
         string endedAt,
-        bool sameParty)
+        bool sameParty,
+        string expectedConstraint)
     {
         var supplierId = Guid.CreateVersion7();
         var customerId = sameParty ? supplierId : Guid.CreateVersion7();
@@ -182,7 +232,9 @@ public sealed class PersistenceTests(PostgreSqlFixture fixture) : IAsyncLifetime
                 ('{Guid.CreateVersion7()}', '{supplierId}', '{customerId}', now(), {endedAt}, '{status}');
             """);
 
-        await insert.Should().ThrowAsync<PostgresException>();
+        var exception = await insert.Should().ThrowAsync<PostgresException>();
+        exception.Which.SqlState.Should().Be(PostgresErrorCodes.CheckViolation);
+        exception.Which.ConstraintName.Should().Be(expectedConstraint);
     }
 
     [Fact]
