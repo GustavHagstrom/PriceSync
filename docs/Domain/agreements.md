@@ -49,6 +49,38 @@ Agreement activation is scoped per `PriceAgreement`, not per Price List. One Act
 
 Supplier publication/withdrawal and Customer selection do not share one aggregate or transaction boundary.
 
+## Commercial scope
+
+### Customer agreement selection per list
+
+Agreements owns the Customer's selected Price Agreement for each logical General Price List. This is a separate Customer-owned aggregate boundary scoped by Customer and logical Price List, with at most one selected Price Agreement. It is independent of `CustomerAgreementState`, which owns acceptance and Active Version selection per agreement. Changing the selected agreement for one list does not change selections for other lists or activate/deactivate any Agreement Version. Customer Pricing consumes these selections through module contracts rather than owning or mutating them.
+
+The Customer may explicitly clear the selected agreement. Each actual selection change, including clearing selection and later returning to a previously selected agreement, is preserved as an immutable Customer business fact recording the selected agreement (or none), decision time and acting Person. Current selection and its durable history are committed atomically within this boundary. Together with Price List and Agreement Version activation history, these facts support reconstruction of previously selected combinations; they do not prove that a projection was retrieved. Clearing selection does not deactivate the agreement or the Price List Version. A General Price List with no selected agreement has no current projection basis; no fallback agreement is chosen automatically.
+
+Selecting an agreement does not require an Active Agreement Version and does not implicitly accept or activate any version. The Customer may prepare the selection before activating a version. Until the selected agreement has an Active Version, the list has no current projection basis; the missing input is reported explicitly without automatic selection.
+
+The Customer may select an agreement even when its Active Version does not cover the list. Lack of coverage produces a warning rather than blocking the selection. The agreement must belong to the applicable Supplier–Customer Trading Relationship and the logical General Price List must belong to that Supplier; Customer choice does not bypass these scope boundaries. Customer Pricing evaluates the exact immutable inputs and returns an invalid projection when the selected Agreement Version has no applicable list terms. It does not invent discount terms, and invalid projections cannot be retrieved as Customer Prices.
+
+Selection changes must be based on the current selection revision. If another Customer decision has changed that selection since it was read, the stale change is rejected as a conflict rather than silently overwriting the other decision. The caller must read the current selection before issuing a new decision. A rejected conflict changes neither current state nor successful selection history.
+
+With a current revision, selecting the already-selected agreement or clearing an already-empty selection returns the existing state without creating a new business-history fact. A stale revision remains a conflict even when its requested agreement matches the current selection. Operational request logging is separate from business selection history.
+
+### Published terms and list coverage
+
+A Price Agreement may cover multiple General Price Lists within its Trading Relationship. Each complete immutable Price Agreement Version records the covered lists and their commercial terms, including Customer Discounts and Rounding Policy. Customer Pricing owns calculation from those terms.
+
+List coverage references logical Price Lists by identity, not fixed Price List Versions. Publishing a new Price List Version does not require republishing the Price Agreement. The Customer selects Price List Versions and Price Agreement Versions independently; Customer Pricing evaluates compatibility of the exact selected immutable versions.
+
+Customer Discounts are specified separately for each covered General Price List. Each list has an explicit general discount, which may be zero, and optional Supplier Price Group discounts. A matching group discount replaces the list's general discount; discounts are never stacked.
+
+The initial model uses a common system rounding rule rather than Supplier-configurable Rounding Policies. The exact decimal precision and rounding method remain to be decided before implementation. Configuration requires a concrete commercial need; if introduced, it is scoped per covered Price List within an immutable Agreement Version.
+
+Different Price Agreements within the same Trading Relationship may reference the same General Price List. List references do not represent exclusive ownership or a transfer between agreements. The Supplier is responsible for publishing the intended terms; the Customer chooses the agreement/list combination to use. Older versions remain usable, with warnings for withdrawal or use outside their validity period rather than a hard block. A newer publication alone does not make an older version expired.
+
+A new Agreement Version may add or remove covered lists and always records the complete coverage. Older versions retain their original coverage and remain usable. Publishing a coverage change does not change Customer Active state; it takes effect for current use only when the Customer activates the new Agreement Version.
+
+For current pricing, the Customer explicitly selects the applicable Price Agreement for each logical General Price List. That selection identifies the agreement, while Agreement Version activation remains scoped per Price Agreement. Changing an agreement's Active version therefore changes the current agreement input for every list where the Customer selected that agreement. The Customer independently selects the Active Price List Version. Recommendations and warnings support these choices but never replace or change them automatically. Customer Pricing still evaluates whether the exact selected combination can produce a valid projection.
+
 ## Commands / decisions
 
 This area owns decisions such as:
@@ -58,6 +90,7 @@ This area owns decisions such as:
 - accept an Agreement Version
 - activate/reactivate an Agreement Version, implicitly accepting if necessary
 - deactivate the currently Active Agreement Version
+- select or clear the Customer's applicable Price Agreement for a logical General Price List, independently of version activation
 
 ## Core invariants
 
