@@ -9,7 +9,7 @@ Customer Pricing:
 - deterministically produces one Customer Price Projection for an exact Customer + Price List Version + optional Price Agreement Version tuple
 - defines the Customer's current projection from the Customer's currently Active source selections
 - allows explicitly requested projections from other compatible immutable source-version combinations, including combinations that were never Active together
-- applies a Price Agreement Version only when the source is a General Price List
+- requires Agreement Version coverage for General and Supplier-published Customer-Specific Net Price Lists; only General Price Lists receive calculated discounts
 - directly projects already-resolved Net Prices for Customer-Specific Net and Customer-Managed External Net Price Lists
 - validates whether the exact source combination can produce a complete Customer-facing projection
 - returns invalid projection results explicitly rather than treating expected incompatibility as an exception
@@ -18,6 +18,7 @@ Customer Pricing:
 - materializes and caches projections lazily when they are requested or needed
 
 ## Projection semantics
+
 
 `CustomerPriceProjection` is not a classic aggregate with a command-driven mutable lifecycle. It is a derived, immutable Customer-specific view for an exact set of immutable inputs.
 
@@ -29,21 +30,23 @@ Its natural identity is:
 - `PriceListVersionId`
 - optional `PriceAgreementVersionId`
 
-`PriceAgreementVersionId` is present for projections derived from a General Price List and absent for already-resolved net price lists. No separate `CalculationRuleVersion`, projection fingerprint, or projection approval identity is part of the domain model.
+`PriceAgreementVersionId` is required for General and Supplier-published Customer-Specific Net Price List projections, including explicit historical/exploratory combinations; the Agreement Version must cover the list and match the Supplier and Customer. The combination need not have been Active together. It is absent for Customer-Managed External Net Price Lists. Supplier-published net-list retrieval facts preserve both exact source-version references even though Agreement coverage does not alter the amount. No separate `CalculationRuleVersion`, projection fingerprint, or projection approval identity is part of the domain model.
 
 For a General Price List, Customer Pricing calculates resolved Customer Prices from the exact Price List Version and Price Agreement Version supplied to it. For Customer-Specific Net Price Lists and Customer-Managed External Net Price Lists, the projection is effectively an identity projection of the already-resolved source prices.
 
 The same exact input tuple always represents the same semantic projection regardless of when or how many times it is materialized. Time affects recommendations and Customer selection, not evaluation of an already selected immutable input tuple.
 
+For calculated Customer Prices, use the rounding semantics locked into the supplied Agreement Version at publication. The initial system rule applies the applicable Customer Discount without intermediate rounding, then rounds the result once to four decimal places with midpoints away from zero, preserving the source Price Quantity and Unit of Measure. Later system-rule changes never reinterpret older Agreement Versions. Already-resolved Net Prices remain identity projections and do not receive this calculation rounding. Users may round more coarsely downstream, outside PriceSync.
+
 ## Current projection
 
 The current projection is defined strictly from Customer-selected Active source state.
 
-For a General Price List:
+For a General Price List or Supplier-published Customer-Specific Net Price List:
 
-`Active PriceListVersion + Active PriceAgreementVersion -> current projection basis`
+`Active PriceListVersion + relationship-wide Active PriceAgreementVersion -> current projection basis`
 
-For a Customer-Specific Net or Customer-Managed External Net Price List:
+For a Customer-Managed External Net Price List:
 
 `Active PriceListVersion -> current projection basis`
 
@@ -73,6 +76,8 @@ This distinction allows PriceSync both to reproduce what the Customer actually u
 
 ## Projection validation
 
+For General Price Lists, each article entry has at most one Supplier Price Group code in its immutable Price List Version. An exact matching Agreement group discount replaces the list's general discount. If the group code is absent or has no matching discount, use the list's explicit general discount; never combine discounts or choose among multiple groups. Net Prices remain unaffected by discounts.
+
 Projection compatibility belongs to Customer Pricing, not Price Publication or Agreements. A valid Price List Version and a valid Price Agreement Version may still form an invalid combination for a particular Customer projection.
 
 Building/evaluating a projection therefore produces an explicit domain result:
@@ -100,11 +105,11 @@ If there is no valid current projection, a comparison may instead be unavailable
 
 Price Publication owns Customer Price List activation state and Agreements owns Customer Agreement acceptance/activation state.
 
-Price List activation is scoped per logical Price List. Agreement activation is scoped per Price Agreement, not per Price List. If one Price Agreement applies to multiple General Price Lists, the same Active Price Agreement Version is used for those lists unless the commercial model defines separate Price Agreements.
+Price List activation is scoped per logical Price List. Agreement activation is scoped to the Supplier–Customer Trading Relationship: at most one version across all Price Agreements is Active. All covered General and Supplier-published Customer-Specific Net Price Lists use that same version. Switching agreements replaces the relationship-wide Active version without changing Active Price List Versions.
 
 A thin application/use-case orchestrator obtains the relevant Active selections and asks Customer Pricing to evaluate the resulting exact immutable tuple. The same projection capability may also be invoked with explicitly selected immutable versions for historical or exploratory reconstruction.
 
-Different Price Agreements may cover the same logical General Price List. For current pricing, the Customer explicitly selects which Price Agreement to use for each logical list; that agreement's Active Version supplies the agreement input. Agreement Version activation remains per agreement and applies across all lists where the Customer has selected it. The list's Active Version is selected independently. System recommendations and warnings are advisory; the Customer is responsible for its selections, and the system never silently substitutes another combination. This freedom does not bypass projection compatibility validation or permit invalid projections to be retrieved.
+There is no Customer agreement selection per list. Current pricing uses the relationship's Active Agreement Version and the independently Active Price List Version. Missing agreement activation means no current projection basis; missing list coverage produces an invalid projection on evaluation. The system never substitutes another agreement for an uncovered list. Explicit historical or exploratory projections may use other compatible immutable versions without changing current state.
 
 That orchestration does not require a distributed transaction or globally atomic snapshot across contexts. Exact immutable version references remain reproducible even if Customer Active state changes concurrently.
 
@@ -114,4 +119,4 @@ New source versions do not require eager recalculation across all affected Custo
 
 ## Context relationships
 
-Customer Pricing consumes exact immutable Price List Versions from Price Publication and, for General Price Lists, exact immutable Price Agreement Versions from Agreements. Current-projection requests additionally use the Customer-owned Active selections from those contexts. Customer Pricing exposes valid projections, invalid Projection Issues, Projection Warnings, and Price Change Sets as derived results.
+Customer Pricing consumes exact immutable Price List Versions from Price Publication and, for General and Supplier-published Customer-Specific Net Price Lists, exact immutable Price Agreement Versions from Agreements. Current-projection requests additionally use the Customer-owned Active selections from those contexts. Customer Pricing exposes valid projections, invalid Projection Issues, Projection Warnings, and Price Change Sets as derived results.

@@ -40,7 +40,7 @@ A directed Supplier–Customer business relationship established outside PriceSy
 _Avoid_: Price acceptance, contract
 
 **Price Agreement**:
-The Supplier-published commercial price terms that apply between a Supplier and Customer within a Trading Relationship and may cover multiple General Price Lists. Different Price Agreements may reference the same General Price List. The Supplier controls and publishes the terms; the Customer may accept and activate published versions independently.
+The Supplier-published commercial price terms that apply between a Supplier and Customer within a Trading Relationship and may cover General Price Lists and Supplier-published Customer-Specific Net Price Lists. Different Price Agreements may reference the same General Price List. The Supplier controls and publishes the terms; the Customer may accept published versions and activate one complete version at a time for the Trading Relationship.
 _Avoid_: Trading Relationship, connection
 
 **Price Agreement Version**:
@@ -51,7 +51,7 @@ The Customer's acknowledgement that it has seen a specific Price Agreement Versi
 _Avoid_: Supplier approval, contract signing
 
 **Active Price Agreement Version**:
-The accepted Price Agreement Version explicitly selected by the Customer for current Customer Price Projections within its Price Agreement scope. Customer activation is authoritative for current use; validity, recommendation, publication, and withdrawal never change Active state automatically.
+The accepted Price Agreement Version explicitly selected by the Customer for current Customer Price Projections within its Supplier–Customer Trading Relationship. At most one version across all Price Agreements in that relationship is Active at a time, supplying terms together for its covered Supplier-published Price Lists. Customer activation is authoritative for current use; validity, recommendation, publication, and withdrawal never change Active state automatically.
 
 **Recommended Price Agreement Version**:
 The non-withdrawn published Price Agreement Version whose validity covers the evaluated UTC calendar date and whose `ValidFrom` is latest; ties are resolved by latest `PublishedAt`. Recommendation expresses Supplier intent and is independent of Customer acceptance or activation.
@@ -89,11 +89,11 @@ A Supplier-owned, reusable collection of List Prices that exists independently o
 _Avoid_: Customer Price List, net price list
 
 **Customer-Specific Net Price List**:
-A Supplier-published list of Net Prices prepared for one Customer. Its prices are already resolved and receive no additional Customer Discount. The Customer is part of the list's scope from creation.
+A Supplier-published list of Net Prices prepared for one Customer. Its prices are already resolved and receive no additional Customer Discount. The Customer is part of the list's scope from creation. Current use requires coverage by the Trading Relationship's Active Price Agreement Version.
 _Avoid_: General Price List, discounted price list
 
 **Price List**:
-The stable logical identity and scope for a sequence of Price List Versions. A Price List is created before its first import or publication. Its Type, Currency, Market, and applicable Customer define its scope and are immutable after the first publication; its Name is display metadata and may change without creating a new version.
+The stable logical identity and scope for a sequence of Price List Versions. A Price List is created before its first import or publication. Its owning Organization, Type, Currency, Market, and applicable Customer define its scope and are immutable from creation. Its Name is display metadata and may change without creating a new version.
 
 **Price List Version**:
 An immutable, complete version of one logical Price List. Each version is a complete canonical snapshot, has required `ValidFrom` and optional `ValidTo` for the whole version, and is published atomically. Canonically identical content does not create a new version.
@@ -109,14 +109,14 @@ The non-withdrawn published Price List Version whose validity covers the evaluat
 A permanent source-side fact that a published Price Agreement Version or Price List Version is no longer recommended. Withdrawal requires a human-readable reason, cannot be reversed, does not alter immutable version content, and does not prevent Customer activation, projection, or retrieval.
 
 **Customer Discount**:
-A customer-specific percentage reduction in a Price Agreement applied to a List Price. It may apply generally to the referenced General Price List or specifically to a Supplier Price Group; applicable discounts are alternatives and are never stacked.
+A customer-specific percentage reduction in a Price Agreement applied to a List Price. A general discount applies to one covered General Price List; a Supplier Price Group discount belongs to the Agreement Version and applies across its covered lists, replacing the general discount for matching articles. Discounts are never stacked.
 
 **Supplier Price Group**:
-A supplier-defined commercial grouping of articles used to assign pricing rules such as a Customer Discount. It is not a general product classification.
+A supplier-defined commercial grouping of articles identified by the Supplier's group code across its Price Lists, used to assign pricing rules such as a Customer Discount. Each article entry belongs to at most one such group within a Price List Version. It is not a general product classification.
 _Avoid_: Product category, product classification
 
 **Rounding Policy**:
-The decimal precision and rounding method used when a Price Agreement resolves a Customer Price from a List Price and Customer Discount.
+The decimal precision, rounding method and calculation stage used to resolve a Customer Price from a List Price and Customer Discount. A published Price Agreement Version preserves its Rounding Policy so its calculated prices remain reproducible.
 
 **Price Calculation Basis**:
 The List Price, applicable Customer Discount, and Rounding Policy used to resolve a Customer Price. It exists only when PriceSync performs that calculation; a specific Net Price has no inferred calculation basis.
