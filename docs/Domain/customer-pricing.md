@@ -104,6 +104,8 @@ Price List activation is scoped per logical Price List. Agreement activation is 
 
 A thin application/use-case orchestrator obtains the relevant Active selections and asks Customer Pricing to evaluate the resulting exact immutable tuple. The same projection capability may also be invoked with explicitly selected immutable versions for historical or exploratory reconstruction.
 
+Different Price Agreements may cover the same logical General Price List. For current pricing, the Customer explicitly selects which Price Agreement to use for each logical list; that agreement's Active Version supplies the agreement input. Agreement Version activation remains per agreement and applies across all lists where the Customer has selected it. The list's Active Version is selected independently. System recommendations and warnings are advisory; the Customer is responsible for its selections, and the system never silently substitutes another combination. This freedom does not bypass projection compatibility validation or permit invalid projections to be retrieved.
+
 That orchestration does not require a distributed transaction or globally atomic snapshot across contexts. Exact immutable version references remain reproducible even if Customer Active state changes concurrently.
 
 ## Materialization

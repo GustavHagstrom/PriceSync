@@ -40,7 +40,7 @@ A directed Supplier–Customer business relationship established outside PriceSy
 _Avoid_: Price acceptance, contract
 
 **Price Agreement**:
-The Supplier-published commercial price terms that apply between a Supplier and Customer within a Trading Relationship. The Supplier controls and publishes the terms; the Customer may accept and activate published versions independently.
+The Supplier-published commercial price terms that apply between a Supplier and Customer within a Trading Relationship and may cover multiple General Price Lists. Different Price Agreements may reference the same General Price List. The Supplier controls and publishes the terms; the Customer may accept and activate published versions independently.
 _Avoid_: Trading Relationship, connection
 
 **Price Agreement Version**:
