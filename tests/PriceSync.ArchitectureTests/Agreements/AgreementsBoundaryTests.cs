@@ -4,7 +4,7 @@ using PriceSync.Modules.Agreements.Contracts;
 using Xunit;
 using static PriceSync.ArchitectureTests.Support.RepositoryProjects;
 
-namespace PriceSync.ArchitectureTests;
+namespace PriceSync.ArchitectureTests.Agreements;
 
 public sealed class AgreementsBoundaryTests
 {

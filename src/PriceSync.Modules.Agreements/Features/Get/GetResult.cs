@@ -1,3 +1,4 @@
+using PriceSync.Modules.Agreements.Models;
 namespace PriceSync.Modules.Agreements.Features.Get;
 
 internal abstract record GetResult

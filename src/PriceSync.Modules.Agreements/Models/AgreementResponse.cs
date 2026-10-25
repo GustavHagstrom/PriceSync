@@ -1,6 +1,6 @@
 using PriceSync.Modules.Agreements.Domain;
 
-namespace PriceSync.Modules.Agreements.Features;
+namespace PriceSync.Modules.Agreements.Models;
 
 internal sealed record AgreementResponse(Guid Id, Guid TradingRelationshipId, Guid CreatedByPersonId,
     DateTimeOffset CreatedAt, Guid? LatestVersionId)

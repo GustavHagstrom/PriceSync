@@ -1,3 +1,4 @@
+using PriceSync.Modules.Agreements.Models;
 using Microsoft.EntityFrameworkCore;
 using PriceSync.Modules.Agreements.Contracts;
 using PriceSync.Modules.Agreements.Persistence;

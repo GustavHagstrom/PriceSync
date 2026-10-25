@@ -1,3 +1,4 @@
+using PriceSync.Modules.Agreements.Models;
 using System.Data;
 using System.Text.Json;
 using Microsoft.AspNetCore.Http.Json;
