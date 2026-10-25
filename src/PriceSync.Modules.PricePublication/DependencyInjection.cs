@@ -7,7 +7,7 @@ using PriceSync.Modules.PricePublication.Features.Verification;
 
 namespace PriceSync.Modules.PricePublication;
 
-public static class PricePublicationModuleServiceCollectionExtensions
+public static class DependencyInjection
 {
     public static IServiceCollection AddPricePublicationModule(this IServiceCollection services, IConfiguration configuration)
     {

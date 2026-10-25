@@ -8,8 +8,12 @@ namespace PriceSync.Modules.PricePublication.Features.Get;
 
 internal static class GetEndpoint
 {
-    internal static async Task<IResult> HandleAsync(Guid priceListId, ICurrentPerson person,
-        ICurrentOrganization organization, IOrganizationAuthorizer authorizer, PricePublicationDbContext db,
+    internal static async Task<IResult> HandleAsync(
+        Guid priceListId, 
+        ICurrentPerson person,
+        ICurrentOrganization organization, 
+        IOrganizationAuthorizer authorizer, 
+        PricePublicationDbContext dbContext,
         CancellationToken cancellationToken)
     {
         if (organization.OrganizationId is not { } owner)
@@ -18,7 +22,7 @@ internal static class GetEndpoint
             return Results.Problem(statusCode: 403, extensions: new Dictionary<string, object?> { ["code"] = "forbidden" });
         if (priceListId == Guid.Empty) return Results.NotFound();
         var id = new PriceListId(priceListId);
-        var list = await db.PriceLists.AsNoTracking().SingleOrDefaultAsync(
+        var list = await dbContext.PriceLists.AsNoTracking().SingleOrDefaultAsync(
             x => x.Id == id && x.OwnerOrganizationId == owner, cancellationToken);
         return list is null ? Results.NotFound() : Results.Ok(PriceListResponse.From(list));
     }

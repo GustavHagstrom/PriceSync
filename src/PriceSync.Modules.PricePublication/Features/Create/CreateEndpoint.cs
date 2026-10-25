@@ -5,12 +5,15 @@ using PriceSync.Modules.PricePublication.Persistence;
 
 namespace PriceSync.Modules.PricePublication.Features.Create;
 
-internal sealed record CreateRequest(string? Name, string? Type, string? Currency, string? Market, Guid? CustomerOrganizationId);
-
 internal static class CreateEndpoint
 {
-    internal static async Task<IResult> HandleAsync(CreateRequest request, ICurrentPerson person,
-        ICurrentOrganization organization, IOrganizationAuthorizer authorizer, IOrganizationStatusReader statusReader, PricePublicationDbContext db,
+    internal static async Task<IResult> HandleAsync(
+        CreateRequest request, 
+        ICurrentPerson person,
+        ICurrentOrganization organization, 
+        IOrganizationAuthorizer authorizer, 
+        IOrganizationStatusReader statusReader, 
+        PricePublicationDbContext dbContext,
         CancellationToken cancellationToken)
     {
         if (organization.OrganizationId is not { } owner)
@@ -32,8 +35,8 @@ internal static class CreateEndpoint
             await statusReader.GetStatusAsync(customerId, cancellationToken) != OrganizationStatusResult.Active)
             return Results.Problem(statusCode: 400,
                 extensions: new Dictionary<string, object?> { ["code"] = "invalid_customer_reference" });
-        db.PriceLists.Add(list);
-        await db.SaveChangesAsync(cancellationToken);
+        dbContext.PriceLists.Add(list);
+        await dbContext.SaveChangesAsync(cancellationToken);
         return Results.Created($"/api/v1/price-lists/{list.Id.Value}", PriceListResponse.From(list));
     }
 }

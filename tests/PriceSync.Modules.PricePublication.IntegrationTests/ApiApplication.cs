@@ -17,9 +17,11 @@ internal sealed class ApiApplication(string connectionString, PersonId? personId
     {
         foreach (var module in new[] { "OrganizationAccess", "TradingRelationships", "PricePublication" })
             builder.UseSetting($"ConnectionStrings:{module}", connectionString);
+
         builder.ConfigureAppConfiguration((_, configuration) => configuration.AddInMemoryCollection(
             new[] { "OrganizationAccess", "TradingRelationships", "PricePublication" }
                 .ToDictionary(module => $"ConnectionStrings:{module}", _ => (string?)connectionString)));
+
         builder.ConfigureServices(services => services.AddAuthentication(TestAuthenticationHandler.SchemeName)
             .AddScheme<TestAuthenticationOptions, TestAuthenticationHandler>(
                 TestAuthenticationHandler.SchemeName, options => options.PersonId = personId));

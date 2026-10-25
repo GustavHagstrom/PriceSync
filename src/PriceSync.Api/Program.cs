@@ -15,7 +15,11 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddPriceSyncApplication();
 builder.Services.AddProblemDetails();
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
+builder.Services.AddSwaggerGen(options =>
+{
+    options.CustomSchemaIds(type => type.FullName?.Replace("+", ".") ?? type.Name);
+});
+
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddAuthentication(UnavailableAuthenticationHandler.SchemeName)
     .AddScheme<AuthenticationSchemeOptions, UnavailableAuthenticationHandler>(

@@ -43,12 +43,12 @@ public sealed class PricePublicationBoundaryTests
     [Fact]
     public void Price_publication_implementation_exports_only_composition_surfaces()
     {
-        typeof(PriceSync.Modules.PricePublication.PricePublicationModuleServiceCollectionExtensions).Assembly.ExportedTypes
+        typeof(PriceSync.Modules.PricePublication.DependencyInjection).Assembly.ExportedTypes
             .Select(type => type.FullName)
             .Should()
             .BeEquivalentTo(
                 [
-                    "PriceSync.Modules.PricePublication.PricePublicationModuleServiceCollectionExtensions",
+                    "PriceSync.Modules.PricePublication.DependencyInjection",
                     "PriceSync.Modules.PricePublication.Endpoints",
                 ]);
     }
@@ -56,10 +56,10 @@ public sealed class PricePublicationBoundaryTests
     [Fact]
     public void Price_publication_root_namespace_contains_only_composition_surfaces()
     {
-        typeof(PriceSync.Modules.PricePublication.PricePublicationModuleServiceCollectionExtensions).Assembly.GetTypes()
+        typeof(PriceSync.Modules.PricePublication.DependencyInjection).Assembly.GetTypes()
             .Where(type => !type.IsNested && type.Namespace == "PriceSync.Modules.PricePublication")
             .Select(type => type.Name)
-            .Should().BeEquivalentTo(["PricePublicationModuleServiceCollectionExtensions", "Endpoints"]);
+            .Should().BeEquivalentTo(["DependencyInjection", "Endpoints"]);
     }
 
     [Fact]

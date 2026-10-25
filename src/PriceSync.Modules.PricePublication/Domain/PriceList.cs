@@ -39,8 +39,13 @@ internal sealed class PriceList
             throw new ArgumentException("Market must contain 1–100 characters.", nameof(market));
         return new PriceList
         {
-            Id = PriceListId.Create(), OwnerOrganizationId = owner, Name = displayName, Type = type,
-            Currency = currency, Market = market.Trim(), CustomerOrganizationId = customer,
+            Id = PriceListId.Create(), 
+            OwnerOrganizationId = owner, 
+            Name = displayName, 
+            Type = type,
+            Currency = currency, 
+            Market = market.Trim(), 
+            CustomerOrganizationId = customer,
         };
     }
 }
