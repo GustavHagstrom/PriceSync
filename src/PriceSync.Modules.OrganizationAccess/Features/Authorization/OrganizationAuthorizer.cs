@@ -37,7 +37,8 @@ internal class OrganizationAuthorizer(
                  m.Status == OrganizationMembershipStatus.Active, cancellationToken);
         if (membership is null)
             return Deny("NoActiveMembership");
-        if (capability is (OrganizationCapability.ManageTradingRelationships or OrganizationCapability.CreatePriceLists) &&
+        if (capability is (OrganizationCapability.ManageTradingRelationships or OrganizationCapability.CreatePriceLists
+            or OrganizationCapability.PublishAgreements or OrganizationCapability.ManageCustomerAgreements) &&
             !membership.Roles.Contains(OrganizationRole.Owner))
             return Deny("RequiredRoleMissing");
 

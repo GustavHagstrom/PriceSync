@@ -17,6 +17,56 @@ public sealed class OrganizationAuthorizationTests(OrganizationAccessPostgreSqlF
 
     public Task DisposeAsync() => Task.CompletedTask;
 
+    [Theory]
+    [InlineData("Member", OrganizationCapability.ReadAgreements, true)]
+    [InlineData("Owner", OrganizationCapability.ReadAgreements, true)]
+    [InlineData("Member", OrganizationCapability.PublishAgreements, false)]
+    [InlineData("Owner", OrganizationCapability.PublishAgreements, true)]
+    [InlineData("Member", OrganizationCapability.ManageCustomerAgreements, false)]
+    [InlineData("Owner", OrganizationCapability.ManageCustomerAgreements, true)]
+    public async Task Agreement_capabilities_follow_membership_roles(
+        string role, OrganizationCapability capability, bool expected)
+    {
+        var person = new PersonId(Guid.CreateVersion7());
+        var organization = await SeedOwnerMembershipAsync(person, role: Enum.Parse<OrganizationRole>(role));
+        await using var context = new OrganizationAccessDbContext(fixture.CreateOptions());
+        IOrganizationAuthorizer authorizer = new OrganizationAuthorizer(context, NullLogger<OrganizationAuthorizer>.Instance);
+
+        (await authorizer.HasCapabilityAsync(person, organization.Id, capability)).Should().Be(expected);
+    }
+
+    [Theory]
+    [InlineData(OrganizationCapability.ReadAgreements)]
+    [InlineData(OrganizationCapability.PublishAgreements)]
+    [InlineData(OrganizationCapability.ManageCustomerAgreements)]
+    public async Task Agreement_capabilities_require_current_authority_in_an_active_organization(OrganizationCapability capability)
+    {
+        var person = new PersonId(Guid.CreateVersion7());
+        var organization = await SeedOwnerMembershipAsync(person);
+        await using var context = new OrganizationAccessDbContext(fixture.CreateOptions());
+        IOrganizationAuthorizer authorizer = new OrganizationAuthorizer(context, NullLogger<OrganizationAuthorizer>.Instance);
+        (await authorizer.HasCapabilityAsync(new PersonId(Guid.CreateVersion7()), organization.Id, capability)).Should().BeFalse();
+        (await authorizer.HasCapabilityAsync(person, OrganizationId.Create(), capability)).Should().BeFalse();
+
+        var membership = context.OrganizationMemberships.Single(x => x.PersonId == person);
+        membership.End(TimeProvider.System);
+        await context.SaveChangesAsync();
+        (await authorizer.HasCapabilityAsync(person, organization.Id, capability)).Should().BeFalse();
+    }
+
+    [Theory]
+    [InlineData(OrganizationCapability.ReadAgreements)]
+    [InlineData(OrganizationCapability.PublishAgreements)]
+    [InlineData(OrganizationCapability.ManageCustomerAgreements)]
+    public async Task Archived_organizations_deny_agreement_capabilities(OrganizationCapability capability)
+    {
+        var person = new PersonId(Guid.CreateVersion7());
+        var organization = await SeedOwnerMembershipAsync(person, archived: true);
+        await using var context = new OrganizationAccessDbContext(fixture.CreateOptions());
+        IOrganizationAuthorizer authorizer = new OrganizationAuthorizer(context, NullLogger<OrganizationAuthorizer>.Instance);
+        (await authorizer.HasCapabilityAsync(person, organization.Id, capability)).Should().BeFalse();
+    }
+
     [Fact]
     public async Task Active_owner_has_relationship_management_capability()
     {

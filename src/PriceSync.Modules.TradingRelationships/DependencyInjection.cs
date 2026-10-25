@@ -7,6 +7,8 @@ using PriceSync.Modules.TradingRelationships.Features.Get;
 using PriceSync.Modules.TradingRelationships.Features.ListSupplier;
 using PriceSync.Modules.TradingRelationships.Features.ListCustomer;
 using PriceSync.Modules.TradingRelationships.Persistence;
+using PriceSync.Modules.TradingRelationships.Contracts;
+using PriceSync.Modules.TradingRelationships.Features.AgreementScope;
 
 namespace PriceSync.Modules.TradingRelationships;
 
@@ -26,6 +28,7 @@ public static class DependencyInjection
                     TradingRelationshipsDbContext.SchemaName));
         });
 
+        services.AddScoped<IAgreementScopeReader, AgreementScopeReader>();
         services.AddScoped<CreateHandler>();
         services.AddScoped<CreateValidator>();
 
