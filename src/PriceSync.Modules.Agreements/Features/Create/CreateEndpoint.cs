@@ -25,10 +25,19 @@ internal static class CreateEndpoint
         var keys = httpContext.Request.Headers["Idempotency-Key"];
         if (keys.Count != 1 || keys[0] is not { Length: >= 1 and <= 200 } key || key.Any(char.IsControl))
             return Results.Problem(statusCode: 400, extensions: new Dictionary<string, object?> { ["code"] = "invalid_idempotency_key" });
-        var replay = await handler.HandleAsync(person.PersonId, acting, TradingRelationshipId.FromGuid(relationshipId), key, cancellationToken);
-        if (replay is null)
-            return Results.Problem(statusCode: 409, extensions: new Dictionary<string, object?> { ["code"] = "agreement_creation_key_conflict" });
-        httpContext.Response.Headers.Location = replay.Location;
-        return Results.Content(replay.ResponseBody, "application/json", statusCode: replay.ResponseStatus);
+        var result = await handler.HandleAsync(person.PersonId, acting, TradingRelationshipId.FromGuid(relationshipId), key, cancellationToken);
+        return result switch
+        {
+            CreateResult.Created created => CreatedResponse(created, httpContext),
+            CreateResult.KeyConflict => Results.Problem(statusCode: 409,
+                extensions: new Dictionary<string, object?> { ["code"] = "agreement_creation_key_conflict" }),
+            _ => throw new InvalidOperationException("Unexpected result type."),
+        };
+    }
+
+    private static IResult CreatedResponse(CreateResult.Created result, HttpContext httpContext)
+    {
+        httpContext.Response.Headers.Location = result.Location;
+        return Results.Content(result.ResponseBody, "application/json", statusCode: result.StatusCode);
     }
 }

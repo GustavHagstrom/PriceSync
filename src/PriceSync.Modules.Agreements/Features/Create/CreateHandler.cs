@@ -13,7 +13,7 @@ namespace PriceSync.Modules.Agreements.Features.Create;
 internal sealed class CreateHandler(AgreementsDbContext db, TimeProvider clock, IOptions<JsonOptions> jsonOptions)
 {
     // Authority and relationship access must be checked by the caller before every invocation, including retries.
-    internal async Task<AgreementCreationReplay?> HandleAsync(PersonId person, OrganizationId acting,
+    internal async Task<CreateResult> HandleAsync(PersonId person, OrganizationId acting,
         TradingRelationshipId relationshipId, string key, CancellationToken cancellationToken)
     {
         await using var transaction = await db.Database.BeginTransactionAsync(IsolationLevel.ReadCommitted, cancellationToken);
@@ -30,11 +30,10 @@ internal sealed class CreateHandler(AgreementsDbContext db, TimeProvider clock, 
             x.ActingOrganizationId == acting && x.Operation == operation && x.Key == key, cancellationToken);
         if (reserved == 0)
         {
-            if (replay.TradingRelationshipId != relationshipId) return null;
-            if (replay.ResponseStatus is null || replay.Location is null || replay.ResponseBody is null)
-                throw new InvalidOperationException("An incomplete agreement creation replay was committed.");
+            if (replay.TradingRelationshipId != relationshipId) return new CreateResult.KeyConflict();
+            var result = ToCreatedResult(replay);
             await transaction.CommitAsync(cancellationToken);
-            return replay;
+            return result;
         }
 
         var now = clock.GetUtcNow();
@@ -45,6 +44,13 @@ internal sealed class CreateHandler(AgreementsDbContext db, TimeProvider clock, 
             JsonSerializer.Serialize(AgreementResponse.From(agreement), jsonOptions.Value.SerializerOptions));
         await db.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
-        return replay;
+        return ToCreatedResult(replay);
+    }
+
+    private static CreateResult.Created ToCreatedResult(AgreementCreationReplay replay)
+    {
+        if (replay.ResponseStatus is not { } status || replay.Location is not { } location || replay.ResponseBody is not { } body)
+            throw new InvalidOperationException("An incomplete agreement creation replay cannot be returned.");
+        return new CreateResult.Created(status, location, body);
     }
 }
