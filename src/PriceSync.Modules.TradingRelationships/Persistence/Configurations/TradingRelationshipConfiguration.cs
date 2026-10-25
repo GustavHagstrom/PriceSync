@@ -1,3 +1,4 @@
+using TradingRelationshipStatus = PriceSync.Modules.TradingRelationships.Domain.TradingRelationshipStatus;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using PriceSync.Modules.OrganizationAccess.Contracts;

@@ -63,7 +63,7 @@ public sealed class TradingRelationshipsBoundaryTests
     }
 
     [Fact]
-    public void Trading_relationships_contracts_exports_only_identifier_and_agreement_scope_facts()
+    public void Trading_relationships_contracts_exports_only_identifier_and_relationship_facts()
     {
         typeof(PriceSync.Modules.TradingRelationships.Contracts.TradingRelationshipId).Assembly.ExportedTypes
             .Select(type => type.FullName)
@@ -71,9 +71,9 @@ public sealed class TradingRelationshipsBoundaryTests
             .BeEquivalentTo(
                 [
                     "PriceSync.Modules.TradingRelationships.Contracts.TradingRelationshipId",
-                    "PriceSync.Modules.TradingRelationships.Contracts.IAgreementScopeReader",
-                    "PriceSync.Modules.TradingRelationships.Contracts.AgreementScope",
-                    "PriceSync.Modules.TradingRelationships.Contracts.AgreementScopeStatus",
+                    "PriceSync.Modules.TradingRelationships.Contracts.ITradingRelationshipReader",
+                    "PriceSync.Modules.TradingRelationships.Contracts.TradingRelationshipDetails",
+                    "PriceSync.Modules.TradingRelationships.Contracts.TradingRelationshipStatus",
                 ]);
     }
 
@@ -83,7 +83,7 @@ public sealed class TradingRelationshipsBoundaryTests
         _projects["PriceSync.Modules.TradingRelationships.Contracts"].ProjectReferences
             .Should()
             .BeEquivalentTo(["PriceSync.Modules.OrganizationAccess.Contracts"],
-                "agreement scope exchanges the exact Organization-owned identifiers");
+                "relationship details exchange the exact Organization-owned identifiers");
     }
 
     [Fact]

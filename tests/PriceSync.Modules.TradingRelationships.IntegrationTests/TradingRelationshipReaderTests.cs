@@ -8,7 +8,7 @@ using PriceSync.Modules.TradingRelationships.Contracts;
 namespace PriceSync.Modules.TradingRelationships.IntegrationTests;
 
 [Collection(TradingRelationshipsPostgreSqlCollection.Name)]
-public sealed class AgreementScopeTests(PostgreSqlFixture fixture) : IAsyncLifetime
+public sealed class TradingRelationshipReaderTests(PostgreSqlFixture fixture) : IAsyncLifetime
 {
     public Task InitializeAsync() => fixture.ResetAsync();
     public Task DisposeAsync() => Task.CompletedTask;
@@ -22,14 +22,14 @@ public sealed class AgreementScopeTests(PostgreSqlFixture fixture) : IAsyncLifet
             new Dictionary<string, string?> { ["ConnectionStrings:TradingRelationships"] = fixture.ConnectionString }).Build());
         await using var provider = services.BuildServiceProvider();
         await using var scope = provider.CreateAsyncScope();
-        var reader = scope.ServiceProvider.GetRequiredService<IAgreementScopeReader>();
+        var reader = scope.ServiceProvider.GetRequiredService<ITradingRelationshipReader>();
 
         var result = await reader.GetAsync(relationship.Id, CancellationToken.None);
 
         result.Should().NotBeNull();
         result!.SupplierOrganizationId.Should().Be(relationship.SupplierOrganizationId);
         result.CustomerOrganizationId.Should().Be(relationship.CustomerOrganizationId);
-        result.Status.Should().Be(AgreementScopeStatus.Active);
+        result.Status.Should().Be(TradingRelationshipStatus.Active);
 
         await using (var db = new TradingRelationshipsDbContext(fixture.CreateOptions()))
         {
@@ -39,8 +39,8 @@ public sealed class AgreementScopeTests(PostgreSqlFixture fixture) : IAsyncLifet
         }
 
         var ended = await reader.GetAsync(relationship.Id, CancellationToken.None);
-        ended!.Status.Should().Be(AgreementScopeStatus.Ended);
-        result.Status.Should().Be(AgreementScopeStatus.Active, "the earlier observation is a point-in-time fact");
+        ended!.Status.Should().Be(TradingRelationshipStatus.Ended);
+        result.Status.Should().Be(TradingRelationshipStatus.Active, "the earlier observation is a point-in-time fact");
         (await reader.GetAsync(TradingRelationshipId.Create(), CancellationToken.None)).Should().BeNull();
 
         using var cancellation = new CancellationTokenSource();
