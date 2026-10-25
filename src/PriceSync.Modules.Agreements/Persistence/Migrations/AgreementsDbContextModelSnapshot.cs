@@ -45,6 +45,42 @@ namespace PriceSync.Modules.Agreements.Persistence.Migrations
 
                     b.ToTable("price_agreements", "agreements");
                 });
+
+            modelBuilder.Entity("PriceSync.Modules.Agreements.Persistence.AgreementCreationReplay", b =>
+                {
+                    b.Property<Guid>("PersonId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ActingOrganizationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Operation")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .UseCollation("C");
+
+                    b.Property<string>("Key")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .UseCollation("C");
+
+                    b.Property<string>("Location")
+                        .HasColumnType("text");
+
+                    b.Property<string>("ResponseBody")
+                        .HasColumnType("text");
+
+                    b.Property<short?>("ResponseStatus")
+                        .HasColumnType("smallint");
+
+                    b.Property<Guid>("TradingRelationshipId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("PersonId", "ActingOrganizationId", "Operation", "Key")
+                        .HasName("pk_agreement_creation_replays");
+
+                    b.ToTable("agreement_creation_replays", "agreements");
+                });
 #pragma warning restore 612, 618
         }
     }

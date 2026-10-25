@@ -1,6 +1,4 @@
 using Microsoft.AspNetCore.Http;
-using PriceSync.Modules.Agreements.Domain;
-using PriceSync.Modules.Agreements.Persistence;
 using PriceSync.Modules.OrganizationAccess.Contracts;
 using PriceSync.Modules.TradingRelationships.Contracts;
 
@@ -8,9 +6,9 @@ namespace PriceSync.Modules.Agreements.Features.Create;
 
 internal static class CreateEndpoint
 {
-    internal static async Task<IResult> HandleAsync(CreateRequest request, ICurrentPerson person,
+    internal static async Task<IResult> HandleAsync(CreateRequest request, HttpContext httpContext, ICurrentPerson person,
         ICurrentOrganization organization, IOrganizationAuthorizer authorizer, ITradingRelationshipReader relationships,
-        AgreementsDbContext db, TimeProvider clock, CancellationToken cancellationToken)
+        CreateHandler handler, CancellationToken cancellationToken)
     {
         if (organization.OrganizationId is not { } acting)
             return Results.Problem(statusCode: 400, extensions: new Dictionary<string, object?> { ["code"] = OrganizationContextErrors.Required });
@@ -24,12 +22,13 @@ internal static class CreateEndpoint
             return Results.Problem(statusCode: 404, extensions: new Dictionary<string, object?> { ["code"] = "agreement_not_found" });
         if (relationship.Status == TradingRelationshipStatus.Ended)
             return Results.Problem(statusCode: 409, extensions: new Dictionary<string, object?> { ["code"] = "agreement_relationship_ended" });
-        var now = clock.GetUtcNow();
-        // Match PostgreSQL microsecond precision in the initial response and subsequent reads.
-        var createdAt = new DateTimeOffset(now.UtcTicks - now.UtcTicks % 10, TimeSpan.Zero);
-        var agreement = PriceAgreement.Create(TradingRelationshipId.FromGuid(relationshipId), person.PersonId, createdAt);
-        db.PriceAgreements.Add(agreement);
-        await db.SaveChangesAsync(cancellationToken);
-        return Results.Created($"/api/v1/agreements/{agreement.Id}", AgreementResponse.From(agreement));
+        var keys = httpContext.Request.Headers["Idempotency-Key"];
+        if (keys.Count != 1 || keys[0] is not { Length: >= 1 and <= 200 } key || key.Any(char.IsControl))
+            return Results.Problem(statusCode: 400, extensions: new Dictionary<string, object?> { ["code"] = "invalid_idempotency_key" });
+        var replay = await handler.HandleAsync(person.PersonId, acting, TradingRelationshipId.FromGuid(relationshipId), key, cancellationToken);
+        if (replay is null)
+            return Results.Problem(statusCode: 409, extensions: new Dictionary<string, object?> { ["code"] = "agreement_creation_key_conflict" });
+        httpContext.Response.Headers.Location = replay.Location;
+        return Results.Content(replay.ResponseBody, "application/json", statusCode: replay.ResponseStatus);
     }
 }

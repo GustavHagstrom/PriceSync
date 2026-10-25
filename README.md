@@ -93,7 +93,9 @@ For database-backed development, configure `ConnectionStrings:OrganizationAccess
 
 ### Price Agreements (work in progress)
 
-`POST /api/v1/agreements` creates a stable Price Agreement with a JSON body containing the required `tradingRelationshipId` (UUID), without commercial terms. Supply the acting Supplier in `organization_id`; an active Supplier Owner and an Active Trading Relationship are required. The response is `201` with Location, a server-generated UUIDv7, relationship identity and creation metadata. No version is published.
+`POST /api/v1/agreements` creates a stable Price Agreement with a JSON body containing the required `tradingRelationshipId` (UUID), without commercial terms. Supply the acting Supplier in `organization_id`; an active Supplier Owner and an Active Trading Relationship are required. Supply one `Idempotency-Key` header of 1–200 characters, without control characters. Keys are case-sensitive and scoped to the Person, acting Organization and create operation. The response is `201` with Location, a server-generated UUIDv7, relationship identity and creation metadata. No version is published.
+
+Matching retries return the original status, Location and JSON representation, even across application restarts. Reusing a key for another relationship returns `409`; distinct keys create separate agreements. Authority and relationship access are checked again before replay, so lost membership, an Archived acting Organization or an Ended relationship prevents replay. Successful replay records have no expiry. A reservation-first local Read Committed transaction commits the agreement and completed replay together; concurrent matching requests wait, and rollback leaves neither record.
 
 `GET /api/v1/agreements/{agreementId}` is available to active Members (including Owners) of either party, including after the relationship has Ended. The acting Organization must be Active. Agreements owns its `agreements` schema and migration history:
 
@@ -102,7 +104,7 @@ $env:PRICESYNC_AGREEMENTS_DESIGN_TIME_CONNECTION_STRING = "Host=localhost;Databa
 dotnet ef database update --project src/PriceSync.Modules.Agreements
 ```
 
-This is stage 2 of #60. Creation idempotency and paginated list reads are pending in the same draft PR.
+Stages 1–3 of #60 are implemented. Paginated list reads and final acceptance verification are pending in the same draft PR.
 
 ### Logical Price Lists
 
