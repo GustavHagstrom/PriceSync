@@ -26,6 +26,7 @@ Module-owned routes under `/api/v1`:
 | Operation | Proposed route/input |
 | --- | --- |
 | Create stable agreement | `POST /agreements`; body requires `tradingRelationshipId`; required `Idempotency-Key`; Supplier Owner creates an agreement with no published versions |
+| List stable agreements | `GET /agreements?tradingRelationshipId={id}`; optional `pageSize` and `cursor`; ordered descending by creation time/identity |
 | Publish next version | `POST /agreements/{agreementId}/versions`; expected latest version ID (nullable for first publication), complete validity/coverage/discount payload |
 | Read agreement/versions | `GET /agreements/{agreementId}` and `/versions`; scoped to an authorized party |
 | Read exact version | `GET /agreements/{agreementId}/versions/{versionId}` |

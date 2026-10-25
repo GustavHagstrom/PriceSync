@@ -91,7 +91,7 @@ Use the URL printed at startup. `GET /` returns the service name. The protected 
 
 For database-backed development, configure `ConnectionStrings:OrganizationAccess`, `ConnectionStrings:TradingRelationships`, `ConnectionStrings:PricePublication` and `ConnectionStrings:Agreements` for your PostgreSQL instance. The default configuration points to a local `pricesync` database; the API host does not automatically apply migrations or seed data.
 
-### Price Agreements (work in progress)
+### Price Agreements
 
 `POST /api/v1/agreements` creates a stable Price Agreement with a JSON body containing the required `tradingRelationshipId` (UUID), without commercial terms. Supply the acting Supplier in `organization_id`; an active Supplier Owner and an Active Trading Relationship are required. Supply one `Idempotency-Key` header of 1–200 characters, without control characters. Keys are case-sensitive and scoped to the Person, acting Organization and create operation. The response is `201` with Location, a server-generated UUIDv7, relationship identity and creation metadata. No version is published.
 
@@ -104,7 +104,7 @@ $env:PRICESYNC_AGREEMENTS_DESIGN_TIME_CONNECTION_STRING = "Host=localhost;Databa
 dotnet ef database update --project src/PriceSync.Modules.Agreements
 ```
 
-Stages 1–3 of #60 are implemented. Paginated list reads and final acceptance verification are pending in the same draft PR.
+`GET /api/v1/agreements?tradingRelationshipId={id}` lists agreements within one relationship, including those without published versions. The same read authority applies to single reads and list pages, including Ended relationships. Results contain `items` and a nullable `nextCursor`, ordered newest first by `createdAt` and agreement ID. The default `pageSize` is 50; valid values are 1–100. Pass the returned `nextCursor` as the `cursor` query parameter to continue. Invalid pagination produces field-addressable `400` errors.
 
 ### Logical Price Lists
 

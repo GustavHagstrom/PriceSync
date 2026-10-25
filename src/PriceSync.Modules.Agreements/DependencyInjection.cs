@@ -3,6 +3,8 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.EntityFrameworkCore;
 using PriceSync.Modules.Agreements.Persistence;
 using PriceSync.Modules.Agreements.Features.Create;
+using PriceSync.Modules.Agreements.Features.List;
+using PriceSync.Modules.Agreements.Features.Get;
 
 namespace PriceSync.Modules.Agreements;
 
@@ -16,6 +18,9 @@ public static class DependencyInjection
             postgres => postgres.MigrationsHistoryTable(AgreementsDbContext.MigrationsHistoryTableName,
                 AgreementsDbContext.SchemaName)));
         services.AddScoped<CreateHandler>();
+        services.AddScoped<ListHandler>();
+        services.AddScoped<ListValidator>();
+        services.AddScoped<GetHandler>();
         return services;
     }
 }

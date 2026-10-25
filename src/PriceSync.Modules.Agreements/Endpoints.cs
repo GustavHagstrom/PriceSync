@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
 using PriceSync.Modules.Agreements.Features.Create;
 using PriceSync.Modules.Agreements.Features.Get;
+using PriceSync.Modules.Agreements.Features.List;
 
 namespace PriceSync.Modules.Agreements;
 
@@ -13,6 +14,7 @@ public static class Endpoints
         var group = endpoints.MapGroup("/api/v1").WithTags("Agreements").RequireAuthorization();
         group.MapPost("/agreements", CreateEndpoint.HandleAsync).WithName("CreateAgreement");
         group.MapGet("/agreements/{agreementId:guid}", GetEndpoint.HandleAsync).WithName("GetAgreement");
+        group.MapGet("/agreements", ListEndpoint.HandleAsync).WithName("ListAgreements");
         return endpoints;
     }
 }

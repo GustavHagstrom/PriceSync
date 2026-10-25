@@ -103,12 +103,16 @@ public sealed partial class AgreementApiTests(PostgreSqlFixture fixture) : IAsyn
         ((int)create.StatusCode).Should().Be(createStatus, await create.Content.ReadAsStringAsync());
         var read = await client.GetAsync(original.Headers.Location);
         ((int)read.StatusCode).Should().Be(readStatus, await read.Content.ReadAsStringAsync());
+        var list = await client.GetAsync($"/api/v1/agreements?tradingRelationshipId={relationship.Id}");
+        ((int)list.StatusCode).Should().Be(readStatus, await list.Content.ReadAsStringAsync());
         if (readStatus == 404)
         {
             var unknown = await client.GetAsync($"/api/v1/agreements/{Guid.CreateVersion7()}");
             (await ProblemWithoutTrace(read)).Should().Be(await ProblemWithoutTrace(unknown));
             var unknownCreate = await PostAgreement(client, Guid.CreateVersion7());
             (await ProblemWithoutTrace(create)).Should().Be(await ProblemWithoutTrace(unknownCreate));
+            var unknownList = await client.GetAsync($"/api/v1/agreements?tradingRelationshipId={Guid.CreateVersion7()}");
+            (await ProblemWithoutTrace(list)).Should().Be(await ProblemWithoutTrace(unknownList));
         }
     }
 
@@ -136,6 +140,7 @@ public sealed partial class AgreementApiTests(PostgreSqlFixture fixture) : IAsyn
         var read = await client.GetAsync(original.Headers.Location);
         read.StatusCode.Should().Be(HttpStatusCode.OK);
         (await read.Content.ReadAsStringAsync()).Should().Be(await original.Content.ReadAsStringAsync());
+        (await client.GetAsync($"/api/v1/agreements?tradingRelationshipId={relationship.Id}")).StatusCode.Should().Be(HttpStatusCode.OK);
     }
 
     private async Task<TradingRelationship> SeedRelationship(OrganizationId supplier, OrganizationId customer)
@@ -169,6 +174,7 @@ public sealed partial class AgreementApiTests(PostgreSqlFixture fixture) : IAsyn
         client.DefaultRequestHeaders.Add("organization_id", supplier.ToString());
         (await PostAgreement(client, relationship.Id.Value)).StatusCode.Should().Be(HttpStatusCode.InternalServerError);
         (await client.GetAsync(original.Headers.Location)).StatusCode.Should().Be(HttpStatusCode.InternalServerError);
+        (await client.GetAsync($"/api/v1/agreements?tradingRelationshipId={relationship.Id}")).StatusCode.Should().Be(HttpStatusCode.InternalServerError);
         await using var db = new Persistence.AgreementsDbContext(fixture.CreateAgreementOptions());
         (await db.PriceAgreements.CountAsync()).Should().Be(1);
     }
