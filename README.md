@@ -35,6 +35,7 @@ The repository currently contains the backend foundation. Price import, publicat
 | Modular monolith | Module projects, separate contracts, and architecture tests on `main` |
 | Organization & Access | Domain rules, PostgreSQL persistence and migrations, and two read endpoints on `main` |
 | Trading Relationships | Create, End, Get, and Supplier/Customer lists with PostgreSQL persistence and concurrency tests on `main` |
+| Logical Price Lists | Supplier-owned General and Customer-Specific Net lists: authenticated create/read, immutable scope, PostgreSQL persistence and complete-set verification for Agreements |
 | Price ingestion, agreements, publication, and consumption | Domain documentation and module scaffolding; workflows remain to be implemented |
 | Production authentication | Pending; the default host does not authenticate users, so protected endpoints return `401` |
 
@@ -76,6 +77,7 @@ Integration tests require a running Docker-compatible container runtime. Testcon
 
 ```sh
 dotnet test tests/PriceSync.Modules.OrganizationAccess.IntegrationTests
+dotnet test tests/PriceSync.Modules.PricePublication.IntegrationTests
 ```
 
 ## Run the API host
@@ -86,7 +88,32 @@ dotnet run --project src/PriceSync.Api
 
 Use the URL printed at startup. `GET /` returns the service name. The protected organization endpoints require authentication that is currently supplied only by the integration-test host; there is no interactive authenticated demo yet.
 
-For database-backed development, configure `ConnectionStrings:OrganizationAccess` for your PostgreSQL instance. The default configuration points to a local `pricesync` database; the API host does not automatically apply migrations or seed data.
+For database-backed development, configure `ConnectionStrings:OrganizationAccess`, `ConnectionStrings:TradingRelationships` and `ConnectionStrings:PricePublication` for your PostgreSQL instance. The default configuration points to a local `pricesync` database; the API host does not automatically apply migrations or seed data.
+
+### Logical Price Lists
+
+`POST /api/v1/price-lists` creates a Supplier-owned logical list before any prices or versions exist. Supply the acting Supplier in the `organization_id` header. OrganizationAccess requires an active Owner to create and an active Member (including Owner) to read through `GET /api/v1/price-lists/{id}`. Reads are private to the owning Supplier.
+
+```json
+{
+  "name": "General SEK",
+  "type": "general",
+  "currency": "SEK",
+  "market": "Sweden",
+  "customerOrganizationId": null
+}
+```
+
+The supported types are `general` (no Customer binding) and `customerSpecificNet` (exactly one active Customer Organization). Name is display metadata, limited to 200 characters; Market is required and limited to 100 characters. Currency uses three uppercase letters. Each creation assigns a new UUIDv7, even for identical names and scope. Owner, type, currency, market and applicable Customer cannot change; both EF mappings and a PostgreSQL trigger protect that scope. There is no scope-update endpoint.
+
+Price Publication exposes `IPriceListScopeVerifier` for trusted module callers. Pass the intended Supplier/Customer and the complete collection of `PriceListReference` values, each with an expected `PriceListType`. Only `Verified` returns immutable scopes for the complete request. `Invalid` returns structured invalid references; `Unavailable` is explicitly retryable. No partial result, Price List Version, publication, or scope lock is involved. The verifier does not authorize HTTP actors; its caller must enforce the caller's own workflow authority before using it.
+
+Price Publication owns the `price_publication` PostgreSQL schema and its own migration history. To apply its migrations with the EF CLI, configure the design-time connection separately:
+
+```powershell
+$env:PRICESYNC_PRICE_PUBLICATION_DESIGN_TIME_CONNECTION_STRING = "Host=localhost;Database=pricesync;Username=pricesync"
+dotnet ef database update --project src/PriceSync.Modules.PricePublication
+```
 
 ## How to read the documentation
 

@@ -28,7 +28,7 @@ builder.Services.AddOrganizationAccessModule(builder.Configuration);
 builder.Services.AddTradingRelationshipsModule(builder.Configuration);
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddAgreementsModule();
-builder.Services.AddPricePublicationModule();
+builder.Services.AddPricePublicationModule(builder.Configuration);
 builder.Services.AddCustomerPricingModule();
 builder.Services.AddRetrievalConsumptionModule();
 builder.Services.AddIntegrationConfigurationModule();
@@ -75,6 +75,7 @@ app.UseAuthorization();
 
 app.MapOrganizationAccessEndpoints();
 app.MapTradingRelationshipsEndpoints();
+app.MapPricePublicationEndpoints();
 
 app.Run();
 
