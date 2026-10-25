@@ -37,7 +37,7 @@ public sealed class AgreementApiTests(PostgreSqlFixture fixture) : IAsyncLifetim
         using var client = app.CreateClient();
         client.DefaultRequestHeaders.Add("organization_id", supplier.ToString());
         var before = DateTimeOffset.UtcNow;
-        var response = await client.PostAsync($"/api/v1/trading-relationships/{relationship.Id}/agreements", null);
+        var response = await client.PostAsJsonAsync("/api/v1/agreements", new { tradingRelationshipId = relationship.Id.Value });
         response.StatusCode.Should().Be(HttpStatusCode.Created, await response.Content.ReadAsStringAsync());
         var result = await response.Content.ReadFromJsonAsync<JsonElement>();
         result.GetProperty("id").GetGuid().Version.Should().Be(7);
@@ -48,7 +48,7 @@ public sealed class AgreementApiTests(PostgreSqlFixture fixture) : IAsyncLifetim
         var read = await client.GetAsync(response.Headers.Location);
         read.StatusCode.Should().Be(HttpStatusCode.OK);
         (await read.Content.ReadAsStringAsync()).Should().Be(await response.Content.ReadAsStringAsync());
-        var another = await client.PostAsync($"/api/v1/trading-relationships/{relationship.Id}/agreements", null);
+        var another = await client.PostAsJsonAsync("/api/v1/agreements", new { tradingRelationshipId = relationship.Id.Value });
         another.StatusCode.Should().Be(HttpStatusCode.Created);
         var other = await another.Content.ReadFromJsonAsync<JsonElement>();
         other.GetProperty("id").GetGuid().Should().NotBe(result.GetProperty("id").GetGuid());
@@ -75,8 +75,8 @@ public sealed class AgreementApiTests(PostgreSqlFixture fixture) : IAsyncLifetim
         await using var ownerApp = new ApiApplication(fixture.ConnectionString, owner);
         using var ownerClient = ownerApp.CreateClient();
         ownerClient.DefaultRequestHeaders.Add("organization_id", supplier.ToString());
-        var route = $"/api/v1/trading-relationships/{relationship.Id}/agreements";
-        var original = await ownerClient.PostAsync(route, null);
+        const string route = "/api/v1/agreements";
+        var original = await ownerClient.PostAsJsonAsync(route, new { tradingRelationshipId = relationship.Id.Value });
         original.StatusCode.Should().Be(HttpStatusCode.Created);
         var acting = scenario.StartsWith("customer", StringComparison.Ordinal) ? customer : supplier;
         if (scenario == "unrelatedOwner")
@@ -100,7 +100,7 @@ public sealed class AgreementApiTests(PostgreSqlFixture fixture) : IAsyncLifetim
         await using var app = new ApiApplication(fixture.ConnectionString, scenario == "anonymous" ? null : actor);
         using var client = app.CreateClient();
         if (scenario != "noOrganization") client.DefaultRequestHeaders.Add("organization_id", acting.ToString());
-        var create = await client.PostAsync(route, null);
+        var create = await client.PostAsJsonAsync(route, new { tradingRelationshipId = relationship.Id.Value });
         ((int)create.StatusCode).Should().Be(createStatus, await create.Content.ReadAsStringAsync());
         var read = await client.GetAsync(original.Headers.Location);
         ((int)read.StatusCode).Should().Be(readStatus, await read.Content.ReadAsStringAsync());
@@ -108,7 +108,7 @@ public sealed class AgreementApiTests(PostgreSqlFixture fixture) : IAsyncLifetim
         {
             var unknown = await client.GetAsync($"/api/v1/agreements/{Guid.CreateVersion7()}");
             (await ProblemWithoutTrace(read)).Should().Be(await ProblemWithoutTrace(unknown));
-            var unknownCreate = await client.PostAsync($"/api/v1/trading-relationships/{Guid.CreateVersion7()}/agreements", null);
+            var unknownCreate = await client.PostAsJsonAsync(route, new { tradingRelationshipId = Guid.CreateVersion7() });
             (await ProblemWithoutTrace(create)).Should().Be(await ProblemWithoutTrace(unknownCreate));
         }
     }
@@ -123,15 +123,15 @@ public sealed class AgreementApiTests(PostgreSqlFixture fixture) : IAsyncLifetim
         await using var app = new ApiApplication(fixture.ConnectionString, owner);
         using var client = app.CreateClient();
         client.DefaultRequestHeaders.Add("organization_id", supplier.ToString());
-        var route = $"/api/v1/trading-relationships/{relationship.Id}/agreements";
-        var original = await client.PostAsync(route, null);
+        const string route = "/api/v1/agreements";
+        var original = await client.PostAsJsonAsync(route, new { tradingRelationshipId = relationship.Id.Value });
         original.StatusCode.Should().Be(HttpStatusCode.Created);
         await using (var db = new TradingRelationshipsDbContext(fixture.CreateRelationshipOptions()))
         {
             (await db.TradingRelationships.FindAsync(relationship.Id))!.End(DateTimeOffset.UtcNow);
             await db.SaveChangesAsync();
         }
-        var rejected = await client.PostAsync(route, null);
+        var rejected = await client.PostAsJsonAsync(route, new { tradingRelationshipId = relationship.Id.Value });
         rejected.StatusCode.Should().Be(HttpStatusCode.Conflict);
         var problem = await rejected.Content.ReadFromJsonAsync<JsonElement>();
         problem.GetProperty("code").GetString().Should().Be("agreement_relationship_ended");
@@ -156,11 +156,11 @@ public sealed class AgreementApiTests(PostgreSqlFixture fixture) : IAsyncLifetim
         var supplier = await SeedOrganization(owner);
         var customer = await SeedOrganization(new PersonId(Guid.CreateVersion7()), "5560360793");
         var relationship = await SeedRelationship(supplier, customer);
-        var route = $"/api/v1/trading-relationships/{relationship.Id}/agreements";
+        const string route = "/api/v1/agreements";
         await using var healthy = new ApiApplication(fixture.ConnectionString, owner);
         using var healthyClient = healthy.CreateClient();
         healthyClient.DefaultRequestHeaders.Add("organization_id", supplier.ToString());
-        var original = await healthyClient.PostAsync(route, null);
+        var original = await healthyClient.PostAsJsonAsync(route, new { tradingRelationshipId = relationship.Id.Value });
         original.StatusCode.Should().Be(HttpStatusCode.Created);
 
         await using var failed = new ApiApplication(fixture.ConnectionString, owner, services =>
@@ -170,7 +170,7 @@ public sealed class AgreementApiTests(PostgreSqlFixture fixture) : IAsyncLifetim
         });
         using var client = failed.CreateClient();
         client.DefaultRequestHeaders.Add("organization_id", supplier.ToString());
-        (await client.PostAsync(route, null)).StatusCode.Should().Be(HttpStatusCode.InternalServerError);
+        (await client.PostAsJsonAsync(route, new { tradingRelationshipId = relationship.Id.Value })).StatusCode.Should().Be(HttpStatusCode.InternalServerError);
         (await client.GetAsync(original.Headers.Location)).StatusCode.Should().Be(HttpStatusCode.InternalServerError);
         await using var db = new Persistence.AgreementsDbContext(fixture.CreateAgreementOptions());
         (await db.PriceAgreements.CountAsync()).Should().Be(1);
@@ -187,6 +187,24 @@ public sealed class AgreementApiTests(PostgreSqlFixture fixture) : IAsyncLifetim
         var problem = JsonNode.Parse(await response.Content.ReadAsStringAsync())!.AsObject();
         problem.Remove("traceId");
         return problem.ToJsonString();
+    }
+
+    [Theory]
+    [InlineData("{}")]
+    [InlineData("{\"tradingRelationshipId\":\"00000000-0000-0000-0000-000000000000\"}")]
+    [InlineData("{\"tradingRelationshipId\":\"invalid\"}")]
+    public async Task Creation_requires_a_relationship_identity_in_the_request_body(string json)
+    {
+        var person = new PersonId(Guid.CreateVersion7());
+        var supplier = await SeedOrganization(person);
+        await using var app = new ApiApplication(fixture.ConnectionString, person);
+        using var client = app.CreateClient();
+        client.DefaultRequestHeaders.Add("organization_id", supplier.ToString());
+        using var content = new StringContent(json, System.Text.Encoding.UTF8, "application/json");
+        var response = await client.PostAsync("/api/v1/agreements", content);
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        await using var db = new Persistence.AgreementsDbContext(fixture.CreateAgreementOptions());
+        (await db.PriceAgreements.CountAsync()).Should().Be(0);
     }
 
     private async Task<OrganizationId> SeedOrganization(PersonId person, string number = "5560160680")

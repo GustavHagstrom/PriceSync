@@ -13,13 +13,10 @@ internal sealed class PriceAgreement
 
     private PriceAgreement() { }
 
-    internal static PriceAgreement Create(TradingRelationshipId relationshipId, PersonId personId, TimeProvider clock)
+    internal static PriceAgreement Create(TradingRelationshipId relationshipId, PersonId personId, DateTimeOffset createdAt)
     {
         if (relationshipId.Value == Guid.Empty) throw new ArgumentException("Relationship is required.", nameof(relationshipId));
         if (personId.Value == Guid.Empty) throw new ArgumentException("Person is required.", nameof(personId));
-        var now = clock.GetUtcNow();
-        // PostgreSQL timestamps preserve microseconds; use the same value in the initial response.
-        var createdAt = new DateTimeOffset(now.Ticks - now.Ticks % 10, TimeSpan.Zero);
         return new PriceAgreement
         {
             Id = AgreementId.Create(), TradingRelationshipId = relationshipId,

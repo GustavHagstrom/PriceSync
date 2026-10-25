@@ -93,7 +93,7 @@ For database-backed development, configure `ConnectionStrings:OrganizationAccess
 
 ### Price Agreements (work in progress)
 
-`POST /api/v1/trading-relationships/{relationshipId}/agreements` creates a stable Price Agreement without a request body or commercial terms. Supply the acting Supplier in `organization_id`; an active Supplier Owner and an Active Trading Relationship are required. The response is `201` with Location, a server-generated UUIDv7, relationship identity and creation metadata. No version is published.
+`POST /api/v1/agreements` creates a stable Price Agreement with a JSON body containing the required `tradingRelationshipId` (UUID), without commercial terms. Supply the acting Supplier in `organization_id`; an active Supplier Owner and an Active Trading Relationship are required. The response is `201` with Location, a server-generated UUIDv7, relationship identity and creation metadata. No version is published.
 
 `GET /api/v1/agreements/{agreementId}` is available to active Members (including Owners) of either party, including after the relationship has Ended. The acting Organization must be Active. Agreements owns its `agreements` schema and migration history:
 

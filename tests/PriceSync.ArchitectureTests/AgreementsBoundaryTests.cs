@@ -11,9 +11,9 @@ public sealed class AgreementsBoundaryTests
     [Fact]
     public void Agreements_exports_only_composition_surfaces_and_its_owned_identifier()
     {
-        typeof(AgreementsModuleServiceCollectionExtensions).Assembly.ExportedTypes
+        typeof(DependencyInjection).Assembly.ExportedTypes
             .Select(type => type.FullName).Should().BeEquivalentTo([
-                "PriceSync.Modules.Agreements.AgreementsModuleServiceCollectionExtensions",
+                "PriceSync.Modules.Agreements.DependencyInjection",
                 "PriceSync.Modules.Agreements.Endpoints",
             ]);
         typeof(AgreementId).Assembly.ExportedTypes.Select(type => type.FullName)

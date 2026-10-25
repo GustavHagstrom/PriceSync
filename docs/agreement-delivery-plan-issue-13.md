@@ -25,7 +25,7 @@ Module-owned routes under `/api/v1`:
 
 | Operation | Proposed route/input |
 | --- | --- |
-| Create stable agreement | `POST /trading-relationships/{relationshipId}/agreements`; required `Idempotency-Key`; Supplier Owner creates an agreement with no published versions |
+| Create stable agreement | `POST /agreements`; body requires `tradingRelationshipId`; required `Idempotency-Key`; Supplier Owner creates an agreement with no published versions |
 | Publish next version | `POST /agreements/{agreementId}/versions`; expected latest version ID (nullable for first publication), complete validity/coverage/discount payload |
 | Read agreement/versions | `GET /agreements/{agreementId}` and `/versions`; scoped to an authorized party |
 | Read exact version | `GET /agreements/{agreementId}/versions/{versionId}` |
@@ -40,7 +40,7 @@ Both selection properties must be present; JSON null explicitly means no Active 
 
 Expected HTTP outcomes follow existing modules: missing acting Organization/invalid input 400; unauthenticated 401; denied capability 403; unknown or out-of-scope resources 404; stale selection/publication or changed withdrawal reason 409; reference-verification Unavailable 503 with an explicit retryable code. Initial version publication returns 201 and Location; matching retry returns 200 with the existing version. Selection/acceptance/withdrawal success returns 200 with current facts. Domain-invalid references and discounts use field-addressable validation problems, not technical errors. Unexpected failures propagate to host error handling.
 
-Create the stable PriceAgreement identity separately before first publication. The server assigns its identity; creation does not publish terms or alter Customer state. Supplier Owner authority and an Active relationship are required. Multiple agreements are allowed. Initial creation input is the relationship route identity; no commercial terms or new agreement metadata are required in this slice.
+Create the stable PriceAgreement identity separately before first publication. The server assigns its identity; creation does not publish terms or alter Customer state. Supplier Owner authority and an Active relationship are required. Multiple agreements are allowed. Initial creation input is the required `tradingRelationshipId` in the JSON request body; no commercial terms or new agreement metadata are required in this slice.
 
 Creation requires a case-sensitive `Idempotency-Key` of 1–200 characters, following the existing planned Organization-creation protocol. Scope the key to Person, acting Organization and operation; the normalized request includes TradingRelationshipId. Persist the original 201 status, Location and JSON representation. Same key/request replays that result; same key with a different relationship returns 409. Missing/invalid key returns 400. Different keys intentionally create distinct agreements. Retain successful replay records without expiry initially. Recheck current authority and relationship access before replay; a key never grants access after authorization is lost.
 

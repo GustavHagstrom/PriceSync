@@ -5,7 +5,7 @@ using PriceSync.Modules.Agreements.Persistence;
 
 namespace PriceSync.Modules.Agreements;
 
-public static class AgreementsModuleServiceCollectionExtensions
+public static class DependencyInjection
 {
     public static IServiceCollection AddAgreementsModule(this IServiceCollection services, IConfiguration configuration)
     {
