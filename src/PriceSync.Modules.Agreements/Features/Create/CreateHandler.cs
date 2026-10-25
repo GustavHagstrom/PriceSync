@@ -10,12 +10,28 @@ using PriceSync.Modules.TradingRelationships.Contracts;
 
 namespace PriceSync.Modules.Agreements.Features.Create;
 
-internal sealed class CreateHandler(AgreementsDbContext db, TimeProvider clock, IOptions<JsonOptions> jsonOptions)
+internal sealed class CreateHandler(AgreementsDbContext db, TimeProvider clock, IOptions<JsonOptions> jsonOptions,
+    ICurrentPerson currentPerson, ICurrentOrganization currentOrganization,
+    IOrganizationAuthorizer authorizer, ITradingRelationshipReader relationships)
 {
-    // Authority and relationship access must be checked by the caller before every invocation, including retries.
-    internal async Task<CreateResult> HandleAsync(PersonId person, OrganizationId acting,
-        TradingRelationshipId relationshipId, string key, CancellationToken cancellationToken)
+    internal async Task<CreateResult> HandleAsync(CreateCommand command, CancellationToken cancellationToken)
     {
+        if (currentOrganization.OrganizationId is not { } acting)
+            return new CreateResult.ActingOrganizationRequired();
+        var person = currentPerson.PersonId;
+        if (!await authorizer.HasCapabilityAsync(person, acting, OrganizationCapability.PublishAgreements, cancellationToken))
+            return new CreateResult.Forbidden();
+        if (!Guid.TryParse(command.TradingRelationshipId, out var id) || id == Guid.Empty)
+            return new CreateResult.InvalidRelationshipId();
+        var relationshipId = TradingRelationshipId.FromGuid(id);
+        var relationship = await relationships.GetAsync(relationshipId, cancellationToken);
+        if (relationship is null || relationship.SupplierOrganizationId != acting)
+            return new CreateResult.NotFound();
+        if (relationship.Status == TradingRelationshipStatus.Ended)
+            return new CreateResult.RelationshipEnded();
+        if (command.IdempotencyKey is not { Length: >= 1 and <= 200 } key || key.Any(char.IsControl))
+            return new CreateResult.InvalidIdempotencyKey();
+
         await using var transaction = await db.Database.BeginTransactionAsync(IsolationLevel.ReadCommitted, cancellationToken);
         var operation = AgreementCreationReplay.CreateOperation;
         // The unique key arbitrates concurrent requests before an agreement is inserted.
