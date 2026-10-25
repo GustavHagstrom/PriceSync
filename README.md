@@ -78,6 +78,7 @@ Integration tests require a running Docker-compatible container runtime. Testcon
 ```sh
 dotnet test tests/PriceSync.Modules.OrganizationAccess.IntegrationTests
 dotnet test tests/PriceSync.Modules.PricePublication.IntegrationTests
+dotnet test tests/PriceSync.Modules.Agreements.IntegrationTests
 ```
 
 ## Run the API host
@@ -88,7 +89,20 @@ dotnet run --project src/PriceSync.Api
 
 Use the URL printed at startup. `GET /` returns the service name. The protected organization endpoints require authentication that is currently supplied only by the integration-test host; there is no interactive authenticated demo yet.
 
-For database-backed development, configure `ConnectionStrings:OrganizationAccess`, `ConnectionStrings:TradingRelationships` and `ConnectionStrings:PricePublication` for your PostgreSQL instance. The default configuration points to a local `pricesync` database; the API host does not automatically apply migrations or seed data.
+For database-backed development, configure `ConnectionStrings:OrganizationAccess`, `ConnectionStrings:TradingRelationships`, `ConnectionStrings:PricePublication` and `ConnectionStrings:Agreements` for your PostgreSQL instance. The default configuration points to a local `pricesync` database; the API host does not automatically apply migrations or seed data.
+
+### Price Agreements (work in progress)
+
+`POST /api/v1/trading-relationships/{relationshipId}/agreements` creates a stable Price Agreement without a request body or commercial terms. Supply the acting Supplier in `organization_id`; an active Supplier Owner and an Active Trading Relationship are required. The response is `201` with Location, a server-generated UUIDv7, relationship identity and creation metadata. No version is published.
+
+`GET /api/v1/agreements/{agreementId}` is available to active Members (including Owners) of either party, including after the relationship has Ended. The acting Organization must be Active. Agreements owns its `agreements` schema and migration history:
+
+```powershell
+$env:PRICESYNC_AGREEMENTS_DESIGN_TIME_CONNECTION_STRING = "Host=localhost;Database=pricesync;Username=pricesync"
+dotnet ef database update --project src/PriceSync.Modules.Agreements
+```
+
+This is stage 2 of #60. Creation idempotency and paginated list reads are pending in the same draft PR.
 
 ### Logical Price Lists
 
