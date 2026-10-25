@@ -15,7 +15,11 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddPriceSyncApplication();
 builder.Services.AddProblemDetails();
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
+builder.Services.AddSwaggerGen(options =>
+{
+    options.CustomSchemaIds(type => type.FullName?.Replace("+", ".") ?? type.Name);
+});
+
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddAuthentication(UnavailableAuthenticationHandler.SchemeName)
     .AddScheme<AuthenticationSchemeOptions, UnavailableAuthenticationHandler>(
@@ -28,7 +32,7 @@ builder.Services.AddOrganizationAccessModule(builder.Configuration);
 builder.Services.AddTradingRelationshipsModule(builder.Configuration);
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddAgreementsModule();
-builder.Services.AddPricePublicationModule();
+builder.Services.AddPricePublicationModule(builder.Configuration);
 builder.Services.AddCustomerPricingModule();
 builder.Services.AddRetrievalConsumptionModule();
 builder.Services.AddIntegrationConfigurationModule();
@@ -75,6 +79,7 @@ app.UseAuthorization();
 
 app.MapOrganizationAccessEndpoints();
 app.MapTradingRelationshipsEndpoints();
+app.MapPricePublicationEndpoints();
 
 app.Run();
 
