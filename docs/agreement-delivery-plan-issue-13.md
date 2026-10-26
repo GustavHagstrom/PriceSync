@@ -25,7 +25,8 @@ Module-owned routes under `/api/v1`:
 
 | Operation | Proposed route/input |
 | --- | --- |
-| Create stable agreement | `POST /trading-relationships/{relationshipId}/agreements`; required `Idempotency-Key`; Supplier Owner creates an agreement with no published versions |
+| Create stable agreement | `POST /agreements`; body requires `tradingRelationshipId`; required `Idempotency-Key`; Supplier Owner creates an agreement with no published versions |
+| List stable agreements | `GET /agreements?tradingRelationshipId={id}`; optional `pageSize` and `cursor`; ordered descending by creation time/identity |
 | Publish next version | `POST /agreements/{agreementId}/versions`; expected latest version ID (nullable for first publication), complete validity/coverage/discount payload |
 | Read agreement/versions | `GET /agreements/{agreementId}` and `/versions`; scoped to an authorized party |
 | Read exact version | `GET /agreements/{agreementId}/versions/{versionId}` |
@@ -40,7 +41,7 @@ Both selection properties must be present; JSON null explicitly means no Active 
 
 Expected HTTP outcomes follow existing modules: missing acting Organization/invalid input 400; unauthenticated 401; denied capability 403; unknown or out-of-scope resources 404; stale selection/publication or changed withdrawal reason 409; reference-verification Unavailable 503 with an explicit retryable code. Initial version publication returns 201 and Location; matching retry returns 200 with the existing version. Selection/acceptance/withdrawal success returns 200 with current facts. Domain-invalid references and discounts use field-addressable validation problems, not technical errors. Unexpected failures propagate to host error handling.
 
-Create the stable PriceAgreement identity separately before first publication. The server assigns its identity; creation does not publish terms or alter Customer state. Supplier Owner authority and an Active relationship are required. Multiple agreements are allowed. Initial creation input is the relationship route identity; no commercial terms or new agreement metadata are required in this slice.
+Create the stable PriceAgreement identity separately before first publication. The server assigns its identity; creation does not publish terms or alter Customer state. Supplier Owner authority and an Active relationship are required. Multiple agreements are allowed. Initial creation input is the required `tradingRelationshipId` in the JSON request body; no commercial terms or new agreement metadata are required in this slice.
 
 Creation requires a case-sensitive `Idempotency-Key` of 1–200 characters, following the existing planned Organization-creation protocol. Scope the key to Person, acting Organization and operation; the normalized request includes TradingRelationshipId. Persist the original 201 status, Location and JSON representation. Same key/request replays that result; same key with a different relationship returns 409. Missing/invalid key returns 400. Different keys intentionally create distinct agreements. Retain successful replay records without expiry initially. Recheck current authority and relationship access before replay; a key never grants access after authorization is lost.
 
@@ -60,7 +61,7 @@ Own `AgreementsDbContext`, schema `agreements`, migration history, design-time f
 | CustomerAgreementState | TradingRelationshipId PK; nullable ActiveVersionId; last transition sequence |
 | AgreementAcceptance | unique relationship/version; immutable first PersonId and timestamp |
 | SelectionTransition | unique relationship/sequence; nullable From/To IDs, PersonId and decision timestamp |
-| AgreementCreationReplay | unique Person/acting Organization/operation/key; normalized relationship request and original status/Location/JSON |
+| CreationIdempotencyRecord | unique Person/acting Organization/operation/key; normalized relationship request and original status/Location/JSON |
 
 Use same-module keys/constraints to prevent mismatched version/relationship references. External Organization, Person, Trading Relationship and Price List IDs have no cross-module foreign keys. Store percentages as exact tenths (0–1000) after rejecting excessive input precision, not after rounding. Preserve complete system rounding semantics directly in every version. Coverage/type/discount shape, validity intervals and uniqueness require database constraints as well as domain validation where practical.
 
@@ -70,7 +71,7 @@ Published rows have no ordinary update/delete use case. Withdrawal is a separate
 
 ## Concurrent writes and retry mechanics
 
-Agreement creation uses a local Read Committed transaction and reservation-first insert into AgreementCreationReplay (`INSERT ... ON CONFLICT DO NOTHING`). The winner inserts the new Agreement and completed replay result before commit. A concurrent matching request waits, then replays the winner; mismatched normalized request conflicts. Rollback removes both reservation and agreement. Reserve an application-generated UUIDv7 before persisting; there is no committed incomplete replay record. This is operation-specific persistence, not generic middleware or a cross-module transaction.
+Agreement creation uses a local Read Committed transaction and reservation-first insert into CreationIdempotencyRecord (`INSERT ... ON CONFLICT DO NOTHING`). The winner inserts the new Agreement and completed replay result before commit. A concurrent matching request waits, then replays the winner; mismatched normalized request conflicts. Rollback removes both reservation and agreement. Reserve an application-generated UUIDv7 before persisting; there is no committed incomplete replay record. This is operation-specific persistence, not generic middleware or a cross-module transaction.
 
 Customer selection:
 

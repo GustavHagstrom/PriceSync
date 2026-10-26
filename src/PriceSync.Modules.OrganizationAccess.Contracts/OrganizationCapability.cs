@@ -6,4 +6,7 @@ public enum OrganizationCapability
     ManageTradingRelationships,
     ReadPriceLists,
     CreatePriceLists,
+    ReadAgreements,
+    PublishAgreements,
+    ManageCustomerAgreements,
 }
