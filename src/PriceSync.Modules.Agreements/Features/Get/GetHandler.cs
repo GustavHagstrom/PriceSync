@@ -15,8 +15,8 @@ internal sealed class GetHandler(AgreementsDbContext db, ICurrentPerson person, 
         if (organization.OrganizationId is not { } acting) return new GetResult.ActingOrganizationRequired();
         if (!await authorizer.HasCapabilityAsync(person.PersonId, acting, OrganizationCapability.ReadAgreements, cancellationToken))
             return new GetResult.Forbidden();
-        var agreement = query.AgreementId == Guid.Empty ? null : await db.PriceAgreements.AsNoTracking()
-            .SingleOrDefaultAsync(x => x.Id == new AgreementId(query.AgreementId), cancellationToken);
+
+        var agreement = query.AgreementId == Guid.Empty ? null : await db.PriceAgreements.AsNoTracking().SingleOrDefaultAsync(x => x.Id == new AgreementId(query.AgreementId), cancellationToken);
         var relationship = agreement is null ? null : await relationships.GetAsync(agreement.TradingRelationshipId, cancellationToken);
         if (relationship is null || (relationship.SupplierOrganizationId != acting && relationship.CustomerOrganizationId != acting))
             return new GetResult.NotFound();

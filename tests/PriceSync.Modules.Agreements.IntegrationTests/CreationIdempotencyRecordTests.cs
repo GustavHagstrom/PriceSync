@@ -114,7 +114,7 @@ public sealed partial class AgreementApiTests
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
         await using var db = new AgreementsDbContext(fixture.CreateAgreementOptions());
         (await db.PriceAgreements.CountAsync()).Should().Be(0);
-        (await db.CreationReplays.CountAsync()).Should().Be(0);
+        (await db.CreationIdempotencyRecords.CountAsync()).Should().Be(0);
     }
 
     private async Task<(PersonId Owner, OrganizationId Supplier, OrganizationId Customer, TradingRelationshipId Relationship)> SeedAgreementScope()
@@ -217,7 +217,7 @@ public sealed partial class AgreementApiTests
         ((int)(await PostAgreement(retry, scope.Relationship.Value, "recheck")).StatusCode).Should().Be(expectedStatus);
         await using var agreements = new AgreementsDbContext(fixture.CreateAgreementOptions());
         (await agreements.PriceAgreements.CountAsync()).Should().Be(1);
-        (await agreements.CreationReplays.CountAsync()).Should().Be(1);
+        (await agreements.CreationIdempotencyRecords.CountAsync()).Should().Be(1);
     }
 
     [Fact]

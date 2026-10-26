@@ -26,7 +26,7 @@ public sealed class AgreementsBoundaryTests
         var root = FindRepositoryRoot(AppContext.BaseDirectory);
         var ownRoot = Path.Combine(root, "src", "PriceSync.Modules.Agreements");
         var forbidden = new[] { "AgreementsDbContext", "PriceSync.Modules.Agreements.Persistence",
-            "agreements.price_agreements", "agreements.agreement_creation_replays" };
+            "agreements.price_agreements", "agreements.creation_idempotency_records" };
         var violations = Directory.EnumerateFiles(Path.Combine(root, "src"), "*.cs", SearchOption.AllDirectories)
             .Where(path => Path.GetRelativePath(ownRoot, path).StartsWith("..", StringComparison.Ordinal))
             .Where(path => forbidden.Any(File.ReadAllText(path).Contains)).ToArray();

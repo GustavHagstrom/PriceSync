@@ -11,7 +11,7 @@ internal sealed class AgreementsDbContext(DbContextOptions<AgreementsDbContext> 
     internal const string SchemaName = "agreements";
     internal const string MigrationsHistoryTableName = "__EFMigrationsHistory";
     internal DbSet<PriceAgreement> PriceAgreements => Set<PriceAgreement>();
-    internal DbSet<AgreementCreationReplay> CreationReplays => Set<AgreementCreationReplay>();
+    internal DbSet<CreationIdempotencyRecord> CreationIdempotencyRecords => Set<CreationIdempotencyRecord>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -25,14 +25,14 @@ internal sealed class AgreementsDbContext(DbContextOptions<AgreementsDbContext> 
         agreement.HasIndex(x => new { x.TradingRelationshipId, x.CreatedAt, x.Id })
             .HasDatabaseName("ix_price_agreements_relationship_created_id");
 
-        var replay = modelBuilder.Entity<AgreementCreationReplay>();
-        replay.ToTable("agreement_creation_replays");
-        replay.HasKey(x => new { x.PersonId, x.ActingOrganizationId, x.Operation, x.Key })
-            .HasName("pk_agreement_creation_replays");
-        replay.Property(x => x.PersonId).HasConversion(x => x.Value, x => new PersonId(x));
-        replay.Property(x => x.ActingOrganizationId).HasConversion(x => x.Value, x => new OrganizationId(x));
-        replay.Property(x => x.TradingRelationshipId).HasConversion(x => x.Value, x => TradingRelationshipId.FromGuid(x));
-        replay.Property(x => x.Operation).HasMaxLength(100).UseCollation("C");
-        replay.Property(x => x.Key).HasMaxLength(200).UseCollation("C");
+        var idempotencyRecord = modelBuilder.Entity<CreationIdempotencyRecord>();
+        idempotencyRecord.ToTable("creation_idempotency_records");
+        idempotencyRecord.HasKey(x => new { x.PersonId, x.ActingOrganizationId, x.Operation, x.Key })
+            .HasName("pk_creation_idempotency_records");
+        idempotencyRecord.Property(x => x.PersonId).HasConversion(x => x.Value, x => new PersonId(x));
+        idempotencyRecord.Property(x => x.ActingOrganizationId).HasConversion(x => x.Value, x => new OrganizationId(x));
+        idempotencyRecord.Property(x => x.TradingRelationshipId).HasConversion(x => x.Value, x => TradingRelationshipId.FromGuid(x));
+        idempotencyRecord.Property(x => x.Operation).HasMaxLength(100).UseCollation("C");
+        idempotencyRecord.Property(x => x.Key).HasMaxLength(200).UseCollation("C");
     }
 }

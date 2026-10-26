@@ -61,7 +61,7 @@ Own `AgreementsDbContext`, schema `agreements`, migration history, design-time f
 | CustomerAgreementState | TradingRelationshipId PK; nullable ActiveVersionId; last transition sequence |
 | AgreementAcceptance | unique relationship/version; immutable first PersonId and timestamp |
 | SelectionTransition | unique relationship/sequence; nullable From/To IDs, PersonId and decision timestamp |
-| AgreementCreationReplay | unique Person/acting Organization/operation/key; normalized relationship request and original status/Location/JSON |
+| CreationIdempotencyRecord | unique Person/acting Organization/operation/key; normalized relationship request and original status/Location/JSON |
 
 Use same-module keys/constraints to prevent mismatched version/relationship references. External Organization, Person, Trading Relationship and Price List IDs have no cross-module foreign keys. Store percentages as exact tenths (0–1000) after rejecting excessive input precision, not after rounding. Preserve complete system rounding semantics directly in every version. Coverage/type/discount shape, validity intervals and uniqueness require database constraints as well as domain validation where practical.
 
@@ -71,7 +71,7 @@ Published rows have no ordinary update/delete use case. Withdrawal is a separate
 
 ## Concurrent writes and retry mechanics
 
-Agreement creation uses a local Read Committed transaction and reservation-first insert into AgreementCreationReplay (`INSERT ... ON CONFLICT DO NOTHING`). The winner inserts the new Agreement and completed replay result before commit. A concurrent matching request waits, then replays the winner; mismatched normalized request conflicts. Rollback removes both reservation and agreement. Reserve an application-generated UUIDv7 before persisting; there is no committed incomplete replay record. This is operation-specific persistence, not generic middleware or a cross-module transaction.
+Agreement creation uses a local Read Committed transaction and reservation-first insert into CreationIdempotencyRecord (`INSERT ... ON CONFLICT DO NOTHING`). The winner inserts the new Agreement and completed replay result before commit. A concurrent matching request waits, then replays the winner; mismatched normalized request conflicts. Rollback removes both reservation and agreement. Reserve an application-generated UUIDv7 before persisting; there is no committed incomplete replay record. This is operation-specific persistence, not generic middleware or a cross-module transaction.
 
 Customer selection:
 

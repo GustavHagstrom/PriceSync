@@ -6,13 +6,13 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace PriceSync.Modules.Agreements.Persistence.Migrations
 {
     /// <inheritdoc />
-    internal partial class AgreementCreationReplay : Migration
+    internal partial class CreationIdempotencyRecords : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.CreateTable(
-                name: "agreement_creation_replays",
+                name: "creation_idempotency_records",
                 schema: "agreements",
                 columns: table => new
                 {
@@ -27,7 +27,7 @@ namespace PriceSync.Modules.Agreements.Persistence.Migrations
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("pk_agreement_creation_replays", x => new { x.PersonId, x.ActingOrganizationId, x.Operation, x.Key });
+                    table.PrimaryKey("pk_creation_idempotency_records", x => new { x.PersonId, x.ActingOrganizationId, x.Operation, x.Key });
                 });
         }
 
@@ -35,7 +35,7 @@ namespace PriceSync.Modules.Agreements.Persistence.Migrations
         protected override void Down(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.DropTable(
-                name: "agreement_creation_replays",
+                name: "creation_idempotency_records",
                 schema: "agreements");
         }
     }

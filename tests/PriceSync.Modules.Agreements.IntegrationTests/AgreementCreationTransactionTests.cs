@@ -52,7 +52,7 @@ public sealed partial class AgreementApiTests
         (await replay.Content.ReadAsStringAsync()).Should().Be(await second.Content.ReadAsStringAsync());
         await using var db = new AgreementsDbContext(fixture.CreateAgreementOptions());
         (await db.PriceAgreements.CountAsync()).Should().Be(1);
-        var record = await db.CreationReplays.SingleAsync();
+        var record = await db.CreationIdempotencyRecords.SingleAsync();
         record.ResponseStatus.Should().Be(201);
         record.ResponseBody.Should().Be(await second.Content.ReadAsStringAsync());
     }
@@ -72,7 +72,7 @@ public sealed partial class AgreementApiTests
         await using (var db = new AgreementsDbContext(fixture.CreateAgreementOptions()))
         {
             (await db.PriceAgreements.CountAsync()).Should().Be(0);
-            (await db.CreationReplays.CountAsync()).Should().Be(0);
+            (await db.CreationIdempotencyRecords.CountAsync()).Should().Be(0);
         }
         (await PostAgreement(client, scope.Relationship.Value, "rollback")).StatusCode.Should().Be(HttpStatusCode.Created);
     }
@@ -85,7 +85,7 @@ public sealed partial class AgreementApiTests
         await using var command = new NpgsqlCommand("""
             SELECT EXISTS (SELECT 1 FROM pg_stat_activity
                 WHERE datname = current_database() AND wait_event_type = 'Lock'
-                AND query LIKE '%INSERT INTO agreements.agreement_creation_replays%')
+                AND query LIKE '%INSERT INTO agreements.creation_idempotency_records%')
             """, connection);
         while (!(bool)(await command.ExecuteScalarAsync(timeout.Token))!)
             await Task.Delay(20, timeout.Token);
@@ -123,7 +123,7 @@ public sealed partial class AgreementApiTests
         (await PostAgreement(client, scope.Relationship.Value, "point-in-time")).StatusCode.Should().Be(HttpStatusCode.Conflict);
         await using var db = new AgreementsDbContext(fixture.CreateAgreementOptions());
         (await db.PriceAgreements.CountAsync()).Should().Be(1);
-        (await db.CreationReplays.CountAsync()).Should().Be(1);
+        (await db.CreationIdempotencyRecords.CountAsync()).Should().Be(1);
     }
 
     private sealed class EndRelationshipOnReservation(Func<Task> endRelationship) : DbCommandInterceptor
@@ -132,7 +132,7 @@ public sealed partial class AgreementApiTests
         public override async ValueTask<InterceptionResult<int>> NonQueryExecutingAsync(DbCommand command,
             CommandEventData eventData, InterceptionResult<int> result, CancellationToken cancellationToken = default)
         {
-            if (command.CommandText.Contains("INSERT INTO agreements.agreement_creation_replays", StringComparison.Ordinal)
+            if (command.CommandText.Contains("INSERT INTO agreements.creation_idempotency_records", StringComparison.Ordinal)
                 && Interlocked.Increment(ref _reservations) == 1)
                 await endRelationship();
             return result;

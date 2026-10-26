@@ -66,7 +66,7 @@ public sealed class PostgreSqlFixture : IAsyncLifetime
     {
         const string sql = """
             truncate table
-                agreements.agreement_creation_replays,
+                agreements.creation_idempotency_records,
                 agreements.price_agreements,
                 trading_relationships."TradingRelationships",
                 organization_access.organization_membership_roles,

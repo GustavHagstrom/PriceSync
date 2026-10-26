@@ -3,7 +3,7 @@ using PriceSync.Modules.TradingRelationships.Contracts;
 
 namespace PriceSync.Modules.Agreements.Persistence;
 
-internal sealed class AgreementCreationReplay
+internal sealed class CreationIdempotencyRecord
 {
     internal const string CreateOperation = "CreateAgreement";
     public PersonId PersonId { get; private set; }

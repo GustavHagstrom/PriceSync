@@ -12,8 +12,8 @@ using PriceSync.Modules.Agreements.Persistence;
 namespace PriceSync.Modules.Agreements.Persistence.Migrations
 {
     [DbContext(typeof(AgreementsDbContext))]
-    [Migration("20261025212556_AgreementCreationReplay")]
-    partial class AgreementCreationReplay
+    [Migration("20261026205632_CreationIdempotencyRecords")]
+    partial class CreationIdempotencyRecords
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -49,7 +49,7 @@ namespace PriceSync.Modules.Agreements.Persistence.Migrations
                     b.ToTable("price_agreements", "agreements");
                 });
 
-            modelBuilder.Entity("PriceSync.Modules.Agreements.Persistence.AgreementCreationReplay", b =>
+            modelBuilder.Entity("PriceSync.Modules.Agreements.Persistence.CreationIdempotencyRecord", b =>
                 {
                     b.Property<Guid>("PersonId")
                         .HasColumnType("uuid");
@@ -80,9 +80,9 @@ namespace PriceSync.Modules.Agreements.Persistence.Migrations
                         .HasColumnType("uuid");
 
                     b.HasKey("PersonId", "ActingOrganizationId", "Operation", "Key")
-                        .HasName("pk_agreement_creation_replays");
+                        .HasName("pk_creation_idempotency_records");
 
-                    b.ToTable("agreement_creation_replays", "agreements");
+                    b.ToTable("creation_idempotency_records", "agreements");
                 });
 #pragma warning restore 612, 618
         }
