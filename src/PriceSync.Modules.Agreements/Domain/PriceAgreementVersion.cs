@@ -1,6 +1,5 @@
 using PriceSync.Modules.Agreements.Contracts;
 using PriceSync.Modules.OrganizationAccess.Contracts;
-using PriceSync.Modules.PricePublication.Contracts;
 using PriceSync.Modules.TradingRelationships.Contracts;
 
 namespace PriceSync.Modules.Agreements.Domain;
@@ -30,16 +29,4 @@ internal sealed class PriceAgreementVersion
         DecimalPlaces = 4, Midpoint = "AwayFromZero",
         RoundingStage = "OnceAfterDiscountWithoutIntermediateRounding", PreservePriceQuantityAndUnitOfMeasure = true,
     };
-}
-
-internal sealed class AgreementVersionCoverage
-{
-    private AgreementVersionCoverage() { }
-    public AgreementVersionId VersionId { get; private set; }
-    public PriceListId PriceListId { get; private set; }
-    public string Type { get; private set; } = null!;
-    public decimal GeneralDiscount { get; private set; }
-
-    internal static AgreementVersionCoverage General(AgreementVersionId version, PriceListId list, decimal discount) =>
-        new() { VersionId = version, PriceListId = list, Type = "general", GeneralDiscount = discount };
 }
