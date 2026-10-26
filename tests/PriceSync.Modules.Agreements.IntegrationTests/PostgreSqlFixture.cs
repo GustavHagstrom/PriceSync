@@ -3,6 +3,7 @@ using Npgsql;
 using PriceSync.Modules.OrganizationAccess.Persistence;
 using PriceSync.Modules.Agreements.Persistence;
 using PriceSync.Modules.TradingRelationships.Persistence;
+using PriceSync.Modules.PricePublication.Persistence;
 using Testcontainers.PostgreSql;
 using Xunit;
 
@@ -45,6 +46,10 @@ public sealed class PostgreSqlFixture : IAsyncLifetime
         await relationships.Database.MigrateAsync();
         await using var agreements = new AgreementsDbContext(CreateAgreementOptions());
         await agreements.Database.MigrateAsync();
+        await using var publication = new PricePublicationDbContext(new DbContextOptionsBuilder<PricePublicationDbContext>()
+            .UseNpgsql(ConnectionString, options => options.MigrationsHistoryTable(
+                PricePublicationDbContext.MigrationsHistoryTableName, PricePublicationDbContext.SchemaName)).Options);
+        await publication.Database.MigrateAsync();
     }
 
     public async Task DisposeAsync()
@@ -66,6 +71,7 @@ public sealed class PostgreSqlFixture : IAsyncLifetime
     {
         const string sql = """
             truncate table
+                price_publication.price_lists,
                 agreements.creation_idempotency_records,
                 agreements.price_agreements,
                 trading_relationships."TradingRelationships",

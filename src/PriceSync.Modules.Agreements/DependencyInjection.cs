@@ -18,6 +18,7 @@ public static class DependencyInjection
             postgres => postgres.MigrationsHistoryTable(AgreementsDbContext.MigrationsHistoryTableName,
                 AgreementsDbContext.SchemaName)));
         services.AddScoped<CreateHandler>();
+        services.AddScoped<Features.PublishVersion.PublishHandler>();
         services.AddScoped<ListHandler>();
         services.AddScoped<ListValidator>();
         services.AddScoped<GetHandler>();
