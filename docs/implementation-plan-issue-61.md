@@ -1,6 +1,6 @@
 # Implementation plan for issue #61
 
-Status: proposed plan for approval before implementation. This plan changes no production code.
+Status: stage 1 approved and completed on 2026-10-26. Stages 2–8 remain. The user requested stage 1 with `/implement` and `/tdd` under this plan.
 
 Starting point: `issue-61`, created from `Issue-13`, with draft PR #68. Execute the stages sequentially on the same branch. Intermediate results are reviewable commits; keep the PR in draft until all of #61 is complete.
 
@@ -210,11 +210,32 @@ Order: **1 → 2 → 3 → 4 → 5 → 6 → 7 → 8**. Start each stage from th
 
 Update this section at the end of each stage:
 
-- Last completed stage: none; planning only.
-- Implementation baseline: empty preparation commit `37a2381` on `issue-61` (planning commits follow it).
-- Next step: approve the proposed interfaces and priority behaviors, then start stage 1 with `/implement` and `/tdd`.
-- Tests run: none; these changes are documentation only.
-- Open decisions/blockers: decide the paged module-contract scope before stage 7 as described above. Confirm interface names and the concrete request DTO JSON shape against this proposal before coding. Implementation approval has not yet been recorded.
+- Last completed stage: **stage 1 — A narrow first publication**.
+- Implementation commit: `2238a7e` on `issue-61`; stage starting point/review baseline: `08afd4b1ecf28baa62ee12f503db523f4c8230ae`.
+- Approval: the user explicitly requested stage 1 under this plan with `/implement` and `/tdd` on 2026-10-26. The proposed publication interface and priority behaviors were used; no repeated approval question was needed.
+- Completed behaviors: first publication with one existing General list, including explicit zero discount; UUIDv7 identity, ordinal 1, actor/time, validity and preserved complete rounding facts; Supplier Owner/Active acting Organization/Active relationship checks; real Price Publication scope verification; field-addressable rejection of invalid or unsupported terms; retryable verification 503 without publication; repeated first attempt returns 409. The Agreements-owned migration binds version scope and the latest identity/ordinal with same-module constraints. No group or normalized retry storage was introduced.
+- Transaction evidence: deterministic separate-request/DbContext race produces one 201 and one 409 at Read Committed while the second waits on the Agreement lock. Injected failure immediately before commit rolls back version, coverage and latest; the same first publication then succeeds. Durable terms are checked through a fresh DbContext until stage 2 introduces exact GET.
+- Concrete JSON shape for the supported request:
+
+  ```json
+  {
+    "expectedLatestVersionId": null,
+    "validFrom": "2026-10-26",
+    "validTo": null,
+    "coverage": [{ "priceListId": "<logical-list-uuid>", "type": "general", "generalDiscount": 0 }],
+    "groupDiscounts": []
+  }
+  ```
+
+  `expectedLatestVersionId` must be explicitly null for this stage; omission is a field-addressable 400. Nonempty groups, net coverage and multiple lists are explicitly rejected. A new publication returns 201/Location with supported complete facts. Exact version GET and matching-retry 200 remain for later stages. The source feature directory is `Features/PublishVersion` because the repository's Visual Studio ignore rule excludes directories named `publish`.
+- Checks executed after the last production change:
+  - `dotnet build PriceSync.slnx -m:1 --no-restore --nologo -v quiet` — passed, zero warnings/errors.
+  - `dotnet test PriceSync.slnx -m:1 --no-restore --nologo -v minimal` — **389 passed**, zero failed/skipped: Architecture 29, Agreements integration 71, OrganizationAccess integration 56/unit 65, PricePublication integration 33, TradingRelationships integration 115/unit 20.
+  - Focused publication tests were run in red–green cycles; Agreements integration and architecture tests were also run separately. PostgreSQL 16 Testcontainers applied fresh module migrations with the real list verifier. Docker initially required startup; no verification blocker remains.
+  - `/review` used parallel Standards and Spec reviewers against the stage baseline: zero remaining findings on either axis. Architecture testing caught the generated migration's public visibility; it was made internal before the final build/full suite.
+  - `git diff --cached --check` — passed before the implementation commit.
+- Next step: stage 2 — add authorized exact HTTP version reads over this storage, without introducing consumer contracts or pagination yet. Continue on `issue-61`; do not repeat stage 1.
+- Open decisions/blockers: no stage 1 blockers. Resolve the paged module-contract scope before stage 7. PR #68 remains draft; commits are local and have not been pushed in this session.
 
 Starter prompt for the next session:
 
