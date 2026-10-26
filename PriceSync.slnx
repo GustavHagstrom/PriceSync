@@ -21,8 +21,10 @@
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/PriceSync.ArchitectureTests/PriceSync.ArchitectureTests.csproj" />
+    <Project Path="tests/PriceSync.Modules.Agreements.IntegrationTests/PriceSync.Modules.Agreements.IntegrationTests.csproj" />
     <Project Path="tests/PriceSync.Modules.OrganizationAccess.IntegrationTests/PriceSync.Modules.OrganizationAccess.IntegrationTests.csproj" />
     <Project Path="tests/PriceSync.Modules.OrganizationAccess.UnitTests/PriceSync.Modules.OrganizationAccess.UnitTests.csproj" />
+    <Project Path="tests/PriceSync.Modules.PricePublication.IntegrationTests/PriceSync.Modules.PricePublication.IntegrationTests.csproj" />
     <Project Path="tests/PriceSync.Modules.TradingRelationships.IntegrationTests/PriceSync.Modules.TradingRelationships.IntegrationTests.csproj" />
     <Project Path="tests/PriceSync.Modules.TradingRelationships.UnitTests/PriceSync.Modules.TradingRelationships.UnitTests.csproj" />
   </Folder>
