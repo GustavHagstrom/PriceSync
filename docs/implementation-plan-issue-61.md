@@ -1,6 +1,6 @@
 # Implementation plan for issue #61
 
-Status: stages 1–6 completed. Stages 7–8 remain.
+Status: stages 1–6 completed. Stage 7 HTTP pagination is verified and the paged module-contract decision is pending.
 
 Starting point: `issue-61`, created from `Issue-13`, with draft PR #68. Execute the stages sequentially on the same branch. Intermediate results are reviewable commits; keep the PR in draft until all of #61 is complete.
 
@@ -210,7 +210,14 @@ Order: **1 → 2 → 3 → 4 → 5 → 6 → 7 → 8**. Start each stage from th
 
 Update this section at the end of each stage:
 
-### Current handoff — stage 6
+### Current handoff — stage 7 HTTP pagination
+
+- HTTP implementation `e2c7d59` on `issue-61`, reviewed against `3689ec9`. Standards and Spec reviews found no issues in the HTTP slice.
+- `GET /api/v1/agreements/{agreementId}/versions` uses descending publication ordinal, an Agreement-bound continuation cursor, and page sizes from 1 to 100 with a default of 50. It returns complete version facts with the same authorization as exact GET. The query fetches at most one extra version and only loads coverage and groups for returned items.
+- `dotnet build PriceSync.slnx -m:1 -v quiet` passed with zero warnings or errors. `dotnet test PriceSync.slnx -m:1 --no-build --no-restore -v quiet` passed all 434 tests, including 15 new pagination cases and 116 Agreements integration tests. `git diff --cached --check` passed.
+- Issue #61 still has conflicting wording about paged module reads and no clarifying comments. The user was asked whether the module contract should include paging. The recommendation is HTTP paging with the exact-version consumer contract. Stage 7 and the combined acceptance criterion remain open pending the decision.
+
+### Stage 6 record (historical)
 
 - Implementation `8ac04a8` on `issue-61`, reviewed against `809507c`. Standards and Spec reviews found no issues.
 - Trusted module consumers resolve `IAgreementVersionReader` from DI. `GetAsync` returns one version's complete typed facts in immutable collections, or null when the exact version does not exist. Technical failures propagate.
