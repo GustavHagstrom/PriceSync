@@ -1,5 +1,4 @@
 using System.Globalization;
-using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using PriceSync.Modules.Agreements.Contracts;
 using PriceSync.Modules.Agreements.Models;
@@ -12,19 +11,20 @@ namespace PriceSync.Modules.Agreements.Features.ListVersions;
 internal sealed class ListVersionsHandler(AgreementsDbContext db, AgreementVersionReader reader, ICurrentPerson person,
     ICurrentOrganization organization, IOrganizationAuthorizer authorizer, ITradingRelationshipReader relationships)
 {
-    internal async Task<IResult> HandleAsync(Guid agreementId, string? pageSize, string? cursor, CancellationToken cancellationToken)
+    internal async Task<ListVersionsResult> HandleAsync(ListVersionsQuery query, CancellationToken cancellationToken)
     {
-        if (organization.OrganizationId is not { } acting) return Problem(400, OrganizationContextErrors.Required);
+        var (agreementId, pageSize, cursor) = query;
+        if (organization.OrganizationId is not { } acting) return new ListVersionsResult.ActingOrganizationRequired();
         if (!await authorizer.HasCapabilityAsync(person.PersonId, acting, OrganizationCapability.ReadAgreements, cancellationToken))
-            return Problem(403, "forbidden");
-        if (agreementId == Guid.Empty) return Problem(404, "agreement_not_found");
+            return new ListVersionsResult.Forbidden();
+        if (agreementId == Guid.Empty) return new ListVersionsResult.NotFound();
 
         var id = new AgreementId(agreementId);
         var agreement = await db.PriceAgreements.AsNoTracking().SingleOrDefaultAsync(x => x.Id == id, cancellationToken);
-        if (agreement is null) return Problem(404, "agreement_not_found");
+        if (agreement is null) return new ListVersionsResult.NotFound();
         var relationship = await relationships.GetAsync(agreement.TradingRelationshipId, cancellationToken);
         if (relationship is null || (relationship.SupplierOrganizationId != acting && relationship.CustomerOrganizationId != acting))
-            return Problem(404, "agreement_not_found");
+            return new ListVersionsResult.NotFound();
 
         var limit = 50;
         if (pageSize is not null && (!int.TryParse(pageSize, NumberStyles.None, CultureInfo.InvariantCulture, out limit) || limit is < 1 or > 100))
@@ -38,17 +38,11 @@ internal sealed class ListVersionsHandler(AgreementsDbContext db, AgreementVersi
         }
 
         var page = await reader.ReadPageAsync(id, before, limit, cancellationToken);
-        return Results.Ok(new
-        {
-            items = page.Items.Select(VersionResponse.From).ToArray(),
-            nextCursor = page.HasMore ? VersionCursor.Encode(id, page.Items[^1].Ordinal) : null,
-        });
+        return new ListVersionsResult.Success(new ListVersionsResponse(
+            page.Items.Select(VersionResponse.From).ToArray(),
+            page.HasMore ? VersionCursor.Encode(id, page.Items[^1].Ordinal) : null));
     }
 
-    private static IResult Invalid(string field, string message) => Results.ValidationProblem(
-        new Dictionary<string, string[]> { [field] = [message] },
-        extensions: new Dictionary<string, object?> { ["code"] = "validation_failed" });
-
-    private static IResult Problem(int status, string code) => Results.Problem(statusCode: status,
-        extensions: new Dictionary<string, object?> { ["code"] = code });
+    private static ListVersionsResult Invalid(string field, string message) =>
+        new ListVersionsResult.ValidationFailed(new Dictionary<string, string[]> { [field] = [message] });
 }

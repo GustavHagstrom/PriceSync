@@ -4,6 +4,8 @@ using Microsoft.AspNetCore.Routing;
 using PriceSync.Modules.Agreements.Features.Create;
 using PriceSync.Modules.Agreements.Features.Get;
 using PriceSync.Modules.Agreements.Features.List;
+using PriceSync.Modules.Agreements.Features.ListVersions;
+using PriceSync.Modules.Agreements.Features.PublishVersion;
 
 namespace PriceSync.Modules.Agreements;
 
@@ -13,17 +15,13 @@ public static class Endpoints
     {
         var group = endpoints.MapGroup("/api/v1").WithTags("Agreements").RequireAuthorization();
         group.MapPost("/agreements", CreateEndpoint.HandleAsync).WithName("CreateAgreement");
-        group.MapPost("/agreements/{agreementId:guid}/versions",
-            (Guid agreementId, Features.PublishVersion.PublishRequest request, Features.PublishVersion.PublishHandler handler, CancellationToken cancellationToken) =>
-                handler.HandleAsync(agreementId, request, cancellationToken)).WithName("PublishAgreementVersion");
+        group.MapPost("/agreements/{agreementId:guid}/versions", PublishVersionEndpoint.HandleAsync).WithName("PublishAgreementVersion");
         group.MapGet("/agreements/{agreementId:guid}", GetEndpoint.HandleAsync).WithName("GetAgreement");
         group.MapGet("/agreements/{agreementId:guid}/versions/{versionId:guid}",
             (Guid agreementId, Guid versionId, Features.GetVersion.GetVersionHandler handler, CancellationToken cancellationToken) =>
                 handler.HandleAsync(agreementId, versionId, cancellationToken)).WithName("GetAgreementVersion");
         group.MapGet("/agreements", ListEndpoint.HandleAsync).WithName("ListAgreements");
-        group.MapGet("/agreements/{agreementId:guid}/versions",
-            (Guid agreementId, string? pageSize, string? cursor, Features.ListVersions.ListVersionsHandler handler, CancellationToken cancellationToken) =>
-                handler.HandleAsync(agreementId, pageSize, cursor, cancellationToken)).WithName("ListAgreementVersions");
+        group.MapGet("/agreements/{agreementId:guid}/versions", ListVersionsEndpoint.HandleAsync).WithName("ListAgreementVersions");
         return endpoints;
     }
 }

@@ -1,6 +1,5 @@
 using System.Data;
 using System.Text.Json;
-using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using PriceSync.Modules.Agreements.Contracts;
 using PriceSync.Modules.Agreements.Domain;
@@ -12,36 +11,37 @@ using PriceSync.Modules.TradingRelationships.Contracts;
 
 namespace PriceSync.Modules.Agreements.Features.PublishVersion;
 
-internal sealed class PublishHandler(AgreementsDbContext db, TimeProvider clock, ICurrentPerson person,
+internal sealed class PublishVersionHandler(AgreementsDbContext db, TimeProvider clock, ICurrentPerson person,
     ICurrentOrganization organization, IOrganizationAuthorizer authorizer, ITradingRelationshipReader relationships,
     IPriceListScopeVerifier lists, AgreementRoundingPolicy rounding)
 {
-    internal async Task<IResult> HandleAsync(Guid agreementId, PublishRequest request, CancellationToken cancellationToken)
+    internal async Task<PublishVersionResult> HandleAsync(PublishVersionCommand command, CancellationToken cancellationToken)
     {
-        if (organization.OrganizationId is not { } acting) return Problem(400, OrganizationContextErrors.Required);
+        var agreementId = command.AgreementId;
+        if (organization.OrganizationId is not { } acting) return new PublishVersionResult.ActingOrganizationRequired();
         if (!await authorizer.HasCapabilityAsync(person.PersonId, acting, OrganizationCapability.PublishAgreements, cancellationToken))
-            return Problem(403, "forbidden");
-        if (agreementId == Guid.Empty) return Problem(404, "agreement_not_found");
+            return new PublishVersionResult.Forbidden();
+        if (agreementId == Guid.Empty) return new PublishVersionResult.NotFound();
         var id = new AgreementId(agreementId);
         var scope = await db.PriceAgreements.AsNoTracking().SingleOrDefaultAsync(x => x.Id == id, cancellationToken);
-        if (scope is null) return Problem(404, "agreement_not_found");
+        if (scope is null) return new PublishVersionResult.NotFound();
         var relationship = await relationships.GetAsync(scope.TradingRelationshipId, cancellationToken);
-        if (relationship is null || relationship.SupplierOrganizationId != acting) return Problem(404, "agreement_not_found");
-        if (relationship.Status == TradingRelationshipStatus.Ended) return Problem(409, "agreement_relationship_ended");
-        if (request.ValidFrom is null) return Invalid("validFrom", "ValidFrom is required.");
-        if (request.ValidTo < request.ValidFrom) return Invalid("validTo", "ValidTo must be on or after ValidFrom.");
+        if (relationship is null || relationship.SupplierOrganizationId != acting) return new PublishVersionResult.NotFound();
+        if (relationship.Status == TradingRelationshipStatus.Ended) return new PublishVersionResult.RelationshipEnded();
+        if (command.ValidFrom is null) return Invalid("validFrom", "ValidFrom is required.");
+        if (command.ValidTo < command.ValidFrom) return Invalid("validTo", "ValidTo must be on or after ValidFrom.");
         AgreementVersionId? expected = null;
-        if (request.ExpectedLatestVersionId.ValueKind != JsonValueKind.Null)
+        if (command.ExpectedLatestVersionId.ValueKind != JsonValueKind.Null)
         {
-            if (request.ExpectedLatestVersionId.ValueKind != JsonValueKind.String ||
-                !request.ExpectedLatestVersionId.TryGetGuid(out var predecessor) || predecessor == Guid.Empty)
+            if (command.ExpectedLatestVersionId.ValueKind != JsonValueKind.String ||
+                !command.ExpectedLatestVersionId.TryGetGuid(out var predecessor) || predecessor == Guid.Empty)
                 return Invalid("expectedLatestVersionId", "An explicit null or a valid version ID is required.");
             expected = new AgreementVersionId(predecessor);
         }
 
-        if (request.Coverage is not { Length: > 0 }) return Invalid("coverage", "At least one Price List is required.");
+        if (command.Coverage is not { Length: > 0 }) return Invalid("coverage", "At least one Price List is required.");
         var groupDiscounts = new Dictionary<string, decimal>(StringComparer.Ordinal);
-        var submittedGroups = request.GroupDiscounts ?? [];
+        var submittedGroups = command.GroupDiscounts ?? [];
         for (var index = 0; index < submittedGroups.Length; index++)
         {
             var field = $"groupDiscounts[{index}]";
@@ -55,10 +55,10 @@ internal sealed class PublishHandler(AgreementsDbContext db, TimeProvider clock,
         }
         var coverageTerms = new List<CoverageResponse>();
         var references = new Dictionary<PriceListId, PriceListReference>();
-        for (var index = 0; index < request.Coverage.Length; index++)
+        for (var index = 0; index < command.Coverage.Length; index++)
         {
             var field = $"coverage[{index}]";
-            var item = request.Coverage[index];
+            var item = command.Coverage[index];
             if (item is null) return Invalid(field, "Coverage is required.");
             var type = item.Type switch
             {
@@ -89,16 +89,15 @@ internal sealed class PublishHandler(AgreementsDbContext db, TimeProvider clock,
         {
             var invalidIds = invalid.References.Select(reference => reference.PriceListId.Value).ToHashSet();
             var errors = new Dictionary<string, string[]>();
-            for (var index = 0; index < request.Coverage.Length; index++)
-                if (invalidIds.Contains(request.Coverage[index].PriceListId))
+            for (var index = 0; index < command.Coverage.Length; index++)
+                if (invalidIds.Contains(command.Coverage[index].PriceListId))
                     errors.Add($"coverage[{index}].priceListId", ["Invalid Price List scope."]);
-            return Results.ValidationProblem(errors, extensions: new Dictionary<string, object?> { ["code"] = "validation_failed" });
+            return new PublishVersionResult.ValidationFailed(errors);
         }
         if (verification is PriceListVerificationResult.Unavailable)
-            return Results.Problem(statusCode: 503, extensions: new Dictionary<string, object?>
-                { ["code"] = "agreement_list_verification_unavailable", ["retryable"] = true });
+            return new PublishVersionResult.ListVerificationUnavailable();
 
-        var normalized = Normalize(expected?.Value, request.ValidFrom.Value, request.ValidTo,
+        var normalized = Normalize(expected?.Value, command.ValidFrom.Value, command.ValidTo,
             coverageTerms,
             groupDiscounts.Select(group => new GroupDiscountResponse(group.Key, group.Value)));
 
@@ -109,11 +108,11 @@ internal sealed class PublishHandler(AgreementsDbContext db, TimeProvider clock,
         if (agreement.LatestVersionId != expected)
         {
             if (agreement.LatestVersionId is not { } latestId)
-                return Problem(409, "agreement_publication_conflict");
+                return new PublishVersionResult.PublicationConflict();
             var latest = await db.Versions.AsNoTracking().SingleAsync(x => x.Id == latestId, cancellationToken);
             if (latest.PredecessorVersionId != expected ||
                 (latest.NormalizedRequest is { } saved && saved != normalized))
-                return Problem(409, "agreement_publication_conflict");
+                return new PublishVersionResult.PublicationConflict();
 
             var savedCoverage = await db.Coverage.AsNoTracking().Where(x => x.VersionId == latestId).ToArrayAsync(cancellationToken);
             var savedGroups = await db.GroupDiscounts.AsNoTracking().Where(x => x.VersionId == latestId).ToArrayAsync(cancellationToken);
@@ -121,11 +120,11 @@ internal sealed class PublishHandler(AgreementsDbContext db, TimeProvider clock,
             // Versions published before this migration carry the same inputs in their immutable terms.
             if (latest.NormalizedRequest is null &&
                 Normalize(response.PredecessorVersionId, response.ValidFrom, response.ValidTo, response.Coverage, response.GroupDiscounts) != normalized)
-                return Problem(409, "agreement_publication_conflict");
+                return new PublishVersionResult.PublicationConflict();
 
-            return Results.Ok(response);
+            return new PublishVersionResult.Existing(response);
         }
-        var version = PriceAgreementVersion.Create(agreement, request.ValidFrom.Value, request.ValidTo, person.PersonId,
+        var version = PriceAgreementVersion.Create(agreement, command.ValidFrom.Value, command.ValidTo, person.PersonId,
             clock.GetUtcNow(), rounding, normalized);
         var coverage = coverageTerms.Select(item =>
             AgreementVersionCoverage.Create(version.Id, new(item.PriceListId), item.Type, item.GeneralDiscount)).ToArray();
@@ -139,7 +138,7 @@ internal sealed class PublishHandler(AgreementsDbContext db, TimeProvider clock,
         agreement.Publish(version);
         await db.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
-        return Results.Created($"/api/v1/agreements/{agreement.Id}/versions/{version.Id}", VersionResponse.From(version, coverage, groups));
+        return new PublishVersionResult.Created($"/api/v1/agreements/{agreement.Id}/versions/{version.Id}", VersionResponse.From(version, coverage, groups));
     }
 
     private static string Normalize(Guid? predecessor, DateOnly validFrom, DateOnly? validTo,
@@ -158,10 +157,6 @@ internal sealed class PublishHandler(AgreementsDbContext db, TimeProvider clock,
             }),
         });
 
-    private static IResult Problem(int status, string code) => Results.Problem(statusCode: status,
-        extensions: new Dictionary<string, object?> { ["code"] = code });
-
-    private static IResult Invalid(string field, string message) => Results.ValidationProblem(
-        new Dictionary<string, string[]> { [field] = [message] },
-        extensions: new Dictionary<string, object?> { ["code"] = "validation_failed" });
+    private static PublishVersionResult Invalid(string field, string message) =>
+        new PublishVersionResult.ValidationFailed(new Dictionary<string, string[]> { [field] = [message] });
 }

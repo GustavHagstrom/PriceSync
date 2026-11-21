@@ -19,7 +19,7 @@ public static class DependencyInjection
                 AgreementsDbContext.SchemaName)));
         services.AddSingleton(Domain.AgreementRoundingPolicy.Default);
         services.AddScoped<CreateHandler>();
-        services.AddScoped<Features.PublishVersion.PublishHandler>();
+        services.AddScoped<Features.PublishVersion.PublishVersionHandler>();
         services.AddScoped<ListHandler>();
         services.AddScoped<ListValidator>();
         services.AddScoped<GetHandler>();
