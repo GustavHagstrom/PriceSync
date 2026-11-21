@@ -1,6 +1,6 @@
 # Implementation plan for issue #61
 
-Status: stage 1 approved and completed on 2026-10-26. Stages 2–8 remain. The user requested stage 1 with `/implement` and `/tdd` under this plan.
+Status: stages 1–2 completed; stage 2 was approved and completed on 2026-11-21. Stages 3–8 remain. The user requested implementation under this plan with `/implement` and `/tdd`.
 
 Starting point: `issue-61`, created from `Issue-13`, with draft PR #68. Execute the stages sequentially on the same branch. Intermediate results are reviewable commits; keep the PR in draft until all of #61 is complete.
 
@@ -17,7 +17,7 @@ Read the requirements in this order:
 
 Use `/implement` for execution and `/tdd` for behavior-driven red–green–refactor. Use `codebase-design` to keep public interfaces small and their implementation cohesive. This plan does not replace the referenced domain rules.
 
-## Existing implementation
+## Implementation before stage 1 (historical)
 
 - #59 provides logical Price Lists and a real `IPriceListScopeVerifier` with Verified, Invalid and Unavailable results.
 - #60 provides stable Agreement identity, create/get/list, authorization and persistence in `agreements`.
@@ -209,6 +209,25 @@ Order: **1 → 2 → 3 → 4 → 5 → 6 → 7 → 8**. Start each stage from th
 ## Handoff between sessions
 
 Update this section at the end of each stage:
+
+### Current handoff — stage 2
+
+- Last completed stage: **stage 2 — Exact HTTP reads of a published version**.
+- Implementation commit: `f3fea37` on `issue-61`; stage starting point/review baseline: `23d4d9b726fea96425850731f3fddf019f7dd565`.
+- Approval: the user explicitly requested continuation with stage 2 on 2026-11-21, retaining the agreed interfaces and TDD priorities.
+- Completed behavior: `GET /api/v1/agreements/{agreementId}/versions/{versionId}` reads one exact stored version and its coverage without history loading. It returns the same complete supported immutable facts as publication, through a shared internal response model. Active Members and Owners of either party may read, including after the relationship has Ended. Missing acting Organization, anonymous/unauthorized actors and Archived/ended memberships follow existing access rules. Unknown versions, unrelated parties and incorrect Agreement/version combinations return scope-safe `agreement_version_not_found`/404.
+- TDD evidence: the first POST → new-request GET test failed with 404 before the endpoint existed, then passed with complete response equality. Authority tests then exposed missing organization/member/party checks and passed after those checks were implemented. Fourteen new HTTP test cases also cover both parties' historical reads, empty/unknown IDs, incorrect Agreement/version combinations and a captured version ID from an injected pre-commit failure. That failed ID stays unreadable while a fresh first publication succeeds and is readable; stage 1's persistence-specific rollback/concurrency tests remain.
+- Scope: no migration, public consumer contract or pagination was introduced. `Models/VersionResponse.cs` is internal and shared by publication and exact GET; coverage response facts are separate from publication request DTOs. Stage 1's supported commercial scope still applies.
+- Checks after the last code change:
+  - `dotnet build PriceSync.slnx -m:1 --no-restore --nologo -v quiet` — passed, zero warnings/errors.
+  - `dotnet test tests/PriceSync.Modules.Agreements.IntegrationTests -m:1 --no-restore --filter FullyQualifiedName~Exact_version_read --nologo -v quiet` — 14 passed.
+  - `dotnet test PriceSync.slnx -m:1 --no-restore --nologo -v minimal` — **403 passed**, zero failed/skipped: Architecture 29, Agreements integration 85, OrganizationAccess integration 56/unit 65, PricePublication integration 33, TradingRelationships integration 115/unit 20.
+  - `/review` used separate Standards and Spec reviewers against the stage baseline: zero findings on either axis.
+  - `git diff --cached --check` — passed before the implementation commit.
+- Next step: **stage 3 — Commercial rules and complete list verification**. Extend the existing publication and exact GET one behavior at a time; keep next-version publication and retry comparison for stage 4.
+- Open decisions/blockers: no stage 2 blockers. Resolve the paged module-contract scope before stage 7. Stage 2 commits are local and have not been pushed in this session; PR #68 remains draft. Update the issue's completed authority/read criterion and PR's stage 2 checkbox with this local completion status.
+
+### Stage 1 record (historical)
 
 - Last completed stage: **stage 1 — A narrow first publication**.
 - Implementation commit: `2238a7e` on `issue-61`; stage starting point/review baseline: `08afd4b1ecf28baa62ee12f503db523f4c8230ae`.
