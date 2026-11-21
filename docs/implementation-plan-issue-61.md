@@ -1,6 +1,6 @@
 # Implementation plan for issue #61
 
-Status: stages 1–5 completed. Stages 6–8 remain.
+Status: stages 1–6 completed. Stages 7–8 remain.
 
 Starting point: `issue-61`, created from `Issue-13`, with draft PR #68. Execute the stages sequentially on the same branch. Intermediate results are reviewable commits; keep the PR in draft until all of #61 is complete.
 
@@ -210,7 +210,15 @@ Order: **1 → 2 → 3 → 4 → 5 → 6 → 7 → 8**. Start each stage from th
 
 Update this section at the end of each stage:
 
-### Current handoff — stage 5
+### Current handoff — stage 6
+
+- Implementation `8ac04a8` on `issue-61`, reviewed against `809507c`. Standards and Spec reviews found no issues.
+- Trusted module consumers resolve `IAgreementVersionReader` from DI. `GetAsync` returns one version's complete typed facts in immutable collections, or null when the exact version does not exist. Technical failures propagate.
+- Exact HTTP GET and the consumer contract share assembly of stored facts. HTTP retains its authorization and party checks. The contract tests cover historical facts after a successor, unknown IDs and database failures.
+- `dotnet build PriceSync.slnx -m:1 -v quiet` passed with zero warnings or errors. `dotnet test PriceSync.slnx -m:1 --no-build --no-restore -v quiet` passed all 419 tests, including 101 Agreements integration tests. `git diff --cached --check` passed.
+- Next is stage 7. Resolve the open paged module-contract question before implementing the version list.
+
+### Stage 5 record (historical)
 
 - Stage 5 tests are in `420a1b6` on `issue-61`. Standards and Spec reviews against `773956d` found no issues.
 - A PostgreSQL error before commit rolls back multiple coverage and group rows. A request blocked on the same Agreement can then publish from the committed predecessor. Expected conflicts and the unrelated database error retain their respective Problem Details.
