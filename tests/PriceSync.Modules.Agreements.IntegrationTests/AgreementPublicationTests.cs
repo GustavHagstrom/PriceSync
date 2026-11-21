@@ -177,11 +177,12 @@ public sealed partial class AgreementApiTests
     }
 
     [Theory]
-    [InlineData(false, false)]
-    [InlineData(false, true)]
-    [InlineData(true, false)]
-    [InlineData(true, true)]
-    public async Task Concurrent_publications_create_one_successor_and_then_replay_or_conflict(bool next, bool matching)
+    [InlineData(false, false, false)]
+    [InlineData(false, true, false)]
+    [InlineData(true, false, false)]
+    [InlineData(true, true, false)]
+    [InlineData(true, false, true)]
+    public async Task Concurrent_publications_resolve_against_the_committed_latest(bool next, bool matching, bool rollback)
     {
         var scope = await PublicationScope();
         await using var app = scope.App;
@@ -194,8 +195,18 @@ public sealed partial class AgreementApiTests
             request["expectedLatestVersionId"] = (await previous.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid();
         }
         var contender = request.DeepClone();
+        if (rollback)
+        {
+            var extra = await initialClient.PostAsJsonAsync("/api/v1/price-lists", new
+            { name = "Extra", type = "general", currency = "SEK", market = "SE" });
+            extra.StatusCode.Should().Be(HttpStatusCode.Created);
+            var extraId = (await extra.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid();
+            request["coverage"]!.AsArray().Add(Publication(extraId)["coverage"]![0]!.DeepClone());
+            request["groupDiscounts"] = JsonNode.Parse(""" [{"code":"A","discount":1},{"code":"B","discount":2}] """);
+            contender["groupDiscounts"] = JsonNode.Parse(""" [{"code":"C","discount":3}] """);
+        }
         if (!matching) contender["coverage"]![0]!["generalDiscount"] = 25m;
-        var gate = new CommitGate(false);
+        var gate = new CommitGate(false, databaseFailure: rollback);
         await using var guarded = app.WithWebHostBuilder(builder => builder.ConfigureServices(services =>
             services.ConfigureDbContext<AgreementsDbContext>(options => options.AddInterceptors(gate))));
         using var client = guarded.CreateClient();
@@ -221,14 +232,30 @@ public sealed partial class AgreementApiTests
         finally { gate.Release.TrySetResult(); }
         var winner = await first;
         var waiter = await second;
-        winner.StatusCode.Should().Be(HttpStatusCode.Created);
-        waiter.StatusCode.Should().Be(matching ? HttpStatusCode.OK : HttpStatusCode.Conflict);
+        winner.StatusCode.Should().Be(rollback ? HttpStatusCode.InternalServerError : HttpStatusCode.Created);
+        waiter.StatusCode.Should().Be(rollback ? HttpStatusCode.Created : matching ? HttpStatusCode.OK : HttpStatusCode.Conflict);
+        if (rollback)
+        {
+            var failure = await winner.Content.ReadFromJsonAsync<JsonElement>();
+            failure.GetProperty("status").GetInt32().Should().Be(500);
+            failure.GetProperty("code").GetString().Should().Be("internal_server_error");
+            var stored = await initialClient.GetAsync(waiter.Headers.Location);
+            stored.StatusCode.Should().Be(HttpStatusCode.OK);
+            (await stored.Content.ReadAsStringAsync()).Should().Be(await waiter.Content.ReadAsStringAsync());
+        }
+        else if (!matching)
+        {
+            var conflict = await waiter.Content.ReadFromJsonAsync<JsonElement>();
+            conflict.GetProperty("code").GetString().Should().Be("agreement_publication_conflict");
+        }
         if (matching) (await waiter.Content.ReadAsStringAsync()).Should().Be(await winner.Content.ReadAsStringAsync());
-        var id = (await winner.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid();
+        var id = (await (rollback ? waiter : winner).Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid();
         await using var db = new AgreementsDbContext(fixture.CreateAgreementOptions());
         (await db.PriceAgreements.SingleAsync()).LatestVersionId!.Value.Value.Should().Be(id);
         (await db.Versions.CountAsync()).Should().Be(next ? 2 : 1);
         (await db.Coverage.CountAsync()).Should().Be(next ? 2 : 1);
+        var groups = await db.GroupDiscounts.Select(group => group.Code).ToListAsync();
+        groups.Should().BeEquivalentTo(rollback ? new[] { "C" } : Array.Empty<string>());
     }
 
     [Fact]
