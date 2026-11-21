@@ -23,6 +23,8 @@ public static class DependencyInjection
         services.AddScoped<ListHandler>();
         services.AddScoped<ListValidator>();
         services.AddScoped<GetHandler>();
+        services.AddScoped<AgreementVersionReader>();
+        services.AddScoped<Contracts.IAgreementVersionReader>(provider => provider.GetRequiredService<AgreementVersionReader>());
         services.AddScoped<Features.GetVersion.GetVersionHandler>();
         return services;
     }
