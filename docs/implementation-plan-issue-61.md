@@ -1,6 +1,6 @@
 # Implementation plan for issue #61
 
-Status: stages 1–6 completed. Stage 7 HTTP pagination is verified and the paged module-contract decision is pending.
+Status: stages 1–7 completed. Stage 8 remains.
 
 Starting point: `issue-61`, created from `Issue-13`, with draft PR #68. Execute the stages sequentially on the same branch. Intermediate results are reviewable commits; keep the PR in draft until all of #61 is complete.
 
@@ -148,17 +148,16 @@ A Docker-compatible runtime is required for Testcontainers/PostgreSQL 16. If una
 
 **Scope: one bounded agent session.**
 
-**Open requirement interpretation before implementing this stage:** #61 says “Exact-version and paged version-list endpoints/consumer contracts”, while its introduction explicitly mentions only an exact-version consumer contract. Check the current issue and any clarifications; if unresolved, the user needs to decide whether paged module reads are included. Other stages can proceed independently. Record the outcome in the handoff before implementing the list interface; neither exclude nor introduce it as an already settled requirement.
+**Scope decision:** The user approved HTTP pagination and an exact-version reader for module consumers. The paged list is exposed through HTTP.
 
 - Implement the version-list HTTP endpoint with descending ordinal keyset pagination, default 50 and maximum 100. Fetch at most pageSize+1 versions and only their child rows; never fetch the entire history.
 - Make the cursor opaque, validated and bound to the Agreement; invalid cursor/pageSize produces field-addressable 400. A later publication must not duplicate or shift already traversed versions on continuation pages.
 - Version lists and exact HTTP GET follow existing agreement-read authority. An incorrect Agreement/version combination and another party's resources produce scope-safe 404 responses.
 - Update architecture-test contract allowlists as needed and preserve contract-only cross-module dependencies.
-- If the decision includes a paged module contract: introduce its typed query/results, DI wiring and tests in this session, using the same complete facts, ordinal ordering and page limits as HTTP. Expose no EF entities or HTTP DTOs in the contract.
 
 **Priority red–green behaviors:** a consumer can reconstruct unchanged inputs for an old version after a new publication; an unknown version returns NotFound; Members of both parties can list after Ended; empty list; 50/100 limits and invalid values; last page; continuation during a new publication; cursor from the wrong Agreement; no missing or repeated versions.
 
-**Done when:** the list-contract scope has a documented decision, the HTTP list and any module contract follow that decision, all pages use bounded queries and modules remain isolated.
+**Done when:** the list-contract scope has a documented decision, the HTTP list and exact-version module contract follow that decision, all pages use bounded queries and modules remain isolated.
 
 ## Stage 8 — Final requirement verification, documentation and review
 
@@ -210,12 +209,12 @@ Order: **1 → 2 → 3 → 4 → 5 → 6 → 7 → 8**. Start each stage from th
 
 Update this section at the end of each stage:
 
-### Current handoff — stage 7 HTTP pagination
+### Current handoff — stage 7
 
 - HTTP implementation `e2c7d59` on `issue-61`, reviewed against `3689ec9`. Standards and Spec reviews found no issues in the HTTP slice.
 - `GET /api/v1/agreements/{agreementId}/versions` uses descending publication ordinal, an Agreement-bound continuation cursor, and page sizes from 1 to 100 with a default of 50. It returns complete version facts with the same authorization as exact GET. The query fetches at most one extra version and only loads coverage and groups for returned items.
 - `dotnet build PriceSync.slnx -m:1 -v quiet` passed with zero warnings or errors. `dotnet test PriceSync.slnx -m:1 --no-build --no-restore -v quiet` passed all 434 tests, including 15 new pagination cases and 116 Agreements integration tests. `git diff --cached --check` passed.
-- Issue #61 still has conflicting wording about paged module reads and no clarifying comments. The user was asked whether the module contract should include paging. The recommendation is HTTP paging with the exact-version consumer contract. Stage 7 and the combined acceptance criterion remain open pending the decision.
+- The user approved HTTP pagination with exact-version reads for module consumers. Stage 7 is complete. Stage 8 covers final requirement verification, documentation and review.
 
 ### Stage 6 record (historical)
 
