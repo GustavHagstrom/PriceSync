@@ -14,6 +14,7 @@ internal sealed class AgreementsDbContext(DbContextOptions<AgreementsDbContext> 
     internal DbSet<PriceAgreement> PriceAgreements => Set<PriceAgreement>();
     internal DbSet<PriceAgreementVersion> Versions => Set<PriceAgreementVersion>();
     internal DbSet<AgreementVersionCoverage> Coverage => Set<AgreementVersionCoverage>();
+    internal DbSet<AgreementVersionGroupDiscount> GroupDiscounts => Set<AgreementVersionGroupDiscount>();
     internal DbSet<CreationIdempotencyRecord> CreationIdempotencyRecords => Set<CreationIdempotencyRecord>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -30,7 +31,8 @@ internal sealed class AgreementsDbContext(DbContextOptions<AgreementsDbContext> 
         agreement.HasAlternateKey(x => new { x.Id, x.TradingRelationshipId });
 
         var version = modelBuilder.Entity<PriceAgreementVersion>();
-        version.ToTable("agreement_versions");
+        version.ToTable("agreement_versions", table => table.HasCheckConstraint("ck_agreement_version_validity",
+            """ "ValidTo" IS NULL OR "ValidTo" >= "ValidFrom" """));
         version.HasKey(x => x.Id);
         version.Property(x => x.Id).HasConversion(x => x.Value, x => new AgreementVersionId(x)).ValueGeneratedNever();
         version.Property(x => x.AgreementId).HasConversion(x => x.Value, x => new AgreementId(x));
@@ -45,12 +47,25 @@ internal sealed class AgreementsDbContext(DbContextOptions<AgreementsDbContext> 
             .HasPrincipalKey(x => new { x.AgreementId, x.TradingRelationshipId, x.Id, x.Ordinal }).OnDelete(DeleteBehavior.Restrict);
 
         var coverage = modelBuilder.Entity<AgreementVersionCoverage>();
-        coverage.ToTable("agreement_version_coverage");
+        coverage.ToTable("agreement_version_coverage", table => table.HasCheckConstraint("ck_agreement_coverage_discount",
+            """
+            ("Type" = 'general' AND "GeneralDiscount" IS NOT NULL AND
+                "GeneralDiscount" BETWEEN 0 AND 100 AND "GeneralDiscount" = trunc("GeneralDiscount", 1))
+            OR ("Type" = 'customerSpecificNet' AND "GeneralDiscount" IS NULL)
+            """));
         coverage.HasKey(x => new { x.VersionId, x.PriceListId });
         coverage.Property(x => x.VersionId).HasConversion(x => x.Value, x => new AgreementVersionId(x));
         coverage.Property(x => x.PriceListId).HasConversion(x => x.Value, x => new PriceListId(x));
         coverage.Property(x => x.GeneralDiscount).HasColumnType("numeric");
         coverage.HasOne<PriceAgreementVersion>().WithMany().HasForeignKey(x => x.VersionId).OnDelete(DeleteBehavior.Restrict);
+        var group = modelBuilder.Entity<AgreementVersionGroupDiscount>();
+        group.ToTable("agreement_version_group_discounts", table => table.HasCheckConstraint("ck_agreement_group_discount",
+            """ "Code" <> '' AND "Discount" BETWEEN 0 AND 100 AND "Discount" = trunc("Discount", 1) """));
+        group.HasKey(x => new { x.VersionId, x.Code });
+        group.Property(x => x.VersionId).HasConversion(x => x.Value, x => new AgreementVersionId(x));
+        group.Property(x => x.Code).UseCollation("C");
+        group.HasOne<PriceAgreementVersion>().WithMany().HasForeignKey(x => x.VersionId).OnDelete(DeleteBehavior.Restrict);
+
         agreement.HasIndex(x => new { x.TradingRelationshipId, x.CreatedAt, x.Id })
             .HasDatabaseName("ix_price_agreements_relationship_created_id");
 

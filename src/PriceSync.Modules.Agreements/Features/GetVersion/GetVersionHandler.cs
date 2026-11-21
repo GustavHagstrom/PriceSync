@@ -25,8 +25,9 @@ internal sealed class GetVersionHandler(AgreementsDbContext db, ICurrentPerson p
         var relationship = await relationships.GetAsync(version.TradingRelationshipId, cancellationToken);
         if (relationship is null || (relationship.SupplierOrganizationId != acting && relationship.CustomerOrganizationId != acting))
             return NotFound();
-        var coverage = await db.Coverage.AsNoTracking().SingleAsync(x => x.VersionId == id, cancellationToken);
-        return Results.Ok(VersionResponse.From(version, coverage));
+        var coverage = await db.Coverage.AsNoTracking().Where(x => x.VersionId == id).ToArrayAsync(cancellationToken);
+        var groups = await db.GroupDiscounts.AsNoTracking().Where(x => x.VersionId == id).ToArrayAsync(cancellationToken);
+        return Results.Ok(VersionResponse.From(version, coverage, groups));
     }
 
     private static IResult NotFound() => Problem(404, "agreement_version_not_found");

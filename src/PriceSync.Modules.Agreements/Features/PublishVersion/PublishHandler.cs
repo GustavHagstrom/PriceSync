@@ -35,21 +35,53 @@ internal sealed class PublishHandler(AgreementsDbContext db, TimeProvider clock,
                 { ["expectedLatestVersionId"] = ["First publication requires an explicit null predecessor."] },
                 extensions: new Dictionary<string, object?> { ["code"] = "validation_failed" });
 
-        if (request.Coverage is not { Length: 1 }) return Invalid("coverage", "This stage requires exactly one General Price List.");
-        if (request.GroupDiscounts.ValueKind is not (JsonValueKind.Undefined or JsonValueKind.Null) &&
-            (request.GroupDiscounts.ValueKind != JsonValueKind.Array || request.GroupDiscounts.GetArrayLength() != 0))
-            return Invalid("groupDiscounts", "Group discounts are not supported yet.");
-        var item = request.Coverage[0];
-        if (item is null) return Invalid("coverage[0]", "Coverage is required.");
-        if (item.Type != "general") return Invalid("coverage[0].type", "Only General coverage is supported yet.");
-        if (item.PriceListId == Guid.Empty) return Invalid("coverage[0].priceListId", "Price List is required.");
-        if (item.GeneralDiscount is not { } discount || discount is < 0 or > 100 || decimal.Round(discount, 1) != discount)
-            return Invalid("coverage[0].generalDiscount", "An explicit discount from 0 to 100 with at most one decimal place is required.");
+        if (request.Coverage is not { Length: > 0 }) return Invalid("coverage", "At least one Price List is required.");
+        var groupDiscounts = new Dictionary<string, decimal>(StringComparer.Ordinal);
+        var submittedGroups = request.GroupDiscounts ?? [];
+        for (var index = 0; index < submittedGroups.Length; index++)
+        {
+            var field = $"groupDiscounts[{index}]";
+            var group = submittedGroups[index];
+            if (group?.Code is not { Length: > 0 } code || code.Contains('\0'))
+                return Invalid($"{field}.code", "Supplier Price Group code is required and cannot contain NUL.");
+            if (!IsValidDiscount(group.Discount))
+                return Invalid($"{field}.discount", "An explicit discount from 0 to 100 with at most one decimal place is required.");
+            if (!groupDiscounts.TryAdd(code, group.Discount!.Value))
+                return Invalid($"{field}.code", "Duplicate Supplier Price Group code.");
+        }
+        var references = new Dictionary<PriceListId, PriceListReference>();
+        for (var index = 0; index < request.Coverage.Length; index++)
+        {
+            var field = $"coverage[{index}]";
+            var item = request.Coverage[index];
+            if (item is null) return Invalid(field, "Coverage is required.");
+            var type = item.Type switch
+            {
+                "general" => PriceListType.General,
+                "customerSpecificNet" => PriceListType.CustomerSpecificNet,
+                _ => (PriceListType?)null,
+            };
+            if (type is null) return Invalid($"{field}.type", "Unsupported Price List type.");
+            if (item.PriceListId == Guid.Empty) return Invalid($"{field}.priceListId", "Price List is required.");
+            var listId = new PriceListId(item.PriceListId);
+            if (!references.TryAdd(listId, new(listId, type.Value)))
+                return Invalid($"{field}.priceListId", "Duplicate Price List.");
+            if (type == PriceListType.CustomerSpecificNet && item.GeneralDiscount is not null)
+                return Invalid($"{field}.generalDiscount", "Net coverage cannot carry a discount.");
+            if (type == PriceListType.General && !IsValidDiscount(item.GeneralDiscount))
+                return Invalid($"{field}.generalDiscount", "An explicit discount from 0 to 100 with at most one decimal place is required.");
+        }
         var verification = await lists.VerifyAsync(acting, relationship.CustomerOrganizationId,
-            [new(new PriceListId(item.PriceListId), PriceListType.General)], cancellationToken);
-        if (verification is PriceListVerificationResult.Invalid)
-            return Results.ValidationProblem(new Dictionary<string, string[]> { ["coverage[0].priceListId"] = ["Invalid Price List scope."] },
-                extensions: new Dictionary<string, object?> { ["code"] = "validation_failed" });
+            references.Values, cancellationToken);
+        if (verification is PriceListVerificationResult.Invalid invalid)
+        {
+            var invalidIds = invalid.References.Select(reference => reference.PriceListId.Value).ToHashSet();
+            var errors = new Dictionary<string, string[]>();
+            for (var index = 0; index < request.Coverage.Length; index++)
+                if (invalidIds.Contains(request.Coverage[index].PriceListId))
+                    errors.Add($"coverage[{index}].priceListId", ["Invalid Price List scope."]);
+            return Results.ValidationProblem(errors, extensions: new Dictionary<string, object?> { ["code"] = "validation_failed" });
+        }
         if (verification is PriceListVerificationResult.Unavailable)
             return Results.Problem(statusCode: 503, extensions: new Dictionary<string, object?>
                 { ["code"] = "agreement_list_verification_unavailable", ["retryable"] = true });
@@ -60,16 +92,23 @@ internal sealed class PublishHandler(AgreementsDbContext db, TimeProvider clock,
             """).SingleAsync(cancellationToken);
         if (agreement.LatestVersionId is not null) return Problem(409, "agreement_publication_conflict");
         var version = PriceAgreementVersion.First(agreement, request.ValidFrom!.Value, request.ValidTo, person.PersonId, clock.GetUtcNow());
-        var coverage = AgreementVersionCoverage.General(version.Id, new(item.PriceListId), item.GeneralDiscount!.Value);
+        var coverage = request.Coverage.Select(item =>
+            AgreementVersionCoverage.Create(version.Id, new(item.PriceListId), item.Type!, item.GeneralDiscount)).ToArray();
+        var groups = groupDiscounts.Select(group =>
+            AgreementVersionGroupDiscount.Create(version.Id, group.Key, group.Value)).ToArray();
         db.Versions.Add(version);
-        db.Coverage.Add(coverage);
+        db.GroupDiscounts.AddRange(groups);
+        db.Coverage.AddRange(coverage);
         // Insert the version before moving the constrained latest pointer, within the same local transaction.
         await db.SaveChangesAsync(cancellationToken);
         agreement.PublishFirst(version);
         await db.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
-        return Results.Created($"/api/v1/agreements/{agreement.Id}/versions/{version.Id}", VersionResponse.From(version, coverage));
+        return Results.Created($"/api/v1/agreements/{agreement.Id}/versions/{version.Id}", VersionResponse.From(version, coverage, groups));
     }
+
+    private static bool IsValidDiscount(decimal? value) =>
+        value is >= 0 and <= 100 && decimal.Round(value.Value, 1) == value.Value;
 
     private static IResult Problem(int status, string code) => Results.Problem(statusCode: status,
         extensions: new Dictionary<string, object?> { ["code"] = code });

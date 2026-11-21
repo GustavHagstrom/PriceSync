@@ -9,8 +9,8 @@ internal sealed class AgreementVersionCoverage
     public AgreementVersionId VersionId { get; private set; }
     public PriceListId PriceListId { get; private set; }
     public string Type { get; private set; } = null!;
-    public decimal GeneralDiscount { get; private set; }
+    public decimal? GeneralDiscount { get; private set; }
 
-    internal static AgreementVersionCoverage General(AgreementVersionId version, PriceListId list, decimal discount) =>
-        new() { VersionId = version, PriceListId = list, Type = "general", GeneralDiscount = discount };
+    internal static AgreementVersionCoverage Create(AgreementVersionId version, PriceListId list, string type, decimal? discount) =>
+        new() { VersionId = version, PriceListId = list, Type = type, GeneralDiscount = discount };
 }
