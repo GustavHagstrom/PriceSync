@@ -1,6 +1,6 @@
 # Implementation plan for issue #61
 
-Status: stages 1–3 completed. Stages 4–8 remain.
+Status: stages 1–4 completed. Stages 5–8 remain.
 
 Starting point: `issue-61`, created from `Issue-13`, with draft PR #68. Execute the stages sequentially on the same branch. Intermediate results are reviewable commits; keep the PR in draft until all of #61 is complete.
 
@@ -210,7 +210,17 @@ Order: **1 → 2 → 3 → 4 → 5 → 6 → 7 → 8**. Start each stage from th
 
 Update this section at the end of each stage:
 
-### Current handoff — stage 3
+### Current handoff — stage 4
+
+- Stage 4 was implemented locally in `7279a52` on `issue-61`, reviewed against `4d91189`. Standards and Spec reviews found no issues.
+- First publication requires explicit null. A later publication requires the current version ID and appends a complete immutable successor with its predecessor and ordinal under the Agreement row lock.
+- A matching request for the immediate successor returns its saved facts with 200. Any mismatch or intervening successor returns 409. The normalized request stores exact group codes and discounts in tenths, ignores collection order and omits the system rounding policy. Earlier versions without saved comparison data are compared using their immutable terms.
+- Tests cover overlapping validity, removal of coverage, order and numeric equivalence, payload differences, a stale predecessor, replay from a fresh host with different rounding, first and next publication races, and rollback before commit.
+- `dotnet build PriceSync.slnx -m:1 --no-restore -v quiet` passed with zero warnings or errors.
+- `dotnet test PriceSync.slnx -m:1 --no-build --no-restore -v quiet` passed all 414 tests, including 96 Agreements integration tests. `git diff --cached --check` passed.
+- Next is stage 5, covering additional concurrency and transaction guarantees. Resolve the paged module-contract scope before stage 7.
+
+### Stage 3 record (historical)
 
 - Completed stage 3 on `issue-61` in `f4c2a1c`, reviewed against `183faab`. Standards and Spec reviews found no issues.
 - First publication supports General, net-only and mixed coverage through the real Price Publication verifier. Invalid references reject the whole publication with indexed field errors. Unavailable verification still returns retryable 503.
