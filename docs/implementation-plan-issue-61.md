@@ -1,6 +1,6 @@
 # Implementation plan for issue #61
 
-Status: stages 1–7 completed. Stage 8 remains.
+Status: stages 1–8 completed and verified locally.
 
 Starting point: `issue-61`, created from `Issue-13`, with draft PR #68. Execute the stages sequentially on the same branch. Intermediate results are reviewable commits; keep the PR in draft until all of #61 is complete.
 
@@ -232,7 +232,15 @@ The exact-version consumer contract is for trusted modules. HTTP handles authori
 
 Update this section at the end of each stage:
 
-### Current handoff — stage 7
+### Final verification — stage 8
+
+- The complete implementation was reviewed against the `Issue-13` merge base `c3baa0c`. Final corrections and documentation are in `63cd405`.
+- Exact JSON discount precision is validated before conversion. The new Agreements migration prevents version predecessors from crossing Agreement scope and retains earlier migration history. Both regressions were reproduced before their fixes.
+- README documents publication and reads. The final acceptance matrix maps all criteria to named evidence. Standards and Spec reviews found no remaining issues.
+- `dotnet build PriceSync.slnx -m:1 -v quiet` passed with zero warnings or errors. `dotnet test PriceSync.slnx -m:1 --no-build --no-restore -v quiet` passed 442 tests, including 124 Agreements integration tests. The PostgreSQL fixture applied the full Agreements migration chain alongside Organization Access, Trading Relationships and Price Publication migrations. `git diff --cached --check` passed.
+- PR #68 is a draft. The stage 6–8 commits were verified locally and remain pending push at this handoff.
+
+### Stage 7 record (historical)
 
 - HTTP implementation `e2c7d59` on `issue-61`, reviewed against `3689ec9`. Standards and Spec reviews found no issues in the HTTP slice.
 - `GET /api/v1/agreements/{agreementId}/versions` uses descending publication ordinal, an Agreement-bound continuation cursor, and page sizes from 1 to 100 with a default of 50. It returns complete version facts with the same authorization as exact GET. The query fetches at most one extra version and only loads coverage and groups for returned items.
