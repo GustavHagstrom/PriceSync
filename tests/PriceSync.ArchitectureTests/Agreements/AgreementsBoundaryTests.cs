@@ -9,7 +9,7 @@ namespace PriceSync.ArchitectureTests.Agreements;
 public sealed class AgreementsBoundaryTests
 {
     [Fact]
-    public void Agreements_exports_only_composition_surfaces_and_its_owned_identifier()
+    public void Agreements_exports_only_composition_surfaces_and_its_owned_contracts()
     {
         typeof(DependencyInjection).Assembly.ExportedTypes
             .Select(type => type.FullName).Should().BeEquivalentTo([
@@ -17,7 +17,13 @@ public sealed class AgreementsBoundaryTests
                 "PriceSync.Modules.Agreements.Endpoints",
             ]);
         typeof(AgreementId).Assembly.ExportedTypes.Select(type => type.FullName)
-            .Should().BeEquivalentTo(["PriceSync.Modules.Agreements.Contracts.AgreementId"]);
+            .Should().BeEquivalentTo(["PriceSync.Modules.Agreements.Contracts.AgreementId",
+                "PriceSync.Modules.Agreements.Contracts.AgreementVersionId",
+                "PriceSync.Modules.Agreements.Contracts.IAgreementVersionReader",
+                "PriceSync.Modules.Agreements.Contracts.AgreementVersionFacts",
+                "PriceSync.Modules.Agreements.Contracts.AgreementVersionListCoverage",
+                "PriceSync.Modules.Agreements.Contracts.AgreementVersionRounding",
+                "PriceSync.Modules.Agreements.Contracts.AgreementVersionGroupTerms"]);
     }
 
     [Fact]
@@ -26,7 +32,8 @@ public sealed class AgreementsBoundaryTests
         var root = FindRepositoryRoot(AppContext.BaseDirectory);
         var ownRoot = Path.Combine(root, "src", "PriceSync.Modules.Agreements");
         var forbidden = new[] { "AgreementsDbContext", "PriceSync.Modules.Agreements.Persistence",
-            "agreements.price_agreements", "agreements.creation_idempotency_records" };
+            "agreements.price_agreements", "agreements.creation_idempotency_records",
+            "agreements.agreement_versions", "agreements.agreement_version_coverage" };
         var violations = Directory.EnumerateFiles(Path.Combine(root, "src"), "*.cs", SearchOption.AllDirectories)
             .Where(path => Path.GetRelativePath(ownRoot, path).StartsWith("..", StringComparison.Ordinal))
             .Where(path => forbidden.Any(File.ReadAllText(path).Contains)).ToArray();

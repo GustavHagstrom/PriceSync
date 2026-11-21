@@ -23,6 +23,49 @@ namespace PriceSync.Modules.Agreements.Persistence.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.Entity("PriceSync.Modules.Agreements.Domain.AgreementVersionCoverage", b =>
+                {
+                    b.Property<Guid>("VersionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("PriceListId")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal?>("GeneralDiscount")
+                        .HasColumnType("numeric");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.HasKey("VersionId", "PriceListId");
+
+                    b.ToTable("agreement_version_coverage", "agreements", t =>
+                        {
+                            t.HasCheckConstraint("ck_agreement_coverage_discount", "(\"Type\" = 'general' AND \"GeneralDiscount\" IS NOT NULL AND\r\n    \"GeneralDiscount\" BETWEEN 0 AND 100 AND \"GeneralDiscount\" = trunc(\"GeneralDiscount\", 1))\r\nOR (\"Type\" = 'customerSpecificNet' AND \"GeneralDiscount\" IS NULL)");
+                        });
+                });
+
+            modelBuilder.Entity("PriceSync.Modules.Agreements.Domain.AgreementVersionGroupDiscount", b =>
+                {
+                    b.Property<Guid>("VersionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Code")
+                        .HasColumnType("text")
+                        .UseCollation("C");
+
+                    b.Property<decimal>("Discount")
+                        .HasColumnType("numeric");
+
+                    b.HasKey("VersionId", "Code");
+
+                    b.ToTable("agreement_version_group_discounts", "agreements", t =>
+                        {
+                            t.HasCheckConstraint("ck_agreement_group_discount", " \"Code\" <> '' AND \"Discount\" BETWEEN 0 AND 100 AND \"Discount\" = trunc(\"Discount\", 1) ");
+                        });
+                });
+
             modelBuilder.Entity("PriceSync.Modules.Agreements.Domain.PriceAgreement", b =>
                 {
                     b.Property<Guid>("Id")
@@ -34,6 +77,12 @@ namespace PriceSync.Modules.Agreements.Persistence.Migrations
                     b.Property<Guid>("CreatedByPersonId")
                         .HasColumnType("uuid");
 
+                    b.Property<long>("LatestOrdinal")
+                        .HasColumnType("bigint");
+
+                    b.Property<Guid?>("LatestVersionId")
+                        .HasColumnType("uuid");
+
                     b.Property<Guid>("TradingRelationshipId")
                         .HasColumnType("uuid");
 
@@ -43,7 +92,71 @@ namespace PriceSync.Modules.Agreements.Persistence.Migrations
                     b.HasIndex("TradingRelationshipId", "CreatedAt", "Id")
                         .HasDatabaseName("ix_price_agreements_relationship_created_id");
 
-                    b.ToTable("price_agreements", "agreements");
+                    b.HasIndex("Id", "TradingRelationshipId", "LatestVersionId", "LatestOrdinal");
+
+                    b.ToTable("price_agreements", "agreements", t =>
+                        {
+                            t.HasCheckConstraint("ck_agreement_latest", "\"LatestVersionId\" IS NULL AND \"LatestOrdinal\" = 0 OR \"LatestVersionId\" IS NOT NULL AND \"LatestOrdinal\" > 0");
+                        });
+                });
+
+            modelBuilder.Entity("PriceSync.Modules.Agreements.Domain.PriceAgreementVersion", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("AgreementId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("DecimalPlaces")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Midpoint")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("NormalizedRequest")
+                        .HasColumnType("text");
+
+                    b.Property<long>("Ordinal")
+                        .HasColumnType("bigint");
+
+                    b.Property<Guid?>("PredecessorVersionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<bool>("PreservePriceQuantityAndUnitOfMeasure")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTimeOffset>("PublishedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("PublishedByPersonId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("RoundingStage")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<Guid>("TradingRelationshipId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateOnly>("ValidFrom")
+                        .HasColumnType("date");
+
+                    b.Property<DateOnly?>("ValidTo")
+                        .HasColumnType("date");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AgreementId", "Ordinal")
+                        .IsUnique();
+
+                    b.HasIndex("AgreementId", "PredecessorVersionId");
+
+                    b.ToTable("agreement_versions", "agreements", t =>
+                        {
+                            t.HasCheckConstraint("ck_agreement_version_validity", " \"ValidTo\" IS NULL OR \"ValidTo\" >= \"ValidFrom\" ");
+                        });
                 });
 
             modelBuilder.Entity("PriceSync.Modules.Agreements.Persistence.CreationIdempotencyRecord", b =>
@@ -80,6 +193,49 @@ namespace PriceSync.Modules.Agreements.Persistence.Migrations
                         .HasName("pk_creation_idempotency_records");
 
                     b.ToTable("creation_idempotency_records", "agreements");
+                });
+
+            modelBuilder.Entity("PriceSync.Modules.Agreements.Domain.AgreementVersionCoverage", b =>
+                {
+                    b.HasOne("PriceSync.Modules.Agreements.Domain.PriceAgreementVersion", null)
+                        .WithMany()
+                        .HasForeignKey("VersionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("PriceSync.Modules.Agreements.Domain.AgreementVersionGroupDiscount", b =>
+                {
+                    b.HasOne("PriceSync.Modules.Agreements.Domain.PriceAgreementVersion", null)
+                        .WithMany()
+                        .HasForeignKey("VersionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("PriceSync.Modules.Agreements.Domain.PriceAgreement", b =>
+                {
+                    b.HasOne("PriceSync.Modules.Agreements.Domain.PriceAgreementVersion", null)
+                        .WithMany()
+                        .HasForeignKey("Id", "TradingRelationshipId", "LatestVersionId", "LatestOrdinal")
+                        .HasPrincipalKey("AgreementId", "TradingRelationshipId", "Id", "Ordinal")
+                        .OnDelete(DeleteBehavior.Restrict);
+                });
+
+            modelBuilder.Entity("PriceSync.Modules.Agreements.Domain.PriceAgreementVersion", b =>
+                {
+                    b.HasOne("PriceSync.Modules.Agreements.Domain.PriceAgreementVersion", null)
+                        .WithMany()
+                        .HasForeignKey("AgreementId", "PredecessorVersionId")
+                        .HasPrincipalKey("AgreementId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("PriceSync.Modules.Agreements.Domain.PriceAgreement", null)
+                        .WithMany()
+                        .HasForeignKey("AgreementId", "TradingRelationshipId")
+                        .HasPrincipalKey("Id", "TradingRelationshipId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
                 });
 #pragma warning restore 612, 618
         }

@@ -101,6 +101,8 @@ public sealed partial class AgreementApiTests(PostgreSqlFixture fixture) : IAsyn
         if (scenario != "noOrganization") client.DefaultRequestHeaders.Add("organization_id", acting.ToString());
         var create = await PostAgreement(client, relationship.Id.Value);
         ((int)create.StatusCode).Should().Be(createStatus, await create.Content.ReadAsStringAsync());
+        var publish = await client.PostAsJsonAsync($"{original.Headers.Location}/versions", Publication(Guid.CreateVersion7()));
+        ((int)publish.StatusCode).Should().Be(createStatus, await publish.Content.ReadAsStringAsync());
         var read = await client.GetAsync(original.Headers.Location);
         ((int)read.StatusCode).Should().Be(readStatus, await read.Content.ReadAsStringAsync());
         var list = await client.GetAsync($"/api/v1/agreements?tradingRelationshipId={relationship.Id}");
@@ -137,6 +139,9 @@ public sealed partial class AgreementApiTests(PostgreSqlFixture fixture) : IAsyn
         rejected.StatusCode.Should().Be(HttpStatusCode.Conflict);
         var problem = await rejected.Content.ReadFromJsonAsync<JsonElement>();
         problem.GetProperty("code").GetString().Should().Be("agreement_relationship_ended");
+        var publish = await client.PostAsJsonAsync($"{original.Headers.Location}/versions", Publication(Guid.CreateVersion7()));
+        publish.StatusCode.Should().Be(HttpStatusCode.Conflict);
+        (await publish.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("code").GetString().Should().Be("agreement_relationship_ended");
         var read = await client.GetAsync(original.Headers.Location);
         read.StatusCode.Should().Be(HttpStatusCode.OK);
         (await read.Content.ReadAsStringAsync()).Should().Be(await original.Content.ReadAsStringAsync());

@@ -16,11 +16,11 @@ internal sealed class ApiApplication(string connectionString, PersonId? personId
 {
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
-        foreach (var module in new[] { "OrganizationAccess", "TradingRelationships", "Agreements" })
+        foreach (var module in new[] { "OrganizationAccess", "TradingRelationships", "Agreements", "PricePublication" })
             builder.UseSetting($"ConnectionStrings:{module}", connectionString);
 
         builder.ConfigureAppConfiguration((_, configuration) => configuration.AddInMemoryCollection(
-            new[] { "OrganizationAccess", "TradingRelationships", "Agreements" }
+            new[] { "OrganizationAccess", "TradingRelationships", "Agreements", "PricePublication" }
                 .ToDictionary(module => $"ConnectionStrings:{module}", _ => (string?)connectionString)));
 
         builder.ConfigureServices(services => services.AddAuthentication(TestAuthenticationHandler.SchemeName)

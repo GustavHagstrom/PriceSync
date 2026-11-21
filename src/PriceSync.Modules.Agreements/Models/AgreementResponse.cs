@@ -6,5 +6,5 @@ internal sealed record AgreementResponse(Guid Id, Guid TradingRelationshipId, Gu
     DateTimeOffset CreatedAt, Guid? LatestVersionId)
 {
     internal static AgreementResponse From(PriceAgreement agreement) => new(agreement.Id.Value,
-        agreement.TradingRelationshipId.Value, agreement.CreatedByPersonId.Value, agreement.CreatedAt, null);
+        agreement.TradingRelationshipId.Value, agreement.CreatedByPersonId.Value, agreement.CreatedAt, agreement.LatestVersionId?.Value);
 }

@@ -17,10 +17,16 @@ public static class DependencyInjection
         services.AddDbContext<AgreementsDbContext>(options => options.UseNpgsql(connectionString,
             postgres => postgres.MigrationsHistoryTable(AgreementsDbContext.MigrationsHistoryTableName,
                 AgreementsDbContext.SchemaName)));
+        services.AddSingleton(Domain.AgreementRoundingPolicy.Default);
         services.AddScoped<CreateHandler>();
+        services.AddScoped<Features.PublishVersion.PublishVersionHandler>();
         services.AddScoped<ListHandler>();
         services.AddScoped<ListValidator>();
         services.AddScoped<GetHandler>();
+        services.AddScoped<Features.ListVersions.ListVersionsHandler>();
+        services.AddScoped<AgreementVersionReader>();
+        services.AddScoped<Contracts.IAgreementVersionReader>(provider => provider.GetRequiredService<AgreementVersionReader>());
+        services.AddScoped<Features.GetVersion.GetVersionHandler>();
         return services;
     }
 }

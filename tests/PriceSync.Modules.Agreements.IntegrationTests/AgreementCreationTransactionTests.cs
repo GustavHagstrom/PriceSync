@@ -139,7 +139,7 @@ public sealed partial class AgreementApiTests
         }
     }
 
-    private sealed class CommitGate(bool failWinner) : DbTransactionInterceptor
+    private sealed class CommitGate(bool failWinner, bool databaseFailure = false) : DbTransactionInterceptor
     {
         private int _commits;
         internal TaskCompletionSource Entered { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -153,6 +153,13 @@ public sealed partial class AgreementApiTests
             Isolation = transaction.IsolationLevel;
             Entered.SetResult();
             await Release.Task.WaitAsync(TimeSpan.FromSeconds(15), cancellationToken);
+            if (databaseFailure)
+            {
+                await using var command = transaction.Connection!.CreateCommand();
+                command.Transaction = transaction;
+                command.CommandText = "SELECT 1 / 0";
+                await command.ExecuteNonQueryAsync(cancellationToken);
+            }
             if (failWinner) throw new InvalidOperationException("Injected failure immediately before commit.");
             return result;
         }

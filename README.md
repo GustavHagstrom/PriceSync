@@ -36,7 +36,8 @@ The repository currently contains the backend foundation. Price import, publicat
 | Organization & Access | Domain rules, PostgreSQL persistence and migrations, and two read endpoints on `main` |
 | Trading Relationships | Create, End, Get, and Supplier/Customer lists with PostgreSQL persistence and concurrency tests on `main` |
 | Logical Price Lists | Supplier-owned General and Customer-Specific Net lists: authenticated create/read, immutable scope, PostgreSQL persistence and complete-set verification for Agreements |
-| Price ingestion, agreements, publication, and consumption | Domain documentation and module scaffolding; workflows remain to be implemented |
+| Price Agreements | Supplier-owned agreement creation and immutable version publication, authorized exact and paged reads, and an exact-version module contract |
+| Price file ingestion, Price List Version publication, and Customer Price consumption | Domain documentation and module scaffolding |
 | Production authentication | Pending; the default host does not authenticate users, so protected endpoints return `401` |
 
 ## Technology and architecture
@@ -105,6 +106,51 @@ dotnet ef database update --project src/PriceSync.Modules.Agreements
 ```
 
 `GET /api/v1/agreements?tradingRelationshipId={id}` lists agreements within one relationship, including those without published versions. The same read authority applies to single reads and list pages, including Ended relationships. Results contain `items` and a nullable `nextCursor`, ordered newest first by `createdAt` and agreement ID. The default `pageSize` is 50; valid values are 1–100. Pass the returned `nextCursor` as the `cursor` query parameter to continue. Invalid pagination produces field-addressable `400` errors.
+
+#### Publish and read Agreement Versions
+
+Publish via `POST /api/v1/agreements/{agreementId}/versions` with the acting Supplier in the `organization_id` header. An active Supplier Owner and an Active Trading Relationship are required. Set `expectedLatestVersionId` explicitly to `null` for the first publication. For the next publication, supply the current `latestVersionId` from the Agreement and send the complete replacement terms.
+
+```json
+{
+  "expectedLatestVersionId": null,
+  "validFrom": "2026-11-01",
+  "validTo": "2026-11-30",
+  "coverage": [
+    {
+      "priceListId": "018f01be-5c01-79a0-8000-000000000001",
+      "type": "general",
+      "generalDiscount": 12.5
+    },
+    {
+      "priceListId": "018f01be-5c01-79a0-8000-000000000002",
+      "type": "customerSpecificNet"
+    }
+  ],
+  "groupDiscounts": [{ "code": "01", "discount": 15 }]
+}
+```
+
+Use calendar dates in `YYYY-MM-DD` form. `validFrom` is required and `validTo` is optional and inclusive. When supplied, it must be on or after `validFrom`. Validity periods may overlap. Coverage must contain at least one unique logical Price List. Both list types can appear together, and net-only coverage is valid. A net list must match the Agreement Customer and carries no discount. Price Publication verifies every list's existence, type, Supplier and applicable Customer, including lists that have no published Price List Version.
+
+General coverage requires an explicit discount, including zero. Discounts are JSON numbers from 0 to 100 inclusive, with at most one decimal place in their exact value. Optional group discounts use exact, case-sensitive codes and preserve leading zeros. A matching group discount replaces the list discount for that group across covered General lists. Codes may be defined before they occur in list content. Duplicate list IDs and group codes are rejected.
+
+A new publication returns `201 Created`, a `Location` for the exact version, and the complete version JSON. The response contains `id` (UUIDv7), `agreementId`, `tradingRelationshipId`, nullable `predecessorVersionId`, `ordinal`, validity, `publishedAt`, `publishedByPersonId`, `coverage`, `groupDiscounts`, and the stored `rounding` rule. The initial rule stores four decimal places, midpoint away from zero, and a single final rounding after discount without intermediate rounding, preserving Price Quantity and Unit of Measure. Price calculation belongs to Customer Pricing. To correct published terms, publish another version.
+
+A matching retry returns `200 OK` with the saved immediate successor and its original metadata and rounding. Comparison ignores collection order and equivalent numeric representations. A different payload or a later intervening publication returns `409`. This publication operation identifies retries through the expected predecessor and submitted terms.
+
+`GET /api/v1/agreements/{agreementId}/versions/{versionId}` returns the same complete facts for an exact version. `GET /api/v1/agreements/{agreementId}/versions?pageSize=50` returns `items` in descending publication ordinal and a nullable `nextCursor`. Pass the cursor back with `cursor` for the same Agreement to continue. The default page size is 50 and the maximum is 100. Active Members of either party may read, including after the relationship has Ended.
+
+| Status | Problem code | When it applies |
+| --- | --- | --- |
+| 400 | `organization_context.required`, `validation_failed` | Missing acting Organization, invalid terms or list scope, or invalid pagination. Validation errors are keyed by field. |
+| 401 | | Authentication is required. |
+| 403 | `forbidden` | The actor lacks the required authority in the acting Organization. |
+| 404 | `agreement_not_found`, `agreement_version_not_found` | The resource is unknown or outside the actor's party scope. Exact reads also use 404 for an incorrect Agreement/version pair. |
+| 409 | `agreement_relationship_ended`, `agreement_publication_conflict` | The relationship has ended, or the publication conflicts with the current version. |
+| 503 | `agreement_list_verification_unavailable` | Price List scope could not be verified. The response includes `retryable: true` and the publication leaves no changes. |
+
+Trusted modules can resolve `IAgreementVersionReader` from dependency injection and call `GetAsync(AgreementVersionId, CancellationToken)`. It returns typed, immutable `AgreementVersionFacts` for that exact version, or `null` for an unknown ID. Technical failures propagate to the consumer. HTTP is the paginated listing surface and enforces party authorization.
 
 ### Logical Price Lists
 
