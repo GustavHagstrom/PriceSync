@@ -1,6 +1,6 @@
 # Implementation plan for issue #61
 
-Status: stages 1–2 completed; stage 2 was approved and completed on 2026-11-21. Stages 3–8 remain. The user requested implementation under this plan with `/implement` and `/tdd`.
+Status: stages 1–3 completed. Stages 4–8 remain.
 
 Starting point: `issue-61`, created from `Issue-13`, with draft PR #68. Execute the stages sequentially on the same branch. Intermediate results are reviewable commits; keep the PR in draft until all of #61 is complete.
 
@@ -210,7 +210,17 @@ Order: **1 → 2 → 3 → 4 → 5 → 6 → 7 → 8**. Start each stage from th
 
 Update this section at the end of each stage:
 
-### Current handoff — stage 2
+### Current handoff — stage 3
+
+- Completed stage 3 on `issue-61` in `f4c2a1c`, reviewed against `183faab`. Standards and Spec reviews found no issues.
+- First publication supports General, net-only and mixed coverage through the real Price Publication verifier. Invalid references reject the whole publication with indexed field errors. Unavailable verification still returns retryable 503.
+- POST and exact GET preserve version-wide `groupDiscounts` entries with `code` and `discount`. Codes are ordinal and stored with PostgreSQL `C` collation. Both discount kinds require exact values from 0 to 100 with at most one decimal place. Net coverage stores a null general discount.
+- Agreements migrations enforce validity dates, coverage type and discount shape, group uniqueness and discount precision. The net-only, mixed and exact-code HTTP tests were added in red–green cycles.
+- `dotnet build PriceSync.slnx -m:1 --no-restore -v quiet` passed with zero warnings or errors.
+- `dotnet test PriceSync.slnx -m:1 --no-build --no-restore -v quiet` passed all 406 tests, including 88 Agreements integration tests against PostgreSQL. `git diff --cached --check` passed.
+- Next is stage 4, covering next-version publication and deterministic retries. Resolve the paged module-contract scope before stage 7.
+
+### Stage 2 record (historical)
 
 - Last completed stage: **stage 2 — Exact HTTP reads of a published version**.
 - Implementation commit: `f3fea37` on `issue-61`; stage starting point/review baseline: `23d4d9b726fea96425850731f3fddf019f7dd565`.
