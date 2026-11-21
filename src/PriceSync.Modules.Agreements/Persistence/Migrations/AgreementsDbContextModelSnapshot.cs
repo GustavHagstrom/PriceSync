@@ -148,10 +148,10 @@ namespace PriceSync.Modules.Agreements.Persistence.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("PredecessorVersionId");
-
                     b.HasIndex("AgreementId", "Ordinal")
                         .IsUnique();
+
+                    b.HasIndex("AgreementId", "PredecessorVersionId");
 
                     b.ToTable("agreement_versions", "agreements", t =>
                         {
@@ -226,7 +226,8 @@ namespace PriceSync.Modules.Agreements.Persistence.Migrations
                 {
                     b.HasOne("PriceSync.Modules.Agreements.Domain.PriceAgreementVersion", null)
                         .WithMany()
-                        .HasForeignKey("PredecessorVersionId")
+                        .HasForeignKey("AgreementId", "PredecessorVersionId")
+                        .HasPrincipalKey("AgreementId", "Id")
                         .OnDelete(DeleteBehavior.Restrict);
 
                     b.HasOne("PriceSync.Modules.Agreements.Domain.PriceAgreement", null)

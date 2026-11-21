@@ -14,6 +14,34 @@ namespace PriceSync.Modules.Agreements.IntegrationTests;
 public sealed partial class AgreementApiTests
 {
     [Fact]
+    public async Task Database_rejects_a_predecessor_from_another_agreement()
+    {
+        var scope = await PublicationScope();
+        await using var app = scope.App;
+        using var client = scope.Client;
+        await using var db = new AgreementsDbContext(fixture.CreateAgreementOptions());
+        var agreement = await db.PriceAgreements.SingleAsync();
+        using var other = await PostAgreement(client, agreement.TradingRelationshipId.Value);
+        other.StatusCode.Should().Be(HttpStatusCode.Created);
+        using var foreign = await client.PostAsJsonAsync($"{other.Headers.Location}/versions", Publication(scope.List));
+        foreign.StatusCode.Should().Be(HttpStatusCode.Created);
+        var foreignId = (await foreign.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid();
+        using var first = await client.PostAsJsonAsync($"{scope.Agreement}/versions", Publication(scope.List));
+        first.StatusCode.Should().Be(HttpStatusCode.Created);
+        var request = Publication(scope.List);
+        request["expectedLatestVersionId"] = (await first.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid();
+        using var next = await client.PostAsJsonAsync($"{scope.Agreement}/versions", request);
+        next.StatusCode.Should().Be(HttpStatusCode.Created);
+        var nextId = (await next.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid();
+
+        var update = async () => await db.Database.ExecuteSqlInterpolatedAsync($"""
+            UPDATE agreements.agreement_versions SET "PredecessorVersionId" = {foreignId} WHERE "Id" = {nextId}
+            """);
+        (await update.Should().ThrowAsync<Npgsql.PostgresException>()).Which.SqlState
+            .Should().Be(Npgsql.PostgresErrorCodes.ForeignKeyViolation);
+    }
+
+    [Fact]
     public async Task Version_sequence_appends_complete_terms_and_preserves_the_previous_version()
     {
         var scope = await PublicationScope();

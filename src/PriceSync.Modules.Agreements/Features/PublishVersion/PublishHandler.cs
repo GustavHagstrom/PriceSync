@@ -48,11 +48,12 @@ internal sealed class PublishHandler(AgreementsDbContext db, TimeProvider clock,
             var group = submittedGroups[index];
             if (group?.Code is not { Length: > 0 } code || code.Contains('\0'))
                 return Invalid($"{field}.code", "Supplier Price Group code is required and cannot contain NUL.");
-            if (!IsValidDiscount(group.Discount))
+            if (!PublicationDiscount.TryRead(group.Discount, out var discount))
                 return Invalid($"{field}.discount", "An explicit discount from 0 to 100 with at most one decimal place is required.");
-            if (!groupDiscounts.TryAdd(code, group.Discount!.Value))
+            if (!groupDiscounts.TryAdd(code, discount))
                 return Invalid($"{field}.code", "Duplicate Supplier Price Group code.");
         }
+        var coverageTerms = new List<CoverageResponse>();
         var references = new Dictionary<PriceListId, PriceListReference>();
         for (var index = 0; index < request.Coverage.Length; index++)
         {
@@ -70,10 +71,17 @@ internal sealed class PublishHandler(AgreementsDbContext db, TimeProvider clock,
             var listId = new PriceListId(item.PriceListId);
             if (!references.TryAdd(listId, new(listId, type.Value)))
                 return Invalid($"{field}.priceListId", "Duplicate Price List.");
-            if (type == PriceListType.CustomerSpecificNet && item.GeneralDiscount is not null)
+            decimal? generalDiscount = null;
+            if (type == PriceListType.General)
+            {
+                if (!PublicationDiscount.TryRead(item.GeneralDiscount, out var discount))
+                    return Invalid($"{field}.generalDiscount", "An explicit discount from 0 to 100 with at most one decimal place is required.");
+                generalDiscount = discount;
+            }
+            else if (item.GeneralDiscount.ValueKind is not (JsonValueKind.Null or JsonValueKind.Undefined))
                 return Invalid($"{field}.generalDiscount", "Net coverage cannot carry a discount.");
-            if (type == PriceListType.General && !IsValidDiscount(item.GeneralDiscount))
-                return Invalid($"{field}.generalDiscount", "An explicit discount from 0 to 100 with at most one decimal place is required.");
+
+            coverageTerms.Add(new(item.PriceListId, item.Type!, generalDiscount));
         }
         var verification = await lists.VerifyAsync(acting, relationship.CustomerOrganizationId,
             references.Values, cancellationToken);
@@ -91,7 +99,7 @@ internal sealed class PublishHandler(AgreementsDbContext db, TimeProvider clock,
                 { ["code"] = "agreement_list_verification_unavailable", ["retryable"] = true });
 
         var normalized = Normalize(expected?.Value, request.ValidFrom.Value, request.ValidTo,
-            request.Coverage.Select(item => new CoverageResponse(item.PriceListId, item.Type!, item.GeneralDiscount)),
+            coverageTerms,
             groupDiscounts.Select(group => new GroupDiscountResponse(group.Key, group.Value)));
 
         await using var transaction = await db.Database.BeginTransactionAsync(IsolationLevel.ReadCommitted, cancellationToken);
@@ -119,8 +127,8 @@ internal sealed class PublishHandler(AgreementsDbContext db, TimeProvider clock,
         }
         var version = PriceAgreementVersion.Create(agreement, request.ValidFrom.Value, request.ValidTo, person.PersonId,
             clock.GetUtcNow(), rounding, normalized);
-        var coverage = request.Coverage.Select(item =>
-            AgreementVersionCoverage.Create(version.Id, new(item.PriceListId), item.Type!, item.GeneralDiscount)).ToArray();
+        var coverage = coverageTerms.Select(item =>
+            AgreementVersionCoverage.Create(version.Id, new(item.PriceListId), item.Type, item.GeneralDiscount)).ToArray();
         var groups = groupDiscounts.Select(group =>
             AgreementVersionGroupDiscount.Create(version.Id, group.Key, group.Value)).ToArray();
         db.Versions.Add(version);
@@ -149,9 +157,6 @@ internal sealed class PublishHandler(AgreementsDbContext db, TimeProvider clock,
                 group.Code, discountTenths = (int)(group.Discount * 10),
             }),
         });
-
-    private static bool IsValidDiscount(decimal? value) =>
-        value is >= 0 and <= 100 && decimal.Round(value.Value, 1) == value.Value;
 
     private static IResult Problem(int status, string code) => Results.Problem(statusCode: status,
         extensions: new Dictionary<string, object?> { ["code"] = code });

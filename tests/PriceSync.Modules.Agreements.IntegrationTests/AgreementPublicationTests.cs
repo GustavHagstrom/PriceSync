@@ -146,15 +146,18 @@ public sealed partial class AgreementApiTests
     [Theory]
     [InlineData("0.1")]
     [InlineData("99.9")]
+    [InlineData("10e-2")]
+    [InlineData("12300e-3")]
+    [InlineData("0.1000000000000000000000000000000")]
     [InlineData("100")]
     public async Task Publication_preserves_allowed_exact_discount_values(string value)
     {
         var scope = await PublicationScope();
         await using var app = scope.App;
         using var client = scope.Client;
-        var discount = decimal.Parse(value, System.Globalization.CultureInfo.InvariantCulture);
+        var discount = decimal.Parse(value, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture);
         var request = Publication(scope.List);
-        request["coverage"]![0]!["generalDiscount"] = discount;
+        request["coverage"]![0]!["generalDiscount"] = JsonNode.Parse(value);
         var response = await client.PostAsJsonAsync($"{scope.Agreement}/versions", request);
         response.StatusCode.Should().Be(HttpStatusCode.Created);
         (await response.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("coverage")[0]
@@ -412,6 +415,28 @@ public sealed partial class AgreementApiTests
             (await response.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("errors")
                 .TryGetProperty("coverage[0].generalDiscount", out _).Should().BeTrue();
         }
+        await using var db = new AgreementsDbContext(fixture.CreateAgreementOptions());
+        (await db.Versions.CountAsync()).Should().Be(0);
+    }
+
+    [Theory]
+    [InlineData(false, "0.1000000000000000000000000000001")]
+    [InlineData(true, "0.1000000000000000000000000000001")]
+    [InlineData(false, "1e-100")]
+    [InlineData(true, "1e-100")]
+    public async Task Publication_rejects_precision_before_decimal_conversion(bool group, string number)
+    {
+        var scope = await PublicationScope();
+        await using var app = scope.App;
+        using var client = scope.Client;
+        var request = Publication(scope.List);
+        var field = group ? "groupDiscounts[0].discount" : "coverage[0].generalDiscount";
+        if (group) request["groupDiscounts"] = JsonNode.Parse("[{\"code\":\"A\",\"discount\":" + number + "}]");
+        else request["coverage"]![0]!["generalDiscount"] = JsonNode.Parse(number);
+        var response = await client.PostAsJsonAsync($"{scope.Agreement}/versions", request);
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        var result = await response.Content.ReadFromJsonAsync<JsonElement>();
+        result.GetProperty("errors").TryGetProperty(field, out _).Should().BeTrue();
         await using var db = new AgreementsDbContext(fixture.CreateAgreementOptions());
         (await db.Versions.CountAsync()).Should().Be(0);
     }

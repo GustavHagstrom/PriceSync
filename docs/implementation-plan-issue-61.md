@@ -205,6 +205,29 @@ dotnet test tests/PriceSync.Modules.PricePublication.IntegrationTests
 
 Order: **1 → 2 → 3 → 4 → 5 → 6 → 7 → 8**. Start each stage from the previous green commit. If one session is insufficient, stop at a green vertical slice, commit and document the exact remaining behaviors; the next session finishes that stage before advancing. Do not hand off a failing test suite. Stages are scope budgets, not guarantees of session duration.
 
+## Final acceptance evidence for #61
+
+Test names below refer to the Agreements integration suite unless noted.
+
+| Acceptance criterion | Evidence |
+| --- | --- |
+| Supplier Owner authority, Active Organization/relationship, and Member reads | `Current_authority_and_relationship_party_scope_control_create_and_read`, `Exact_version_read_requires_current_member_authority_in_either_active_party`, `Version_list_applies_current_authority_after_the_relationship_ends` |
+| Validity, publication identity and metadata, immutable corrections | `Publication_requires_a_valid_whole_version_validity_period`, `Supplier_owner_publishes_first_version_with_explicit_zero_discount`, `Version_sequence_appends_complete_terms_and_preserves_the_previous_version` |
+| Logical General/net coverage and explicit discounts | `Commercial_terms_round_trip_for_net_only_or_mixed_coverage`, `General_discount_is_required_and_rejects_out_of_range_or_excessive_precision`, `Invalid_coverage_and_group_terms_are_rejected_without_partial_publication` |
+| Real list verification, all-or-nothing failure, retryable 503 | `Real_scope_verification_rejects_wrong_supplier_type_and_customer`, `Commercial_terms_round_trip_for_net_only_or_mixed_coverage`, `Invalid_list_scope_and_unavailable_verification_never_publish` |
+| Exact percentages and duplicate rejection | `Publication_preserves_allowed_exact_discount_values`, `General_discount_is_required_and_rejects_out_of_range_or_excessive_precision`, `Invalid_coverage_and_group_terms_are_rejected_without_partial_publication`, `Publication_rejects_precision_before_decimal_conversion` |
+| Exact group codes, version-wide replacement terms | `Commercial_terms_preserve_exact_group_codes_across_publication_and_read`, `Consumer_reads_original_facts_after_a_successor_is_published`. The publication stores the independent version-wide rule. Applying it belongs to Customer Pricing. |
+| Preserved rounding rules | `Supplier_owner_publishes_first_version_with_explicit_zero_discount`, `Successful_publication_updates_the_durable_agreement_latest_pointer_and_repeated_first_attempt_replays`, `Consumer_reads_original_facts_after_a_successor_is_published` |
+| Explicit expected predecessor, scoped locking and atomic append/latest | `First_publication_requires_an_explicit_null_predecessor`, `Concurrent_publications_resolve_against_the_committed_latest`, `Paused_publication_allows_another_agreement_to_publish_and_does_not_hold_external_locks` |
+| Deterministic matched, changed and later retries | `Version_sequence_replays_only_the_matching_immediate_successor`, `Concurrent_publications_resolve_against_the_committed_latest` |
+| Retry despite changed rounding defaults | `Version_sequence_replay_after_host_restart_preserves_original_rounding` |
+| Durable exact terms and comparison, same-module constraints, no shared writes or locks | PostgreSQL fixture applies the complete module migration chains. `Database_rejects_a_latest_ordinal_without_a_latest_version`, `Database_rejects_a_predecessor_from_another_agreement`, `Version_sequence_replay_after_host_restart_preserves_original_rounding`, `Version_sequence_can_replay_a_version_published_before_request_storage`, `Paused_publication_allows_another_agreement_to_publish_and_does_not_hold_external_locks` |
+| Exact HTTP and consumer reads, bounded paged HTTP | `Exact_version_read_returns_all_published_facts_from_a_new_request`, `Exact_version_read_hides_unknown_versions_and_incorrect_agreement_version_combinations`, `Consumer_reads_original_facts_after_a_successor_is_published`, `Consumer_returns_null_for_an_unknown_exact_version`, `Consumer_propagates_database_failures`, `Version_list_defaults_to_50_and_accepts_a_limit_of_100`, `Version_list_keeps_its_position_when_a_new_version_is_published`, `Version_list_validates_query_fields` |
+| PostgreSQL/API concurrency, rollback and commercial cases | The commercial tests above plus `Concurrent_publications_resolve_against_the_committed_latest`, `Failure_before_commit_rolls_back_version_coverage_and_latest_and_allows_first_publication_again`, `Version_sequence_failed_commit_keeps_previous_version_and_latest`, `Exact_version_read_cannot_observe_a_publication_rolled_back_before_commit` |
+| Publication only, point-in-time relationship state | `Paused_publication_allows_another_agreement_to_publish_and_does_not_hold_external_locks` and `Exact_version_read_remains_available_to_both_parties_members_after_relationship_ended`. Source review of endpoint registrations, publication writes and module dependencies confirms no version edit/delete/republish, Customer acceptance/selection, pricing calculation, projection, or Price Publication writes. |
+
+The exact-version consumer contract is for trusted modules. HTTP handles authorization and paginated listing. Customer activation, pricing and distribution belong to their respective workflows.
+
 ## Handoff between sessions
 
 Update this section at the end of each stage:

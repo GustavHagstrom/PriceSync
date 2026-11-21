@@ -39,7 +39,9 @@ internal sealed class AgreementsDbContext(DbContextOptions<AgreementsDbContext> 
         version.Property(x => x.TradingRelationshipId).HasConversion(x => x.Value, x => TradingRelationshipId.FromGuid(x));
         version.Property(x => x.PublishedByPersonId).HasConversion(x => x.Value, x => new PersonId(x));
         version.Property(x => x.PredecessorVersionId).HasConversion(x => x!.Value.Value, x => new AgreementVersionId(x));
-        version.HasOne<PriceAgreementVersion>().WithMany().HasForeignKey(x => x.PredecessorVersionId).OnDelete(DeleteBehavior.Restrict);
+        version.HasOne<PriceAgreementVersion>().WithMany()
+            .HasForeignKey(x => new { x.AgreementId, x.PredecessorVersionId })
+            .HasPrincipalKey(x => new { x.AgreementId, x.Id }).OnDelete(DeleteBehavior.Restrict);
         version.HasIndex(x => new { x.AgreementId, x.Ordinal }).IsUnique();
         version.HasAlternateKey(x => new { x.AgreementId, x.TradingRelationshipId, x.Id, x.Ordinal });
         version.HasOne<PriceAgreement>().WithMany().HasForeignKey(x => new { x.AgreementId, x.TradingRelationshipId })
