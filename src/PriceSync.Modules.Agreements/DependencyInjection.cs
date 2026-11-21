@@ -22,6 +22,7 @@ public static class DependencyInjection
         services.AddScoped<ListHandler>();
         services.AddScoped<ListValidator>();
         services.AddScoped<GetHandler>();
+        services.AddScoped<Features.GetVersion.GetVersionHandler>();
         return services;
     }
 }

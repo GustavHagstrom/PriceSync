@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore;
 using PriceSync.Modules.Agreements.Contracts;
 using PriceSync.Modules.Agreements.Domain;
 using PriceSync.Modules.Agreements.Persistence;
+using PriceSync.Modules.Agreements.Models;
 using PriceSync.Modules.OrganizationAccess.Contracts;
 using PriceSync.Modules.PricePublication.Contracts;
 using PriceSync.Modules.TradingRelationships.Contracts;

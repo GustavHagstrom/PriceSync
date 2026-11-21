@@ -17,6 +17,9 @@ public static class Endpoints
             (Guid agreementId, Features.PublishVersion.PublishRequest request, Features.PublishVersion.PublishHandler handler, CancellationToken cancellationToken) =>
                 handler.HandleAsync(agreementId, request, cancellationToken)).WithName("PublishAgreementVersion");
         group.MapGet("/agreements/{agreementId:guid}", GetEndpoint.HandleAsync).WithName("GetAgreement");
+        group.MapGet("/agreements/{agreementId:guid}/versions/{versionId:guid}",
+            (Guid agreementId, Guid versionId, Features.GetVersion.GetVersionHandler handler, CancellationToken cancellationToken) =>
+                handler.HandleAsync(agreementId, versionId, cancellationToken)).WithName("GetAgreementVersion");
         group.MapGet("/agreements", ListEndpoint.HandleAsync).WithName("ListAgreements");
         return endpoints;
     }
