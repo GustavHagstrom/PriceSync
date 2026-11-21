@@ -176,24 +176,37 @@ public sealed partial class AgreementApiTests
         (await change.Should().ThrowAsync<PostgresException>()).Which.SqlState.Should().Be(PostgresErrorCodes.CheckViolation);
     }
 
-    [Fact]
-    public async Task Concurrent_first_publications_lock_the_agreement_and_produce_one_created_and_one_conflict()
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public async Task Concurrent_publications_create_one_successor_and_then_replay_or_conflict(bool next, bool matching)
     {
         var scope = await PublicationScope();
         await using var app = scope.App;
         using var initialClient = scope.Client;
+        var request = Publication(scope.List);
+        if (next)
+        {
+            var previous = await initialClient.PostAsJsonAsync($"{scope.Agreement}/versions", request);
+            previous.StatusCode.Should().Be(HttpStatusCode.Created);
+            request["expectedLatestVersionId"] = (await previous.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid();
+        }
+        var contender = request.DeepClone();
+        if (!matching) contender["coverage"]![0]!["generalDiscount"] = 25m;
         var gate = new CommitGate(false);
         await using var guarded = app.WithWebHostBuilder(builder => builder.ConfigureServices(services =>
             services.ConfigureDbContext<AgreementsDbContext>(options => options.AddInterceptors(gate))));
         using var client = guarded.CreateClient();
         client.DefaultRequestHeaders.Add("organization_id", initialClient.DefaultRequestHeaders.GetValues("organization_id"));
-        var first = client.PostAsJsonAsync($"{scope.Agreement}/versions", Publication(scope.List));
+        var first = client.PostAsJsonAsync($"{scope.Agreement}/versions", request);
         Task<HttpResponseMessage> second;
         try
         {
             await gate.Entered.Task.WaitAsync(TimeSpan.FromSeconds(10));
             gate.Isolation.Should().Be(System.Data.IsolationLevel.ReadCommitted);
-            second = client.PostAsJsonAsync($"{scope.Agreement}/versions", Publication(scope.List));
+            second = client.PostAsJsonAsync($"{scope.Agreement}/versions", contender);
             using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
             await using var connection = new NpgsqlConnection(fixture.ConnectionString);
             await connection.OpenAsync(timeout.Token);
@@ -206,12 +219,16 @@ public sealed partial class AgreementApiTests
             second.IsCompleted.Should().BeFalse();
         }
         finally { gate.Release.TrySetResult(); }
-        (await first).StatusCode.Should().Be(HttpStatusCode.Created);
-        (await second).StatusCode.Should().Be(HttpStatusCode.Conflict);
+        var winner = await first;
+        var waiter = await second;
+        winner.StatusCode.Should().Be(HttpStatusCode.Created);
+        waiter.StatusCode.Should().Be(matching ? HttpStatusCode.OK : HttpStatusCode.Conflict);
+        if (matching) (await waiter.Content.ReadAsStringAsync()).Should().Be(await winner.Content.ReadAsStringAsync());
+        var id = (await winner.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid();
         await using var db = new AgreementsDbContext(fixture.CreateAgreementOptions());
-        var version = await db.Versions.SingleAsync();
-        (await db.PriceAgreements.SingleAsync()).LatestVersionId.Should().Be(version.Id);
-        (await db.Coverage.CountAsync()).Should().Be(1);
+        (await db.PriceAgreements.SingleAsync()).LatestVersionId!.Value.Value.Should().Be(id);
+        (await db.Versions.CountAsync()).Should().Be(next ? 2 : 1);
+        (await db.Coverage.CountAsync()).Should().Be(next ? 2 : 1);
     }
 
     [Fact]
@@ -276,7 +293,7 @@ public sealed partial class AgreementApiTests
     }
 
     [Fact]
-    public async Task Successful_publication_updates_the_durable_agreement_latest_pointer_and_repeated_first_attempt_conflicts()
+    public async Task Successful_publication_updates_the_durable_agreement_latest_pointer_and_repeated_first_attempt_replays()
     {
         var scope = await PublicationScope();
         await using var app = scope.App;
@@ -288,8 +305,8 @@ public sealed partial class AgreementApiTests
         var read = await client.GetFromJsonAsync<JsonElement>(scope.Agreement);
         read.GetProperty("latestVersionId").GetGuid().Should().Be(version.GetProperty("id").GetGuid());
         var retry = await client.PostAsJsonAsync($"{scope.Agreement}/versions", request);
-        retry.StatusCode.Should().Be(HttpStatusCode.Conflict);
-        (await retry.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("code").GetString().Should().Be("agreement_publication_conflict");
+        retry.StatusCode.Should().Be(HttpStatusCode.OK);
+        (await retry.Content.ReadAsStringAsync()).Should().Be(await published.Content.ReadAsStringAsync());
         await using var db = new AgreementsDbContext(fixture.CreateAgreementOptions());
         var stored = await db.Versions.SingleAsync();
         stored.Id.Value.Should().Be(version.GetProperty("id").GetGuid());

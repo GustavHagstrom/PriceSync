@@ -115,8 +115,14 @@ namespace PriceSync.Modules.Agreements.Persistence.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
+                    b.Property<string>("NormalizedRequest")
+                        .HasColumnType("text");
+
                     b.Property<long>("Ordinal")
                         .HasColumnType("bigint");
+
+                    b.Property<Guid?>("PredecessorVersionId")
+                        .HasColumnType("uuid");
 
                     b.Property<bool>("PreservePriceQuantityAndUnitOfMeasure")
                         .HasColumnType("boolean");
@@ -141,6 +147,8 @@ namespace PriceSync.Modules.Agreements.Persistence.Migrations
                         .HasColumnType("date");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("PredecessorVersionId");
 
                     b.HasIndex("AgreementId", "Ordinal")
                         .IsUnique();
@@ -216,6 +224,11 @@ namespace PriceSync.Modules.Agreements.Persistence.Migrations
 
             modelBuilder.Entity("PriceSync.Modules.Agreements.Domain.PriceAgreementVersion", b =>
                 {
+                    b.HasOne("PriceSync.Modules.Agreements.Domain.PriceAgreementVersion", null)
+                        .WithMany()
+                        .HasForeignKey("PredecessorVersionId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("PriceSync.Modules.Agreements.Domain.PriceAgreement", null)
                         .WithMany()
                         .HasForeignKey("AgreementId", "TradingRelationshipId")

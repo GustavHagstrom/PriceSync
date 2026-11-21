@@ -17,6 +17,7 @@ public static class DependencyInjection
         services.AddDbContext<AgreementsDbContext>(options => options.UseNpgsql(connectionString,
             postgres => postgres.MigrationsHistoryTable(AgreementsDbContext.MigrationsHistoryTableName,
                 AgreementsDbContext.SchemaName)));
+        services.AddSingleton(Domain.AgreementRoundingPolicy.Default);
         services.AddScoped<CreateHandler>();
         services.AddScoped<Features.PublishVersion.PublishHandler>();
         services.AddScoped<ListHandler>();

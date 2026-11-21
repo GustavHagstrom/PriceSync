@@ -13,10 +13,10 @@ internal sealed class PriceAgreement
     public AgreementVersionId? LatestVersionId { get; private set; }
     public long LatestOrdinal { get; private set; }
 
-    internal void PublishFirst(PriceAgreementVersion version)
+    internal void Publish(PriceAgreementVersion version)
     {
-        if (LatestVersionId is not null || version.AgreementId != Id || version.TradingRelationshipId != TradingRelationshipId)
-            throw new InvalidOperationException("Version must be the first publication in this Agreement scope.");
+        if (version.PredecessorVersionId != LatestVersionId || version.Ordinal != LatestOrdinal + 1 || version.AgreementId != Id || version.TradingRelationshipId != TradingRelationshipId)
+            throw new InvalidOperationException("Version must be the next publication in this Agreement scope.");
         LatestVersionId = version.Id;
         LatestOrdinal = version.Ordinal;
     }

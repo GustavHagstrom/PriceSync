@@ -14,7 +14,7 @@ namespace PriceSync.Modules.Agreements.Features.PublishVersion;
 
 internal sealed class PublishHandler(AgreementsDbContext db, TimeProvider clock, ICurrentPerson person,
     ICurrentOrganization organization, IOrganizationAuthorizer authorizer, ITradingRelationshipReader relationships,
-    IPriceListScopeVerifier lists)
+    IPriceListScopeVerifier lists, AgreementRoundingPolicy rounding)
 {
     internal async Task<IResult> HandleAsync(Guid agreementId, PublishRequest request, CancellationToken cancellationToken)
     {
@@ -30,10 +30,14 @@ internal sealed class PublishHandler(AgreementsDbContext db, TimeProvider clock,
         if (relationship.Status == TradingRelationshipStatus.Ended) return Problem(409, "agreement_relationship_ended");
         if (request.ValidFrom is null) return Invalid("validFrom", "ValidFrom is required.");
         if (request.ValidTo < request.ValidFrom) return Invalid("validTo", "ValidTo must be on or after ValidFrom.");
+        AgreementVersionId? expected = null;
         if (request.ExpectedLatestVersionId.ValueKind != JsonValueKind.Null)
-            return Results.ValidationProblem(new Dictionary<string, string[]>
-                { ["expectedLatestVersionId"] = ["First publication requires an explicit null predecessor."] },
-                extensions: new Dictionary<string, object?> { ["code"] = "validation_failed" });
+        {
+            if (request.ExpectedLatestVersionId.ValueKind != JsonValueKind.String ||
+                !request.ExpectedLatestVersionId.TryGetGuid(out var predecessor) || predecessor == Guid.Empty)
+                return Invalid("expectedLatestVersionId", "An explicit null or a valid version ID is required.");
+            expected = new AgreementVersionId(predecessor);
+        }
 
         if (request.Coverage is not { Length: > 0 }) return Invalid("coverage", "At least one Price List is required.");
         var groupDiscounts = new Dictionary<string, decimal>(StringComparer.Ordinal);
@@ -86,12 +90,35 @@ internal sealed class PublishHandler(AgreementsDbContext db, TimeProvider clock,
             return Results.Problem(statusCode: 503, extensions: new Dictionary<string, object?>
                 { ["code"] = "agreement_list_verification_unavailable", ["retryable"] = true });
 
+        var normalized = Normalize(expected?.Value, request.ValidFrom.Value, request.ValidTo,
+            request.Coverage.Select(item => new CoverageResponse(item.PriceListId, item.Type!, item.GeneralDiscount)),
+            groupDiscounts.Select(group => new GroupDiscountResponse(group.Key, group.Value)));
+
         await using var transaction = await db.Database.BeginTransactionAsync(IsolationLevel.ReadCommitted, cancellationToken);
         var agreement = await db.PriceAgreements.FromSqlInterpolated($"""
             SELECT * FROM agreements.price_agreements WHERE "Id" = {agreementId} FOR UPDATE
             """).SingleAsync(cancellationToken);
-        if (agreement.LatestVersionId is not null) return Problem(409, "agreement_publication_conflict");
-        var version = PriceAgreementVersion.First(agreement, request.ValidFrom!.Value, request.ValidTo, person.PersonId, clock.GetUtcNow());
+        if (agreement.LatestVersionId != expected)
+        {
+            if (agreement.LatestVersionId is not { } latestId)
+                return Problem(409, "agreement_publication_conflict");
+            var latest = await db.Versions.AsNoTracking().SingleAsync(x => x.Id == latestId, cancellationToken);
+            if (latest.PredecessorVersionId != expected ||
+                (latest.NormalizedRequest is { } saved && saved != normalized))
+                return Problem(409, "agreement_publication_conflict");
+
+            var savedCoverage = await db.Coverage.AsNoTracking().Where(x => x.VersionId == latestId).ToArrayAsync(cancellationToken);
+            var savedGroups = await db.GroupDiscounts.AsNoTracking().Where(x => x.VersionId == latestId).ToArrayAsync(cancellationToken);
+            var response = VersionResponse.From(latest, savedCoverage, savedGroups);
+            // Versions published before this migration carry the same inputs in their immutable terms.
+            if (latest.NormalizedRequest is null &&
+                Normalize(response.PredecessorVersionId, response.ValidFrom, response.ValidTo, response.Coverage, response.GroupDiscounts) != normalized)
+                return Problem(409, "agreement_publication_conflict");
+
+            return Results.Ok(response);
+        }
+        var version = PriceAgreementVersion.Create(agreement, request.ValidFrom.Value, request.ValidTo, person.PersonId,
+            clock.GetUtcNow(), rounding, normalized);
         var coverage = request.Coverage.Select(item =>
             AgreementVersionCoverage.Create(version.Id, new(item.PriceListId), item.Type!, item.GeneralDiscount)).ToArray();
         var groups = groupDiscounts.Select(group =>
@@ -101,11 +128,27 @@ internal sealed class PublishHandler(AgreementsDbContext db, TimeProvider clock,
         db.Coverage.AddRange(coverage);
         // Insert the version before moving the constrained latest pointer, within the same local transaction.
         await db.SaveChangesAsync(cancellationToken);
-        agreement.PublishFirst(version);
+        agreement.Publish(version);
         await db.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
         return Results.Created($"/api/v1/agreements/{agreement.Id}/versions/{version.Id}", VersionResponse.From(version, coverage, groups));
     }
+
+    private static string Normalize(Guid? predecessor, DateOnly validFrom, DateOnly? validTo,
+        IEnumerable<CoverageResponse> coverage, IEnumerable<GroupDiscountResponse> groups) =>
+        JsonSerializer.Serialize(new
+        {
+            predecessor, validFrom, validTo,
+            coverage = coverage.OrderBy(item => item.PriceListId).Select(item => new
+            {
+                item.PriceListId, item.Type,
+                discountTenths = item.GeneralDiscount is { } discount ? (int?)(discount * 10) : null,
+            }),
+            groups = groups.OrderBy(group => group.Code, StringComparer.Ordinal).Select(group => new
+            {
+                group.Code, discountTenths = (int)(group.Discount * 10),
+            }),
+        });
 
     private static bool IsValidDiscount(decimal? value) =>
         value is >= 0 and <= 100 && decimal.Round(value.Value, 1) == value.Value;

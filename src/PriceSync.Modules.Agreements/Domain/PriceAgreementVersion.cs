@@ -10,6 +10,8 @@ internal sealed class PriceAgreementVersion
     public AgreementVersionId Id { get; private set; }
     public AgreementId AgreementId { get; private set; }
     public TradingRelationshipId TradingRelationshipId { get; private set; }
+    public AgreementVersionId? PredecessorVersionId { get; private set; }
+    public string? NormalizedRequest { get; private set; }
     public long Ordinal { get; private set; }
     public DateOnly ValidFrom { get; private set; }
     public DateOnly? ValidTo { get; private set; }
@@ -20,13 +22,14 @@ internal sealed class PriceAgreementVersion
     public string RoundingStage { get; private set; } = null!;
     public bool PreservePriceQuantityAndUnitOfMeasure { get; private set; }
 
-    internal static PriceAgreementVersion First(PriceAgreement agreement, DateOnly validFrom, DateOnly? validTo,
-        PersonId person, DateTimeOffset now) => new()
+    internal static PriceAgreementVersion Create(PriceAgreement agreement, DateOnly validFrom, DateOnly? validTo,
+        PersonId person, DateTimeOffset now, AgreementRoundingPolicy rounding, string normalizedRequest) => new()
     {
         Id = AgreementVersionId.Create(), AgreementId = agreement.Id, TradingRelationshipId = agreement.TradingRelationshipId,
-        Ordinal = 1, ValidFrom = validFrom, ValidTo = validTo, PublishedByPersonId = person,
+        PredecessorVersionId = agreement.LatestVersionId, Ordinal = agreement.LatestOrdinal + 1, ValidFrom = validFrom, ValidTo = validTo, PublishedByPersonId = person,
         PublishedAt = new DateTimeOffset(now.UtcTicks - now.UtcTicks % 10, TimeSpan.Zero),
-        DecimalPlaces = 4, Midpoint = "AwayFromZero",
-        RoundingStage = "OnceAfterDiscountWithoutIntermediateRounding", PreservePriceQuantityAndUnitOfMeasure = true,
+        DecimalPlaces = rounding.DecimalPlaces, Midpoint = rounding.Midpoint, RoundingStage = rounding.Stage,
+        PreservePriceQuantityAndUnitOfMeasure = rounding.PreservePriceQuantityAndUnitOfMeasure,
+        NormalizedRequest = normalizedRequest,
     };
 }

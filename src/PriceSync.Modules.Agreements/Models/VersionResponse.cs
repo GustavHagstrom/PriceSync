@@ -7,7 +7,7 @@ internal sealed record VersionResponse(Guid Id, Guid AgreementId, Guid TradingRe
     DateTimeOffset PublishedAt, Guid PublishedByPersonId, CoverageResponse[] Coverage, RoundingResponse Rounding, GroupDiscountResponse[] GroupDiscounts)
 {
     internal static VersionResponse From(PriceAgreementVersion version, IEnumerable<AgreementVersionCoverage> coverage, IEnumerable<AgreementVersionGroupDiscount> groups) => new(
-        version.Id.Value, version.AgreementId.Value, version.TradingRelationshipId.Value, null, version.Ordinal,
+        version.Id.Value, version.AgreementId.Value, version.TradingRelationshipId.Value, version.PredecessorVersionId?.Value, version.Ordinal,
         version.ValidFrom, version.ValidTo, version.PublishedAt, version.PublishedByPersonId.Value,
         coverage.OrderBy(item => item.PriceListId.Value).Select(item => new CoverageResponse(item.PriceListId.Value, item.Type, item.GeneralDiscount)).ToArray(),
         new(version.DecimalPlaces, version.Midpoint, version.RoundingStage, version.PreservePriceQuantityAndUnitOfMeasure),
