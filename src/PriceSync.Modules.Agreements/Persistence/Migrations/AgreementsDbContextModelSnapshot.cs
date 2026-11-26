@@ -66,6 +66,28 @@ namespace PriceSync.Modules.Agreements.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("PriceSync.Modules.Agreements.Domain.AgreementVersionWithdrawal", b =>
+                {
+                    b.Property<Guid>("VersionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<DateTimeOffset>("WithdrawnAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("WithdrawnByPersonId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("VersionId")
+                        .HasName("pk_agreement_version_withdrawals");
+
+                    b.ToTable("agreement_version_withdrawals", "agreements");
+                });
+
             modelBuilder.Entity("PriceSync.Modules.Agreements.Domain.PriceAgreement", b =>
                 {
                     b.Property<Guid>("Id")
@@ -209,6 +231,15 @@ namespace PriceSync.Modules.Agreements.Persistence.Migrations
                     b.HasOne("PriceSync.Modules.Agreements.Domain.PriceAgreementVersion", null)
                         .WithMany()
                         .HasForeignKey("VersionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("PriceSync.Modules.Agreements.Domain.AgreementVersionWithdrawal", b =>
+                {
+                    b.HasOne("PriceSync.Modules.Agreements.Domain.PriceAgreementVersion", null)
+                        .WithOne()
+                        .HasForeignKey("PriceSync.Modules.Agreements.Domain.AgreementVersionWithdrawal", "VersionId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });

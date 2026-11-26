@@ -13,6 +13,8 @@ internal sealed class AgreementsDbContext(DbContextOptions<AgreementsDbContext> 
     internal const string MigrationsHistoryTableName = "__EFMigrationsHistory";
     internal DbSet<PriceAgreement> PriceAgreements => Set<PriceAgreement>();
     internal DbSet<PriceAgreementVersion> Versions => Set<PriceAgreementVersion>();
+    internal DbSet<AgreementVersionWithdrawal> Withdrawals => Set<AgreementVersionWithdrawal>();
+    internal const string WithdrawalKey = "pk_agreement_version_withdrawals";
     internal DbSet<AgreementVersionCoverage> Coverage => Set<AgreementVersionCoverage>();
     internal DbSet<AgreementVersionGroupDiscount> GroupDiscounts => Set<AgreementVersionGroupDiscount>();
     internal DbSet<CreationIdempotencyRecord> CreationIdempotencyRecords => Set<CreationIdempotencyRecord>();
@@ -20,6 +22,14 @@ internal sealed class AgreementsDbContext(DbContextOptions<AgreementsDbContext> 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.HasDefaultSchema(SchemaName);
+        var withdrawal = modelBuilder.Entity<AgreementVersionWithdrawal>();
+        withdrawal.ToTable("agreement_version_withdrawals");
+        withdrawal.HasKey(x => x.VersionId).HasName(WithdrawalKey);
+        withdrawal.Property(x => x.VersionId).HasConversion(x => x.Value, x => new AgreementVersionId(x)).ValueGeneratedNever();
+        withdrawal.Property(x => x.WithdrawnByPersonId).HasConversion(x => x.Value, x => new PersonId(x));
+        withdrawal.Property(x => x.Reason).HasMaxLength(2000);
+        withdrawal.HasOne<PriceAgreementVersion>().WithOne().HasForeignKey<AgreementVersionWithdrawal>(x => x.VersionId)
+            .OnDelete(DeleteBehavior.Restrict);
         var agreement = modelBuilder.Entity<PriceAgreement>();
         agreement.ToTable("price_agreements", table => table.HasCheckConstraint("ck_agreement_latest",
             "\"LatestVersionId\" IS NULL AND \"LatestOrdinal\" = 0 OR \"LatestVersionId\" IS NOT NULL AND \"LatestOrdinal\" > 0"));

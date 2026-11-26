@@ -16,7 +16,15 @@ public sealed record AgreementVersionFacts(AgreementVersionId Id, AgreementId Ag
     TradingRelationshipId TradingRelationshipId, AgreementVersionId? PredecessorVersionId, long Ordinal,
     DateOnly ValidFrom, DateOnly? ValidTo, DateTimeOffset PublishedAt, PersonId PublishedByPersonId,
     ImmutableArray<AgreementVersionListCoverage> Coverage, AgreementVersionRounding Rounding,
-    ImmutableArray<AgreementVersionGroupTerms> GroupDiscounts);
+    ImmutableArray<AgreementVersionGroupTerms> GroupDiscounts)
+{
+    public AgreementVersionWithdrawalFacts? Withdrawal { get; init; }
+
+    public bool IsOutsideValidityOn(DateOnly evaluatedDate) =>
+        evaluatedDate < ValidFrom || evaluatedDate > ValidTo;
+}
+
+public sealed record AgreementVersionWithdrawalFacts(string Reason, PersonId WithdrawnByPersonId, DateTimeOffset WithdrawnAt);
 
 public sealed record AgreementVersionListCoverage(PriceListId PriceListId, PriceListType Type, decimal? GeneralDiscount);
 

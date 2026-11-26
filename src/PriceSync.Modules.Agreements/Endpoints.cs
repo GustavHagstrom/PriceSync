@@ -16,6 +16,8 @@ public static class Endpoints
         var group = endpoints.MapGroup("/api/v1").WithTags("Agreements").RequireAuthorization();
         group.MapPost("/agreements", CreateEndpoint.HandleAsync).WithName("CreateAgreement");
         group.MapPost("/agreements/{agreementId:guid}/versions", PublishVersionEndpoint.HandleAsync).WithName("PublishAgreementVersion");
+        group.MapPost("/agreements/{agreementId:guid}/versions/{versionId:guid}/withdraw",
+            Features.WithdrawVersion.WithdrawVersionEndpoint.HandleAsync).WithName("WithdrawAgreementVersion");
         group.MapGet("/agreements/{agreementId:guid}", GetEndpoint.HandleAsync).WithName("GetAgreement");
         group.MapGet("/agreements/{agreementId:guid}/versions/{versionId:guid}",
             (Guid agreementId, Guid versionId, Features.GetVersion.GetVersionHandler handler, CancellationToken cancellationToken) =>

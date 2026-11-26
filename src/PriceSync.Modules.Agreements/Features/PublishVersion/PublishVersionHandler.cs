@@ -116,7 +116,7 @@ internal sealed class PublishVersionHandler(AgreementsDbContext db, TimeProvider
 
             var savedCoverage = await db.Coverage.AsNoTracking().Where(x => x.VersionId == latestId).ToArrayAsync(cancellationToken);
             var savedGroups = await db.GroupDiscounts.AsNoTracking().Where(x => x.VersionId == latestId).ToArrayAsync(cancellationToken);
-            var response = VersionResponse.From(latest, savedCoverage, savedGroups);
+            var response = VersionResponse.From(latest, savedCoverage, savedGroups, DateOnly.FromDateTime(clock.GetUtcNow().UtcDateTime));
             // Versions published before this migration carry the same inputs in their immutable terms.
             if (latest.NormalizedRequest is null &&
                 Normalize(response.PredecessorVersionId, response.ValidFrom, response.ValidTo, response.Coverage, response.GroupDiscounts) != normalized)
@@ -138,7 +138,7 @@ internal sealed class PublishVersionHandler(AgreementsDbContext db, TimeProvider
         agreement.Publish(version);
         await db.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
-        return new PublishVersionResult.Created($"/api/v1/agreements/{agreement.Id}/versions/{version.Id}", VersionResponse.From(version, coverage, groups));
+        return new PublishVersionResult.Created($"/api/v1/agreements/{agreement.Id}/versions/{version.Id}", VersionResponse.From(version, coverage, groups, DateOnly.FromDateTime(clock.GetUtcNow().UtcDateTime)));
     }
 
     private static string Normalize(Guid? predecessor, DateOnly validFrom, DateOnly? validTo,

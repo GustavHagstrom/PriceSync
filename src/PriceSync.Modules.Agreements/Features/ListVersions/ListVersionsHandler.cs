@@ -9,7 +9,7 @@ using PriceSync.Modules.TradingRelationships.Contracts;
 namespace PriceSync.Modules.Agreements.Features.ListVersions;
 
 internal sealed class ListVersionsHandler(AgreementsDbContext db, AgreementVersionReader reader, ICurrentPerson person,
-    ICurrentOrganization organization, IOrganizationAuthorizer authorizer, ITradingRelationshipReader relationships)
+    ICurrentOrganization organization, IOrganizationAuthorizer authorizer, ITradingRelationshipReader relationships, TimeProvider clock)
 {
     internal async Task<ListVersionsResult> HandleAsync(ListVersionsQuery query, CancellationToken cancellationToken)
     {
@@ -38,8 +38,9 @@ internal sealed class ListVersionsHandler(AgreementsDbContext db, AgreementVersi
         }
 
         var page = await reader.ReadPageAsync(id, before, limit, cancellationToken);
+        var date = DateOnly.FromDateTime(clock.GetUtcNow().UtcDateTime);
         return new ListVersionsResult.Success(new ListVersionsResponse(
-            page.Items.Select(VersionResponse.From).ToArray(),
+            page.Items.Select(facts => VersionResponse.From(facts, date)).ToArray(),
             page.HasMore ? VersionCursor.Encode(id, page.Items[^1].Ordinal) : null));
     }
 
