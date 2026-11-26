@@ -48,7 +48,7 @@ OrganizationAccess authorizes `ReadTradingRelationships` for active members of a
 
 OrganizationAccess also authorizes `ReadPriceLists` and `ReadAgreements` for active Members (including Owners) of an Active Organization. `CreatePriceLists`, `PublishAgreements` and `ManageCustomerAgreements` require an active Owner membership in an Active Organization. Archived Organizations are denied these capabilities.
 
-These capabilities establish Organization-scoped authority only. Price Publication enforces list ownership, and Agreements enforces the acting Organization's Supplier/Customer scope within the Trading Relationship. `ManageCustomerAgreements` is available in the authorizer, while Customer acceptance and activation use cases remain unimplemented in the current slice.
+These capabilities establish Organization-scoped authority only. Price Publication enforces list ownership, and Agreements enforces the acting Organization's Supplier/Customer scope within the Trading Relationship. Agreements uses `ManageCustomerAgreements` to authorize explicit Customer acceptance. Customer activation remains for a later slice.
 
 ## Business facts
 

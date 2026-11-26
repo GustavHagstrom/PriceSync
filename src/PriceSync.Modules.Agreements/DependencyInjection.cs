@@ -19,6 +19,10 @@ public static class DependencyInjection
                 AgreementsDbContext.SchemaName)));
         services.AddSingleton(Domain.AgreementRoundingPolicy.Default);
         services.AddScoped<CreateHandler>();
+        services.AddScoped<AgreementAcceptanceStore>();
+        services.AddScoped<Acceptance.AcceptanceScopeReader>();
+        services.AddScoped<Features.AcceptVersion.AcceptVersionHandler>();
+        services.AddScoped<Features.GetVersionAcceptance.GetVersionAcceptanceHandler>();
         services.AddScoped<Features.PublishVersion.PublishVersionHandler>();
         services.AddScoped<Features.WithdrawVersion.WithdrawVersionHandler>();
         services.AddScoped<Features.WithdrawVersion.WithdrawVersionValidator>();

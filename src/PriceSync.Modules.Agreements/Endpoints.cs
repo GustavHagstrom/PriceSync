@@ -14,6 +14,11 @@ public static class Endpoints
     public static IEndpointRouteBuilder MapAgreementsEndpoints(this IEndpointRouteBuilder endpoints)
     {
         var group = endpoints.MapGroup("/api/v1").WithTags("Agreements").RequireAuthorization();
+        const string acceptance = "/agreements/{agreementId:guid}/versions/{versionId:guid}/acceptance";
+        group.MapGet(acceptance, Features.GetVersionAcceptance.GetVersionAcceptanceEndpoint.HandleAsync)
+            .WithName("GetAgreementVersionAcceptance");
+        group.MapPost(acceptance, Features.AcceptVersion.AcceptVersionEndpoint.HandleAsync)
+            .WithName("AcceptAgreementVersion");
         group.MapPost("/agreements", CreateEndpoint.HandleAsync).WithName("CreateAgreement");
         group.MapPost("/agreements/{agreementId:guid}/versions", PublishVersionEndpoint.HandleAsync).WithName("PublishAgreementVersion");
         group.MapPost("/agreements/{agreementId:guid}/versions/{versionId:guid}/withdraw",

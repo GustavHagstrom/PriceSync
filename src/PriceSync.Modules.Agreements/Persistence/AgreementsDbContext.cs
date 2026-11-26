@@ -22,6 +22,17 @@ internal sealed class AgreementsDbContext(DbContextOptions<AgreementsDbContext> 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.HasDefaultSchema(SchemaName);
+        var acceptance = modelBuilder.Entity<AgreementAcceptance>();
+        acceptance.ToTable("agreement_acceptances");
+        acceptance.HasKey(x => new { x.TradingRelationshipId, x.VersionId });
+        acceptance.Property(x => x.TradingRelationshipId).HasConversion(x => x.Value, x => TradingRelationshipId.FromGuid(x));
+        acceptance.Property(x => x.VersionId).HasConversion(x => x.Value, x => new AgreementVersionId(x));
+        acceptance.Property(x => x.AcceptedByPersonId).HasConversion(x => x.Value, x => new PersonId(x));
+        acceptance.HasOne<PriceAgreementVersion>().WithOne()
+            .HasForeignKey<AgreementAcceptance>(x => new { x.TradingRelationshipId, x.VersionId })
+            .HasPrincipalKey<PriceAgreementVersion>(x => new { x.TradingRelationshipId, x.Id })
+            .OnDelete(DeleteBehavior.Restrict);
+
         var withdrawal = modelBuilder.Entity<AgreementVersionWithdrawal>();
         withdrawal.ToTable("agreement_version_withdrawals");
         withdrawal.HasKey(x => x.VersionId).HasName(WithdrawalKey);
