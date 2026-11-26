@@ -9,6 +9,7 @@ using Microsoft.Extensions.DependencyInjection;
 using PriceSync.Modules.Agreements.Contracts;
 using PriceSync.Modules.Agreements.Domain;
 using PriceSync.Modules.Agreements.Persistence;
+using PriceSync.Modules.OrganizationAccess.Contracts;
 using PriceSync.Modules.TradingRelationships.Persistence;
 
 namespace PriceSync.Modules.Agreements.IntegrationTests;
@@ -63,10 +64,18 @@ public sealed partial class AgreementApiTests
         publication.StatusCode.Should().Be(HttpStatusCode.Created);
         var original = await publication.Content.ReadFromJsonAsync<JsonElement>();
         var url = publication.Headers.Location!;
-        using var customer = app.CreateClient();
-        customer.DefaultRequestHeaders.Add("organization_id", scope.Customer.ToString());
-        using var denied = await customer.PostAsJsonAsync($"{url}/withdraw", new { reason = "Incorrect terms" });
-        denied.StatusCode.Should().BeOneOf(HttpStatusCode.Forbidden, HttpStatusCode.NotFound);
+        var actor = new PersonId(Guid.CreateVersion7());
+        var unrelatedOrganization = await SeedOrganization(actor, "5560004615");
+        await using var unrelatedApp = new ApiApplication(fixture.ConnectionString, actor);
+        using var unrelatedOwner = unrelatedApp.CreateClient();
+        unrelatedOwner.DefaultRequestHeaders.Add("organization_id", unrelatedOrganization.ToString());
+        var request = new { reason = "Incorrect terms" };
+        using var denied = await unrelatedOwner.PostAsJsonAsync($"{url}/withdraw", request);
+        using var unknown = await unrelatedOwner.PostAsJsonAsync(
+            $"{scope.Agreement}/versions/{Guid.CreateVersion7()}/withdraw", request);
+        denied.StatusCode.Should().Be(HttpStatusCode.NotFound);
+        unknown.StatusCode.Should().Be(HttpStatusCode.NotFound);
+        (await ProblemWithoutTrace(denied)).Should().Be(await ProblemWithoutTrace(unknown));
         using var invalid = await supplier.PostAsJsonAsync($"{url}/withdraw", new { reason = "   " });
         invalid.StatusCode.Should().Be(HttpStatusCode.BadRequest);
         await using (var db = new TradingRelationshipsDbContext(fixture.CreateRelationshipOptions()))
