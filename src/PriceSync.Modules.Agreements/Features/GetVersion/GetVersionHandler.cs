@@ -9,7 +9,7 @@ using PriceSync.Modules.TradingRelationships.Contracts;
 namespace PriceSync.Modules.Agreements.Features.GetVersion;
 
 internal sealed class GetVersionHandler(AgreementsDbContext db, ICurrentPerson person, ICurrentOrganization organization,
-    IOrganizationAuthorizer authorizer, ITradingRelationshipReader relationships, AgreementVersionReader reader)
+    IOrganizationAuthorizer authorizer, ITradingRelationshipReader relationships, AgreementVersionReader reader, TimeProvider clock)
 {
     internal async Task<IResult> HandleAsync(Guid agreementId, Guid versionId, CancellationToken cancellationToken)
     {
@@ -25,7 +25,7 @@ internal sealed class GetVersionHandler(AgreementsDbContext db, ICurrentPerson p
         var relationship = await relationships.GetAsync(version.TradingRelationshipId, cancellationToken);
         if (relationship is null || (relationship.SupplierOrganizationId != acting && relationship.CustomerOrganizationId != acting))
             return NotFound();
-        return Results.Ok(VersionResponse.From(await reader.ReadFactsAsync(version, cancellationToken)));
+        return Results.Ok(VersionResponse.From(await reader.ReadFactsAsync(version, cancellationToken), DateOnly.FromDateTime(clock.GetUtcNow().UtcDateTime)));
     }
 
     private static IResult NotFound() => Problem(404, "agreement_version_not_found");

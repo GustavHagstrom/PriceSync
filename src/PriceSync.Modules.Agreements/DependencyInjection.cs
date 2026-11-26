@@ -20,7 +20,11 @@ public static class DependencyInjection
         services.AddSingleton(Domain.AgreementRoundingPolicy.Default);
         services.AddScoped<CreateHandler>();
         services.AddScoped<Features.PublishVersion.PublishVersionHandler>();
+        services.AddScoped<Features.WithdrawVersion.WithdrawVersionHandler>();
+        services.AddScoped<Features.WithdrawVersion.WithdrawVersionValidator>();
         services.AddScoped<ListHandler>();
+        services.AddScoped<Features.Recommendation.RecommendationHandler>();
+        services.AddScoped<Features.Recommendation.RecommendationValidator>();
         services.AddScoped<ListValidator>();
         services.AddScoped<GetHandler>();
         services.AddScoped<Features.ListVersions.ListVersionsHandler>();

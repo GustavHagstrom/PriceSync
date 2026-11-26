@@ -17,7 +17,8 @@ internal sealed class AgreementVersionReader(AgreementsDbContext db) : IAgreemen
     {
         var coverage = await db.Coverage.AsNoTracking().Where(x => x.VersionId == version.Id).ToArrayAsync(cancellationToken);
         var groups = await db.GroupDiscounts.AsNoTracking().Where(x => x.VersionId == version.Id).ToArrayAsync(cancellationToken);
-        return AgreementVersionFactsMapper.From(version, coverage, groups);
+        var withdrawal = await db.Withdrawals.AsNoTracking().SingleOrDefaultAsync(x => x.VersionId == version.Id, cancellationToken);
+        return WithWithdrawal(AgreementVersionFactsMapper.From(version, coverage, groups), withdrawal);
     }
 
     internal async Task<(AgreementVersionFacts[] Items, bool HasMore)> ReadPageAsync(
@@ -35,7 +36,16 @@ internal sealed class AgreementVersionReader(AgreementsDbContext db) : IAgreemen
             .ToArrayAsync(cancellationToken)).ToLookup(x => x.VersionId);
         var groups = (await db.GroupDiscounts.AsNoTracking().Where(x => ids.Contains(x.VersionId))
             .ToArrayAsync(cancellationToken)).ToLookup(x => x.VersionId);
-        return (versions.Select(version => AgreementVersionFactsMapper.From(version, coverage[version.Id], groups[version.Id]))
+        var withdrawals = await db.Withdrawals.AsNoTracking().Where(x => ids.Contains(x.VersionId))
+            .ToDictionaryAsync(x => x.VersionId, cancellationToken);
+        return (versions.Select(version => WithWithdrawal(AgreementVersionFactsMapper.From(version, coverage[version.Id], groups[version.Id]),
+                withdrawals.GetValueOrDefault(version.Id)))
             .ToArray(), hasMore);
     }
+
+    private static AgreementVersionFacts WithWithdrawal(AgreementVersionFacts facts, AgreementVersionWithdrawal? withdrawal) =>
+        withdrawal is null ? facts : facts with
+        {
+            Withdrawal = new(withdrawal.Reason, withdrawal.WithdrawnByPersonId, withdrawal.WithdrawnAt),
+        };
 }

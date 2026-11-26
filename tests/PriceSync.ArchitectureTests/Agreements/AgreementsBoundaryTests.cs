@@ -23,7 +23,8 @@ public sealed class AgreementsBoundaryTests
                 "PriceSync.Modules.Agreements.Contracts.AgreementVersionFacts",
                 "PriceSync.Modules.Agreements.Contracts.AgreementVersionListCoverage",
                 "PriceSync.Modules.Agreements.Contracts.AgreementVersionRounding",
-                "PriceSync.Modules.Agreements.Contracts.AgreementVersionGroupTerms"]);
+                "PriceSync.Modules.Agreements.Contracts.AgreementVersionGroupTerms",
+                "PriceSync.Modules.Agreements.Contracts.AgreementVersionWithdrawalFacts"]);
     }
 
     [Fact]
