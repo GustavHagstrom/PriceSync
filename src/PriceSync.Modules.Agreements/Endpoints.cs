@@ -23,6 +23,8 @@ public static class Endpoints
             (Guid agreementId, Guid versionId, Features.GetVersion.GetVersionHandler handler, CancellationToken cancellationToken) =>
                 handler.HandleAsync(agreementId, versionId, cancellationToken)).WithName("GetAgreementVersion");
         group.MapGet("/agreements", ListEndpoint.HandleAsync).WithName("ListAgreements");
+        group.MapGet("/agreements/{agreementId:guid}/recommendation",
+            Features.Recommendation.RecommendationEndpoint.HandleAsync).WithName("GetAgreementRecommendation");
         group.MapGet("/agreements/{agreementId:guid}/versions", ListVersionsEndpoint.HandleAsync).WithName("ListAgreementVersions");
         return endpoints;
     }
