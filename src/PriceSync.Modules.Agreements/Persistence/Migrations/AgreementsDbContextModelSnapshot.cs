@@ -23,6 +23,25 @@ namespace PriceSync.Modules.Agreements.Persistence.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.Entity("PriceSync.Modules.Agreements.Domain.AgreementAcceptance", b =>
+                {
+                    b.Property<Guid>("TradingRelationshipId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("VersionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("AcceptedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("AcceptedByPersonId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("TradingRelationshipId", "VersionId");
+
+                    b.ToTable("agreement_acceptances", "agreements");
+                });
+
             modelBuilder.Entity("PriceSync.Modules.Agreements.Domain.AgreementVersionCoverage", b =>
                 {
                     b.Property<Guid>("VersionId")
@@ -215,6 +234,16 @@ namespace PriceSync.Modules.Agreements.Persistence.Migrations
                         .HasName("pk_creation_idempotency_records");
 
                     b.ToTable("creation_idempotency_records", "agreements");
+                });
+
+            modelBuilder.Entity("PriceSync.Modules.Agreements.Domain.AgreementAcceptance", b =>
+                {
+                    b.HasOne("PriceSync.Modules.Agreements.Domain.PriceAgreementVersion", null)
+                        .WithOne()
+                        .HasForeignKey("PriceSync.Modules.Agreements.Domain.AgreementAcceptance", "TradingRelationshipId", "VersionId")
+                        .HasPrincipalKey("PriceSync.Modules.Agreements.Domain.PriceAgreementVersion", "TradingRelationshipId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("PriceSync.Modules.Agreements.Domain.AgreementVersionCoverage", b =>

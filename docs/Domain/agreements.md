@@ -112,6 +112,8 @@ After the Trading Relationship has Ended, reading history, Supplier withdrawal a
 
 ### Repeated and concurrent decisions
 
+Stable agreement creation requires a case-sensitive idempotency key scoped to the Person, acting Organization and creation operation. Within that scope, the same key and Trading Relationship replay the original successful creation result; the same key with a different relationship conflicts. Different keys may create distinct agreements within the same relationship. Current authority, Supplier scope and Active relationship status are checked before replay, so a stored result never grants access after authority is lost or the relationship has Ended. Creation does not publish terms or change Customer state.
+
 Customer selection requests identify the expected From version and desired To version, either of which may explicitly mean no Active version. If To is already current, succeed without another transition. Otherwise, apply the change only if From is current; a different current version conflicts and requires reload. Comparison and transition are atomic. Intervening changes that return to From do not themselves prevent the request. No idempotency key or caller revision is required for selection.
 
 The first acceptance of a version preserves its Person and timestamp. Repeated explicit acceptance, or implicit acceptance during activation, never overwrites that first fact or creates duplicates. Actual selection transitions preserve From/To, Person and system decision time in an unambiguous relationship-wide order.
@@ -157,3 +159,9 @@ Publication and withdrawal are durable Supplier facts. Historical recommendation
 ## References
 
 The area references Organizations and the applicable Trading Relationship by identity. It does not own those concepts. Customer Pricing consumes exact immutable Agreement Version references but does not mutate Agreements state.
+
+## Current implementation scope
+
+Stable agreement creation, scoped agreement reads/lists, complete immutable version publication and exact-version reads/version lists are implemented. Withdrawal, recommendation, explicit Customer acceptance and scoped acceptance status reads are also implemented. Customer activation/deactivation and selection history remain for later slices.
+
+`IAgreementVersionReader` exposes exact immutable version facts to trusted module consumers: agreement/relationship/version identities, predecessor and publication ordinal, validity, publication actor/time, complete list coverage, discounts and preserved rounding semantics. A missing version returns no result; technical failures propagate. This reader does not authorize a Person or select a Customer's current inputs. HTTP reads separately enforce Active acting-Organization membership and relationship party scope, including for Ended relationships; consumers remain responsible for their own use-case authorization and compatibility checks.

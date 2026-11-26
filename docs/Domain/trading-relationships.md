@@ -106,7 +106,7 @@ The area produces facts that a Trading Relationship exists or has ended. Downstr
 
 ## Public module boundary
 
-The current cross-module contract exposes `TradingRelationshipId`, without exposing the aggregate or a generic identity/status reader. Future consumers must define purpose-built contracts from concrete needs. HTTP representations remain internal to the module. No domain/integration event or outbox contract is required by the current implementation.
+The cross-module contract exposes `TradingRelationshipId` and `ITradingRelationshipReader`, which returns the Supplier and Customer Organization identities and the current Active/Ended status for an identified relationship, or no result if it does not exist. Consumers must authorize the acting Organization and verify its party scope; the reader does not grant access by itself. Status is observed point-in-time, without cross-module locks, and technical failures propagate rather than becoming a missing relationship or an assumed Active status. The aggregate and HTTP representations remain internal to the module. No domain/integration event or outbox contract is required by the current implementation.
 
 ## References
 
