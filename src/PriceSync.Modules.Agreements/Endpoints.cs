@@ -16,21 +16,51 @@ public static class Endpoints
         var group = endpoints.MapGroup("/api/v1").WithTags("Agreements").RequireAuthorization();
         const string acceptance = "/agreements/{agreementId:guid}/versions/{versionId:guid}/acceptance";
         group.MapGet(acceptance, Features.GetVersionAcceptance.GetVersionAcceptanceEndpoint.HandleAsync)
-            .WithName("GetAgreementVersionAcceptance");
+
+            .WithName("GetAgreementVersionAcceptance")
+            .WithSummary("Get the customer's acceptance of an agreement version")
+            .WithDescription("The supplier and customer can check whether the customer has accepted this version and see the acceptance details when available.");
         group.MapPost(acceptance, Features.AcceptVersion.AcceptVersionEndpoint.HandleAsync)
-            .WithName("AcceptAgreementVersion");
-        group.MapPost("/agreements", CreateEndpoint.HandleAsync).WithName("CreateAgreement");
-        group.MapPost("/agreements/{agreementId:guid}/versions", PublishVersionEndpoint.HandleAsync).WithName("PublishAgreementVersion");
+
+            .WithName("AcceptAgreementVersion")
+            .WithSummary("Accept an agreement version")
+            .WithDescription("Records acceptance of a specific published version on behalf of the customer organization.");
+        group.MapPost("/agreements", CreateEndpoint.HandleAsync)
+            .WithName("CreateAgreement")
+            .WithSummary("Create an agreement")
+            .WithDescription("The supplier creates an agreement for a trading relationship. Send an `Idempotency-Key` header and reuse it when retrying the same request.");
+        group.MapPost("/agreements/{agreementId:guid}/versions", PublishVersionEndpoint.HandleAsync)
+            .WithName("PublishAgreementVersion")
+            .WithSummary("Publish an agreement version")
+            .WithDescription("The supplier publishes a version with validity dates, price list coverage, and discounts. Supply the expected latest version ID, or `null` for the first publication.");
         group.MapPost("/agreements/{agreementId:guid}/versions/{versionId:guid}/withdraw",
-            Features.WithdrawVersion.WithdrawVersionEndpoint.HandleAsync).WithName("WithdrawAgreementVersion");
-        group.MapGet("/agreements/{agreementId:guid}", GetEndpoint.HandleAsync).WithName("GetAgreement");
+            Features.WithdrawVersion.WithdrawVersionEndpoint.HandleAsync)
+            .WithName("WithdrawAgreementVersion")
+            .WithSummary("Withdraw an agreement version")
+            .WithDescription("The supplier withdraws a specific published version and can provide a reason. The version remains available in the agreement history.");
+        group.MapGet("/agreements/{agreementId:guid}", GetEndpoint.HandleAsync)
+            .WithName("GetAgreement")
+            .WithSummary("Get an agreement")
+            .WithDescription("Returns agreement details, including its trading relationship and latest version ID, to the supplier or customer.");
         group.MapGet("/agreements/{agreementId:guid}/versions/{versionId:guid}",
             (Guid agreementId, Guid versionId, Features.GetVersion.GetVersionHandler handler, CancellationToken cancellationToken) =>
-                handler.HandleAsync(agreementId, versionId, cancellationToken)).WithName("GetAgreementVersion");
-        group.MapGet("/agreements", ListEndpoint.HandleAsync).WithName("ListAgreements");
+                handler.HandleAsync(agreementId, versionId, cancellationToken))
+            .WithName("GetAgreementVersion")
+            .WithSummary("Get an agreement version")
+            .WithDescription("Returns the published terms and lifecycle status of a specific version, including its validity period, coverage, and discounts.");
+        group.MapGet("/agreements", ListEndpoint.HandleAsync)
+            .WithName("ListAgreements")
+            .WithSummary("List agreements for a trading relationship")
+            .WithDescription("Returns a page of agreements for the supplied `tradingRelationshipId`, newest first. Pass the returned `nextCursor` as `cursor` to continue.");
         group.MapGet("/agreements/{agreementId:guid}/recommendation",
-            Features.Recommendation.RecommendationEndpoint.HandleAsync).WithName("GetAgreementRecommendation");
-        group.MapGet("/agreements/{agreementId:guid}/versions", ListVersionsEndpoint.HandleAsync).WithName("ListAgreementVersions");
+            Features.Recommendation.RecommendationEndpoint.HandleAsync)
+            .WithName("GetAgreementRecommendation")
+            .WithSummary("Get the recommended agreement version")
+            .WithDescription("Uses `evaluatedDate` to check validity and `knowledgeCutoff` to determine which publications and withdrawals were known. The recommendation is `null` when no version qualifies.");
+        group.MapGet("/agreements/{agreementId:guid}/versions", ListVersionsEndpoint.HandleAsync)
+            .WithName("ListAgreementVersions")
+            .WithSummary("List versions of an agreement")
+            .WithDescription("Returns published versions in reverse publication order, including withdrawn versions. Pass the returned `nextCursor` as `cursor` to continue.");
         return endpoints;
     }
 }
