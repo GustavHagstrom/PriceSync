@@ -39,10 +39,22 @@ internal sealed class CustomerAgreementSelectionStore(AgreementsDbContext db, Ti
         if (current.ActiveVersionId != from)
             return SelectionChange.Conflict;
 
-        var decidedAt = clock.GetUtcNow();
+        var now = clock.GetUtcNow();
+        var decidedAt = now;
+        if (current.Sequence > 0)
+        {
+            // Read the preceding transition while holding the relationship state lock.
+            var previousDecision = await db.Set<CustomerAgreementTransition>()
+                .Where(x => x.TradingRelationshipId == relationshipId && x.Sequence == current.Sequence)
+                .Select(x => x.DecidedAt)
+                .SingleAsync(cancellationToken);
+            if (previousDecision > decidedAt)
+                decidedAt = previousDecision;
+        }
+
         if (to is { } destination)
             await new AgreementAcceptanceStore(db, clock).AcceptAsync(relationshipId, destination, personId,
-                decidedAt, cancellationToken);
+                now, cancellationToken);
 
         var nextSequence = checked(current.Sequence + 1);
         await db.Database.ExecuteSqlInterpolatedAsync($"""

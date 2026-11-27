@@ -17,8 +17,14 @@ public static class Endpoints
         const string selection = "/trading-relationships/{relationshipId:guid}/agreement-selection";
         group.MapGet(selection, Features.AgreementSelection.AgreementSelectionEndpoints.GetAsync)
             .WithName("GetAgreementSelection")
-            .WithSummary("Get the current agreement selection for a trading relationship")
+            .WithSummary("Get the current or historical agreement selection for a trading relationship")
+            .WithDescription("Supply at most one inclusive boundary: `asOfUtc` (an ISO 8601 timestamp with an explicit offset) or `throughSequence` (a nonnegative sequence). Historical responses have an empty warnings list.")
             .Produces<Features.AgreementSelection.AgreementSelectionResponse>();
+        group.MapGet(selection + "/history", Features.AgreementSelection.AgreementSelectionEndpoints.GetHistoryAsync)
+            .WithName("GetAgreementSelectionHistory")
+            .WithSummary("List agreement selection transitions for a trading relationship")
+            .WithDescription("Returns transitions in ascending sequence order. Page size defaults to 50 and is capped at 100. Pass `nextAfterSequence` as `afterSequence` to continue.")
+            .Produces<Features.AgreementSelection.AgreementSelectionHistoryResponse>();
         group.MapPut(selection, Features.AgreementSelection.AgreementSelectionEndpoints.PutAsync)
             .WithName("ChangeAgreementSelection")
             .WithSummary("Change the current agreement selection for a trading relationship")

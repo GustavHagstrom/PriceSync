@@ -53,6 +53,10 @@ public sealed partial class AgreementApiTests
         await using var otherCustomerApp = new ApiApplication(fixture.ConnectionString, otherOwner);
         using var otherClient = AcceptanceClient(otherCustomerApp, otherCustomer);
         await ChangeSelection(otherClient, SelectionUrl(foreign.RelationshipId), null, foreign.Id);
+        using var hiddenHistory = await otherClient.GetAsync($"{url}/history");
+        using var hiddenSelection = await otherClient.GetAsync($"{url}?throughSequence=1");
+        hiddenHistory.StatusCode.Should().Be(HttpStatusCode.NotFound);
+        hiddenSelection.StatusCode.Should().Be(HttpStatusCode.NotFound);
         (await ReadActiveSelection(customer, url)).Should().Be(current.Id);
         var history = await db.Set<CustomerAgreementTransition>().ToListAsync();
         history.Select(x => x.TradingRelationshipId.Value).Should()
@@ -118,6 +122,12 @@ public sealed partial class AgreementApiTests
         var history = await db.Set<CustomerAgreementTransition>().OrderBy(x => x.Sequence).ToListAsync();
         history.Select(x => x.Sequence).Should().Equal(1, 2, 3);
         history.Select(x => x.DecidedAt).Should().Equal(decision.DecidedAt, deactivatedAt, clock.Now);
+        var cutoff = Uri.EscapeDataString(deactivatedAt.ToOffset(TimeSpan.FromHours(1)).ToString("O"));
+        (await supplier.GetFromJsonAsync<JsonElement>($"{url}?asOfUtc={cutoff}"))
+            .GetProperty("activeVersionId").ValueKind.Should().Be(JsonValueKind.Null);
+        var firstCutoff = Uri.EscapeDataString(decision.DecidedAt.ToString("O"));
+        (await supplier.GetFromJsonAsync<JsonElement>($"{url}?asOfUtc={firstCutoff}"))
+            .GetProperty("activeVersionId").GetGuid().Should().Be(version.Id);
         JsonElement.DeepEquals(acceptance, await supplier.GetFromJsonAsync<JsonElement>(acceptanceUrl)).Should().BeTrue();
     }
 
@@ -142,8 +152,12 @@ public sealed partial class AgreementApiTests
 
         using var retry = await PutSelection(customer, url, null, version.Id);
         using var read = await customer.GetAsync(url);
+        using var historical = await customer.GetAsync($"{url}?throughSequence=1");
+        using var history = await customer.GetAsync($"{url}/history");
         retry.StatusCode.Should().Be(HttpStatusCode.Forbidden);
         read.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        historical.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        history.StatusCode.Should().Be(HttpStatusCode.Forbidden);
         (await ReadActiveSelection(supplier, url)).Should().Be(version.Id);
     }
 
@@ -246,7 +260,6 @@ public sealed partial class AgreementApiTests
         });
         createdList.StatusCode.Should().Be(HttpStatusCode.Created);
         var otherList = (await createdList.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid();
-        var replacement = await PublishSiblingSelectionTerms(supplier, original.RelationshipId, otherList);
         var listUrl = $"/api/v1/price-lists/{scope.List}";
         var savedList = await supplier.GetFromJsonAsync<JsonElement>(listUrl);
         var owner = await AddAcceptanceActor(scope.Customer, OrganizationRole.Owner);
@@ -255,7 +268,14 @@ public sealed partial class AgreementApiTests
         using var customer = AcceptanceClient(customerApp, scope.Customer);
         var url = SelectionUrl(original.RelationshipId);
         await ChangeSelection(customer, url, null, original.Id);
+        var historicalUrl = $"{url}?throughSequence=1";
+        var before = await supplier.GetFromJsonAsync<JsonElement>(historicalUrl);
+        before.GetProperty("activeVersionId").GetGuid().Should().Be(original.Id);
+        var replacement = await PublishSiblingSelectionTerms(supplier, original.RelationshipId, otherList);
         await ChangeSelection(customer, url, original.Id, replacement.Id);
+        using var withdrawal = await supplier.PostAsJsonAsync($"{original.Location}/withdraw", new { reason = "Superseded" });
+        withdrawal.StatusCode.Should().Be(HttpStatusCode.OK);
+        JsonElement.DeepEquals(before, await supplier.GetFromJsonAsync<JsonElement>(historicalUrl)).Should().BeTrue();
 
         JsonElement.DeepEquals(savedList, await supplier.GetFromJsonAsync<JsonElement>(listUrl)).Should().BeTrue();
         await using var services = customerApp.Services.CreateAsyncScope();
@@ -265,6 +285,8 @@ public sealed partial class AgreementApiTests
         active.Should().Be(new AgreementVersionId(replacement.Id));
         var terms = await versions.GetAsync(active!.Value);
         terms!.Coverage.Select(item => item.PriceListId.Value).Should().Equal(otherList);
+        var originalTerms = await versions.GetAsync(new AgreementVersionId(original.Id));
+        originalTerms!.Coverage.Select(item => item.PriceListId.Value).Should().Equal(scope.List);
     }
 
     private sealed class UnexpectedSelectionListVerification : IPriceListScopeVerifier
