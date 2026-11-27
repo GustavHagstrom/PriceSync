@@ -27,7 +27,7 @@ internal sealed record VersionResponse(Guid Id, Guid AgreementId, Guid TradingRe
                 : null,
         };
 
-    private static string[] GetWarnings(AgreementVersionFacts facts, DateOnly date)
+    internal static string[] GetWarnings(AgreementVersionFacts facts, DateOnly date)
     {
         var warnings = new List<string>(2);
         if (facts.Withdrawal is not null) warnings.Add("agreement_version_withdrawn");

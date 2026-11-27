@@ -14,6 +14,16 @@ public static class Endpoints
     public static IEndpointRouteBuilder MapAgreementsEndpoints(this IEndpointRouteBuilder endpoints)
     {
         var group = endpoints.MapGroup("/api/v1").WithTags("Agreements").RequireAuthorization();
+        const string selection = "/trading-relationships/{relationshipId:guid}/agreement-selection";
+        group.MapGet(selection, Features.AgreementSelection.AgreementSelectionEndpoints.GetAsync)
+            .WithName("GetAgreementSelection")
+            .WithSummary("Get the current agreement selection for a trading relationship")
+            .Produces<Features.AgreementSelection.AgreementSelectionResponse>();
+        group.MapPut(selection, Features.AgreementSelection.AgreementSelectionEndpoints.PutAsync)
+            .WithName("ChangeAgreementSelection")
+            .WithSummary("Change the current agreement selection for a trading relationship")
+            .WithDescription("Supply both version IDs. An explicit null means no active version. Reload the current selection after a conflict.")
+            .Produces<Features.AgreementSelection.AgreementSelectionResponse>();
         const string acceptance = "/agreements/{agreementId:guid}/versions/{versionId:guid}/acceptance";
         group.MapGet(acceptance, Features.GetVersionAcceptance.GetVersionAcceptanceEndpoint.HandleAsync)
 

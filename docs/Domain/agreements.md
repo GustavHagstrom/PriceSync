@@ -162,6 +162,8 @@ The area references Organizations and the applicable Trading Relationship by ide
 
 ## Current implementation scope
 
-Stable agreement creation, scoped agreement reads/lists, complete immutable version publication and exact-version reads/version lists are implemented. Withdrawal, recommendation, explicit Customer acceptance and scoped acceptance status reads are also implemented. Customer activation/deactivation and selection history remain for later slices.
+Stable agreement creation, scoped agreement reads/lists, complete immutable version publication and exact-version reads/version lists are implemented. Withdrawal, recommendation, explicit Customer acceptance and scoped acceptance status reads are also implemented. Customers can change the Active selection for a Trading Relationship, and either party can read the current selection. Each actual change records history for later historical queries.
+
+`ICustomerAgreementSelectionReader` returns the exact current Agreement Version identity or null for trusted module consumers. Consumers apply their own authorization and evaluate compatibility with their selected Price List Versions.
 
 `IAgreementVersionReader` exposes exact immutable version facts to trusted module consumers: agreement/relationship/version identities, predecessor and publication ordinal, validity, publication actor/time, complete list coverage, discounts and preserved rounding semantics. A missing version returns no result; technical failures propagate. This reader does not authorize a Person or select a Customer's current inputs. HTTP reads separately enforce Active acting-Organization membership and relationship party scope, including for Ended relationships; consumers remain responsible for their own use-case authorization and compatibility checks.
