@@ -37,8 +37,10 @@ public sealed partial class AgreementApiTests
         (await supplier.GetFromJsonAsync<JsonElement>(url)).GetProperty("activeVersionId").GetGuid().Should().Be(versionId);
         await using var services = customerApp.Services.CreateAsyncScope();
         var reader = services.ServiceProvider.GetRequiredService<ICustomerAgreementSelectionReader>();
-        (await reader.GetActiveVersionIdAsync(TradingRelationshipId.FromGuid(relationshipId)))
-            .Should().Be(new AgreementVersionId(versionId));
+        var id = TradingRelationshipId.FromGuid(relationshipId);
+        (await reader.GetActiveVersionIdAsync(id)).Should().Be(new AgreementVersionId(versionId));
+        await ChangeSelection(customer, url, versionId, null);
+        (await reader.GetActiveVersionIdAsync(id)).Should().BeNull();
     }
 
     [Fact]

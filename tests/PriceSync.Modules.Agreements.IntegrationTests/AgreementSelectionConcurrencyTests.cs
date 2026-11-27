@@ -97,7 +97,7 @@ public sealed partial class AgreementApiTests
         using var customer = AcceptanceClient(customerApp, scope.Customer);
         await ChangeSelection(customer, url, null, a.Id);
 
-        var pause = new PauseSelectionBeforeStateInsert();
+        var pause = new PauseSelectionCommand();
         await using var delayedApp = SelectionApi(owner, pause);
         using var delayed = AcceptanceClient(delayedApp, scope.Customer);
         var pending = PutSelection(delayed, url, a.Id, b.Id);
@@ -205,7 +205,7 @@ public sealed partial class AgreementApiTests
         withdrawal.StatusCode.Should().Be(HttpStatusCode.OK);
         (await ReadActiveSelection(supplier, url)).Should().Be(a.Id);
 
-        var pause = new PauseSelectionBeforeStateInsert();
+        var pause = new PauseSelectionCommand();
         await using var delayedApp = SelectionApi(owner, pause);
         using var delayed = AcceptanceClient(delayedApp, scope.Customer);
         var pending = PutSelection(delayed, url, a.Id, b.Id);
@@ -279,10 +279,13 @@ public sealed partial class AgreementApiTests
         return selected.ValueKind == JsonValueKind.Null ? null : selected.GetGuid();
     }
 
-    private sealed class PauseSelectionBeforeStateInsert : DbCommandInterceptor
+    private sealed class PauseSelectionCommand(
+        string sql = "INSERT INTO agreements.customer_agreement_states") : DbCommandInterceptor
     {
         private readonly TaskCompletionSource _arrived = new(TaskCreationOptions.RunContinuationsAsynchronously);
         private readonly TaskCompletionSource _released = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        internal System.Data.IsolationLevel? IsolationLevel { get; private set; }
 
         internal Task WaitForArrivalAsync() => _arrived.Task.WaitAsync(TimeSpan.FromSeconds(10));
 
@@ -291,8 +294,9 @@ public sealed partial class AgreementApiTests
         public override async ValueTask<InterceptionResult<int>> NonQueryExecutingAsync(DbCommand command,
             CommandEventData eventData, InterceptionResult<int> result, CancellationToken cancellationToken = default)
         {
-            if (command.CommandText.Contains("INSERT INTO agreements.customer_agreement_states", StringComparison.Ordinal))
+            if (command.CommandText.Contains(sql, StringComparison.Ordinal))
             {
+                IsolationLevel = command.Transaction?.IsolationLevel;
                 _arrived.TrySetResult();
                 await _released.Task.WaitAsync(TimeSpan.FromSeconds(10), cancellationToken);
             }
