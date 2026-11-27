@@ -73,6 +73,7 @@ public sealed class PostgreSqlFixture : IAsyncLifetime
             truncate table
                 price_publication.price_lists,
                 agreements.creation_idempotency_records,
+                agreements.customer_agreement_states,
                 agreements.price_agreements,
                 trading_relationships."TradingRelationships",
                 organization_access.organization_membership_roles,

@@ -33,6 +33,32 @@ internal sealed class AgreementsDbContext(DbContextOptions<AgreementsDbContext> 
             .HasPrincipalKey<PriceAgreementVersion>(x => new { x.TradingRelationshipId, x.Id })
             .OnDelete(DeleteBehavior.Restrict);
 
+        var state = modelBuilder.Entity<CustomerAgreementState>();
+        state.ToTable("customer_agreement_states", table => table.HasCheckConstraint("ck_customer_agreement_state_sequence",
+            """ "Sequence" > 0 OR ("Sequence" = 0 AND "ActiveVersionId" IS NULL) """));
+        state.HasKey(x => x.TradingRelationshipId);
+        state.Property(x => x.TradingRelationshipId).HasConversion(x => x.Value, x => TradingRelationshipId.FromGuid(x))
+            .ValueGeneratedNever();
+        state.Property(x => x.ActiveVersionId).HasConversion(x => x!.Value.Value, x => new AgreementVersionId(x));
+        state.HasOne<AgreementAcceptance>().WithMany()
+            .HasForeignKey(x => new { x.TradingRelationshipId, x.ActiveVersionId }).OnDelete(DeleteBehavior.Restrict);
+
+        var transition = modelBuilder.Entity<CustomerAgreementTransition>();
+        transition.ToTable("customer_agreement_transitions", table =>
+            table.HasCheckConstraint("ck_customer_agreement_transition",
+                """ "Sequence" > 0 AND "FromVersionId" IS DISTINCT FROM "ToVersionId" """));
+        transition.HasKey(x => new { x.TradingRelationshipId, x.Sequence });
+        transition.Property(x => x.TradingRelationshipId).HasConversion(x => x.Value, x => TradingRelationshipId.FromGuid(x));
+        transition.Property(x => x.FromVersionId).HasConversion(x => x!.Value.Value, x => new AgreementVersionId(x));
+        transition.Property(x => x.ToVersionId).HasConversion(x => x!.Value.Value, x => new AgreementVersionId(x));
+        transition.Property(x => x.PersonId).HasConversion(x => x.Value, x => new PersonId(x));
+        transition.HasOne<CustomerAgreementState>().WithMany()
+            .HasForeignKey(x => x.TradingRelationshipId).OnDelete(DeleteBehavior.Restrict);
+        transition.HasOne<AgreementAcceptance>().WithMany()
+            .HasForeignKey(x => new { x.TradingRelationshipId, x.FromVersionId }).OnDelete(DeleteBehavior.Restrict);
+        transition.HasOne<AgreementAcceptance>().WithMany()
+            .HasForeignKey(x => new { x.TradingRelationshipId, x.ToVersionId }).OnDelete(DeleteBehavior.Restrict);
+
         var withdrawal = modelBuilder.Entity<AgreementVersionWithdrawal>();
         withdrawal.ToTable("agreement_version_withdrawals");
         withdrawal.HasKey(x => x.VersionId).HasName(WithdrawalKey);
