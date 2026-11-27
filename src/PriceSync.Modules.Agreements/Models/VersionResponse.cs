@@ -1,6 +1,5 @@
 using PriceSync.Modules.Agreements.Contracts;
 using PriceSync.Modules.Agreements.Domain;
-using PriceSync.Modules.PricePublication.Contracts;
 
 namespace PriceSync.Modules.Agreements.Models;
 
@@ -17,12 +16,8 @@ internal sealed record VersionResponse(Guid Id, Guid AgreementId, Guid TradingRe
     internal static VersionResponse From(AgreementVersionFacts facts, DateOnly date) => new(
         facts.Id.Value, facts.AgreementId.Value, facts.TradingRelationshipId.Value, facts.PredecessorVersionId?.Value, facts.Ordinal,
         facts.ValidFrom, facts.ValidTo, facts.PublishedAt, facts.PublishedByPersonId.Value,
-        facts.Coverage.Select(item => new CoverageResponse(item.PriceListId.Value, item.Type switch
-        {
-            PriceListType.General => "general",
-            PriceListType.CustomerSpecificNet => "customerSpecificNet",
-            _ => throw new InvalidOperationException("Unsupported Price List type."),
-        }, item.GeneralDiscount)).ToArray(),
+        facts.Coverage.Select(item => new CoverageResponse(item.PriceListId.Value,
+            CoverageType.Format(item.Type), item.GeneralDiscount)).ToArray(),
         new(facts.Rounding.DecimalPlaces, facts.Rounding.Midpoint, facts.Rounding.Stage, facts.Rounding.PreservePriceQuantityAndUnitOfMeasure),
         facts.GroupDiscounts.Select(group => new GroupDiscountResponse(group.Code, group.Discount)).ToArray())
         {

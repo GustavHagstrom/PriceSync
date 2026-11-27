@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using PriceSync.Modules.Agreements.Contracts;
 using PriceSync.Modules.Agreements.Domain;
+using PriceSync.Modules.Agreements.Models;
 using PriceSync.Modules.PricePublication.Contracts;
 
 namespace PriceSync.Modules.Agreements.Persistence.Configurations;
@@ -19,7 +20,13 @@ internal sealed class AgreementVersionCoverageConfiguration : IEntityTypeConfigu
         builder.HasKey(x => new { x.VersionId, x.PriceListId });
         builder.Property(x => x.VersionId).HasConversion(x => x.Value, x => new AgreementVersionId(x));
         builder.Property(x => x.PriceListId).HasConversion(x => x.Value, x => new PriceListId(x));
+        builder.Property(x => x.Type).HasConversion(
+            type => CoverageType.Format(type),
+            value => CoverageType.Parse(value) ?? UnknownStoredType());
         builder.Property(x => x.GeneralDiscount).HasColumnType("numeric");
         builder.HasOne<PriceAgreementVersion>().WithMany().HasForeignKey(x => x.VersionId).OnDelete(DeleteBehavior.Restrict);
     }
+
+    private static PriceListType UnknownStoredType() =>
+        throw new InvalidOperationException("Unsupported stored Price List type.");
 }
