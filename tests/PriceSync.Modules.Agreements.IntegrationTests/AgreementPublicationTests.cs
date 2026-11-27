@@ -9,6 +9,7 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using PriceSync.Modules.PricePublication.Contracts;
 using PriceSync.Modules.OrganizationAccess.Contracts;
 using Npgsql;
+using PriceSync.Modules.Agreements.Domain;
 using PriceSync.Modules.Agreements.Persistence;
 using FluentAssertions;
 
@@ -16,6 +17,25 @@ namespace PriceSync.Modules.Agreements.IntegrationTests;
 
 public sealed partial class AgreementApiTests
 {
+    [Fact]
+    public async Task Publication_does_not_initialize_acceptance_or_selection()
+    {
+        var scope = await PublicationScope();
+        await using var app = scope.App;
+        using var supplier = scope.Client;
+        var version = await PublishSelectionTerms(supplier, scope.Agreement, scope.List);
+
+        var acceptance = await supplier.GetFromJsonAsync<JsonElement>($"{version.Location}/acceptance");
+        acceptance.GetProperty("accepted").GetBoolean().Should().BeFalse();
+        var url = SelectionUrl(version.RelationshipId);
+        (await ReadActiveSelection(supplier, url)).Should().BeNull();
+        (await supplier.GetFromJsonAsync<JsonElement>($"{url}/history")).GetProperty("items").GetArrayLength()
+            .Should().Be(0);
+        await using var db = SelectionContext();
+        (await db.Set<CustomerAgreementState>().AnyAsync()).Should().BeFalse();
+        (await db.Set<AgreementAcceptance>().AnyAsync()).Should().BeFalse();
+    }
+
     [Fact]
     public async Task Commercial_terms_preserve_exact_group_codes_across_publication_and_read()
     {

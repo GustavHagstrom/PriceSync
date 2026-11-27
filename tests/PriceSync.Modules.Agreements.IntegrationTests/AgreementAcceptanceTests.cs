@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
+using PriceSync.Modules.Agreements.Domain;
 using PriceSync.Modules.Agreements.Persistence;
 using PriceSync.Modules.TradingRelationships.Contracts;
 using PriceSync.Modules.TradingRelationships.Persistence;
@@ -18,6 +19,37 @@ namespace PriceSync.Modules.Agreements.IntegrationTests;
 
 public sealed partial class AgreementApiTests
 {
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Standalone_acceptance_leaves_selection_state_and_history_unchanged(bool hasActiveSelection)
+    {
+        var scope = await PublicationScope();
+        await using var app = scope.App;
+        using var supplier = scope.Client;
+        var first = await PublishSelectionTerms(supplier, scope.Agreement, scope.List);
+        var second = await PublishSelectionTerms(supplier, scope.Agreement, scope.List, first.Id);
+        var owner = await AddAcceptanceActor(scope.Customer, OrganizationRole.Owner);
+        await using var customerApp = new ApiApplication(fixture.ConnectionString, owner);
+        using var customer = AcceptanceClient(customerApp, scope.Customer);
+        var url = SelectionUrl(first.RelationshipId);
+        if (hasActiveSelection)
+            await ChangeSelection(customer, url, null, first.Id);
+
+        var before = await customer.GetFromJsonAsync<JsonElement>(url);
+        var history = await customer.GetFromJsonAsync<JsonElement>($"{url}/history");
+
+        using var accepted = await customer.PostAsync($"{second.Location}/acceptance", null);
+
+        accepted.StatusCode.Should().Be(HttpStatusCode.OK);
+        (await accepted.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("accepted").GetBoolean().Should().BeTrue();
+        JsonElement.DeepEquals(before, await customer.GetFromJsonAsync<JsonElement>(url)).Should().BeTrue();
+        JsonElement.DeepEquals(history, await customer.GetFromJsonAsync<JsonElement>($"{url}/history")).Should().BeTrue();
+        await using var db = SelectionContext();
+        (await db.Set<CustomerAgreementState>().CountAsync())
+            .Should().Be(hasActiveSelection ? 1 : 0);
+    }
+
     [Fact]
     public async Task Customer_owner_can_accept_and_read_an_exact_published_version()
     {

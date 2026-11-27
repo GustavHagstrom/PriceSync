@@ -6,16 +6,68 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using PriceSync.Modules.Agreements.Contracts;
 using PriceSync.Modules.Agreements.Domain;
 using PriceSync.Modules.Agreements.Persistence;
 using PriceSync.Modules.OrganizationAccess.Contracts;
+using PriceSync.Modules.OrganizationAccess.Domain;
+using PriceSync.Modules.OrganizationAccess.Persistence;
 using PriceSync.Modules.TradingRelationships.Persistence;
 
 namespace PriceSync.Modules.Agreements.IntegrationTests;
 
 public sealed partial class AgreementApiTests
 {
+    [Theory]
+    [InlineData(1, HttpStatusCode.OK)]
+    [InlineData(2000, HttpStatusCode.OK)]
+    [InlineData(2001, HttpStatusCode.BadRequest)]
+    public async Task Withdrawal_validates_reason_length_after_trimming(int length, HttpStatusCode status)
+    {
+        var scope = await PublicationScope();
+        await using var app = scope.App;
+        using var supplier = scope.Client;
+        var version = await PublishSelectionTerms(supplier, scope.Agreement, scope.List);
+        var reason = new string('x', length);
+        using var response = await supplier.PostAsJsonAsync($"{version.Location}/withdraw", new { reason = $"  {reason}  " });
+
+        response.StatusCode.Should().Be(status);
+        var read = await supplier.GetFromJsonAsync<JsonElement>(version.Location);
+        var withdrawal = read.GetProperty("withdrawal");
+        if (status == HttpStatusCode.OK)
+            withdrawal.GetProperty("reason").GetString().Should().Be(reason);
+        else
+            withdrawal.ValueKind.Should().Be(JsonValueKind.Null);
+    }
+
+    [Fact]
+    public async Task Withdrawal_requires_an_owner_of_an_active_supplier()
+    {
+        var scope = await PublicationScope();
+        await using var app = scope.App;
+        using var supplier = scope.Client;
+        var version = await PublishSelectionTerms(supplier, scope.Agreement, scope.List);
+        var supplierId = new OrganizationId(Guid.Parse(supplier.DefaultRequestHeaders.GetValues("organization_id").Single()));
+        var member = await AddAcceptanceActor(supplierId, OrganizationRole.Member);
+        await using var memberApp = new ApiApplication(fixture.ConnectionString, member);
+        using var memberClient = AcceptanceClient(memberApp, supplierId);
+        var request = new { reason = "Incorrect terms" };
+        var url = $"{version.Location}/withdraw";
+
+        using var memberResponse = await memberClient.PostAsJsonAsync(url, request);
+        memberResponse.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        await using (var db = new OrganizationAccessDbContext(fixture.CreateOptions()))
+        {
+            (await db.Organizations.SingleAsync(x => x.Id == supplierId)).Archive(TimeProvider.System);
+            await db.SaveChangesAsync();
+        }
+        using var archivedResponse = await supplier.PostAsJsonAsync(url, request);
+        archivedResponse.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        await using var agreements = SelectionContext();
+        (await agreements.Withdrawals.AnyAsync()).Should().BeFalse();
+    }
+
     [Theory]
     [InlineData(true)]
     [InlineData(false)]
@@ -25,16 +77,28 @@ public sealed partial class AgreementApiTests
         await using var app = scope.App;
         using var publisher = scope.Client;
         var gate = new WithdrawalInsertGate();
-        await using var guarded = app.WithWebHostBuilder(builder => builder.ConfigureServices(services =>
-            services.ConfigureDbContext<AgreementsDbContext>(options => options.AddInterceptors(gate))));
-        using var supplier = guarded.CreateClient();
-        supplier.DefaultRequestHeaders.Add("organization_id", publisher.DefaultRequestHeaders.GetValues("organization_id"));
-        using var publication = await supplier.PostAsJsonAsync($"{scope.Agreement}/versions", Publication(scope.List));
-        publication.StatusCode.Should().Be(HttpStatusCode.Created);
-        var url = publication.Headers.Location!;
+        var supplierId = new OrganizationId(Guid.Parse(publisher.DefaultRequestHeaders.GetValues("organization_id").Single()));
+        var firstOwner = await AddAcceptanceActor(supplierId, OrganizationRole.Owner);
+        var secondOwner = await AddAcceptanceActor(supplierId, OrganizationRole.Owner);
+        var firstTime = new DateTimeOffset(2026, 11, 27, 12, 0, 0, TimeSpan.Zero);
+        var secondTime = firstTime.AddMinutes(1);
+        await using var firstApp = WithdrawalApi(firstOwner, firstTime);
+        await using var secondApp = WithdrawalApi(secondOwner, secondTime);
+        using var first = AcceptanceClient(firstApp, supplierId);
+        using var second = AcceptanceClient(secondApp, supplierId);
+        var version = await PublishSelectionTerms(publisher, scope.Agreement, scope.List);
+        var url = $"{version.Location}/withdraw";
         var results = await Task.WhenAll(
-            supplier.PostAsJsonAsync($"{url}/withdraw", new { reason = " first " }),
-            supplier.PostAsJsonAsync($"{url}/withdraw", new { reason = sameReason ? "first" : "second" }));
+            first.PostAsJsonAsync(url, new { reason = " first " }),
+            second.PostAsJsonAsync(url, new { reason = sameReason ? "first" : "second" }));
+
+        ApiApplication WithdrawalApi(PersonId owner, DateTimeOffset now) =>
+            new(fixture.ConnectionString, owner, services =>
+            {
+                services.RemoveAll<TimeProvider>();
+                services.AddSingleton<TimeProvider>(new ListTestClock(now));
+                services.ConfigureDbContext<AgreementsDbContext>(options => options.AddInterceptors(gate));
+            });
         try
         {
             results.Count(response => response.IsSuccessStatusCode).Should().Be(sameReason ? 2 : 1);
@@ -42,10 +106,19 @@ public sealed partial class AgreementApiTests
                 results.Single(response => !response.IsSuccessStatusCode).StatusCode.Should().Be(HttpStatusCode.Conflict);
             var winner = await results.First(response => response.IsSuccessStatusCode).Content.ReadFromJsonAsync<JsonElement>();
             var reason = winner.GetProperty("reason").GetString();
-            using var retry = await supplier.PostAsJsonAsync($"{url}/withdraw", new { reason });
+            await using var db = SelectionContext();
+            var stored = (await db.Withdrawals.ToListAsync()).Should().ContainSingle().Which;
+            new[] { firstOwner, secondOwner }.Should().Contain(stored.WithdrawnByPersonId);
+            stored.WithdrawnAt.Should().Be(stored.WithdrawnByPersonId == firstOwner ? firstTime : secondTime);
+            winner.GetProperty("withdrawnByPersonId").GetGuid().Should().Be(stored.WithdrawnByPersonId.Value);
+            winner.GetProperty("withdrawnAt").GetDateTimeOffset().Should().Be(stored.WithdrawnAt);
+            stored.Reason.Should().Be(reason);
+
+            var losingClient = stored.WithdrawnByPersonId == firstOwner ? second : first;
+            using var retry = await losingClient.PostAsJsonAsync(url, new { reason });
             retry.StatusCode.Should().Be(HttpStatusCode.OK);
             JsonElement.DeepEquals(winner, await retry.Content.ReadFromJsonAsync<JsonElement>()).Should().BeTrue();
-            using var conflict = await supplier.PostAsJsonAsync($"{url}/withdraw", new { reason = "different" });
+            using var conflict = await losingClient.PostAsJsonAsync(url, new { reason = "different" });
             conflict.StatusCode.Should().Be(HttpStatusCode.Conflict);
         }
         finally

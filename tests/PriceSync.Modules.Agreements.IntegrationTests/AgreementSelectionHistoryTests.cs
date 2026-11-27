@@ -10,6 +10,7 @@ using PriceSync.Modules.Agreements.Persistence;
 using PriceSync.Modules.OrganizationAccess.Contracts;
 using PriceSync.Modules.OrganizationAccess.Domain;
 using PriceSync.Modules.TradingRelationships.Contracts;
+using PriceSync.Modules.TradingRelationships.Persistence;
 
 namespace PriceSync.Modules.Agreements.IntegrationTests;
 
@@ -145,6 +146,25 @@ public sealed partial class AgreementApiTests
         second.Items.Select(x => x.Sequence).Should().Equal(Enumerable.Range(51, 51).Select(x => (long)x));
         second.NextAfterSequence.Should().BeNull();
         (await reader.GetHistoryAsync(relationship, pageSize: 100)).NextAfterSequence.Should().Be(100);
+
+
+        await using var relationships = new TradingRelationshipsDbContext(
+            fixture.CreateRelationshipOptions());
+        var persistedRelationship = await relationships.TradingRelationships.SingleAsync();
+        var member = await AddAcceptanceActor(persistedRelationship.CustomerOrganizationId, OrganizationRole.Member);
+        await using var memberApp = new ApiApplication(fixture.ConnectionString, member);
+        using var customer = AcceptanceClient(memberApp, persistedRelationship.CustomerOrganizationId);
+        var url = $"{SelectionUrl(relationship.Value)}/history";
+        var defaultPage = await customer.GetFromJsonAsync<JsonElement>(url);
+        defaultPage.GetProperty("items").GetArrayLength().Should().Be(50);
+        defaultPage.GetProperty("nextAfterSequence").GetInt64().Should().Be(50);
+        var maximumPage = await customer.GetFromJsonAsync<JsonElement>($"{url}?pageSize=100");
+        maximumPage.GetProperty("items").GetArrayLength().Should().Be(100);
+        maximumPage.GetProperty("nextAfterSequence").GetInt64().Should().Be(100);
+        var continuation = await customer.GetFromJsonAsync<JsonElement>($"{url}?afterSequence=50&pageSize=100");
+        continuation.GetProperty("items").EnumerateArray().Select(item => item.GetProperty("sequence").GetInt64())
+            .Should().Equal(Enumerable.Range(51, 51).Select(sequence => (long)sequence));
+        continuation.GetProperty("nextAfterSequence").ValueKind.Should().Be(JsonValueKind.Null);
 
         var exhausted = await reader.GetHistoryAsync(relationship, afterSequence: 101);
         exhausted.Items.Should().BeEmpty();

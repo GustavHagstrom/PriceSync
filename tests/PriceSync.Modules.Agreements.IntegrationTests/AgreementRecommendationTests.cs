@@ -7,12 +7,45 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using PriceSync.Modules.OrganizationAccess.Contracts;
+using PriceSync.Modules.OrganizationAccess.Domain;
 using PriceSync.Modules.TradingRelationships.Persistence;
 
 namespace PriceSync.Modules.Agreements.IntegrationTests;
 
 public sealed partial class AgreementApiTests
 {
+    [Fact]
+    public async Task Recommendation_prefers_later_publication_time_over_ordinal_and_ignores_customer_choices()
+    {
+        var scope = await PublicationScope();
+        await using var app = scope.App;
+        using var supplier = scope.Client;
+        var latestTime = new DateTimeOffset(2026, 11, 10, 12, 0, 0, TimeSpan.Zero);
+        var clock = new RecommendationTestClock(latestTime);
+        await using var timed = app.WithWebHostBuilder(builder => builder.ConfigureServices(services =>
+        {
+            services.RemoveAll<TimeProvider>();
+            services.AddSingleton<TimeProvider>(clock);
+        }));
+        using var publisher = timed.CreateClient();
+        publisher.DefaultRequestHeaders.Add("organization_id", supplier.DefaultRequestHeaders.GetValues("organization_id"));
+
+        var recommended = await PublishSelectionTerms(publisher, scope.Agreement, scope.List);
+        clock.Now = latestTime.AddDays(-1);
+        var active = await PublishSelectionTerms(publisher, scope.Agreement, scope.List, recommended.Id);
+        var accepted = await PublishSelectionTerms(publisher, scope.Agreement, scope.List, active.Id);
+        var owner = await AddAcceptanceActor(scope.Customer, OrganizationRole.Owner);
+        await using var customerApp = new ApiApplication(fixture.ConnectionString, owner);
+        using var customer = AcceptanceClient(customerApp, scope.Customer);
+        await ChangeSelection(customer, SelectionUrl(active.RelationshipId), null, active.Id);
+        using var acceptance = await customer.PostAsync($"{accepted.Location}/acceptance", null);
+        acceptance.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var result = await customer.GetFromJsonAsync<JsonElement>(
+            $"{scope.Agreement}/recommendation?evaluatedDate=2026-11-10&knowledgeCutoff=2026-11-10T12:00:00Z");
+        result.GetProperty("recommendation").GetProperty("id").GetGuid().Should().Be(recommended.Id);
+    }
+
     [Fact]
     public async Task Historical_recommendation_uses_only_facts_known_at_the_cutoff()
     {

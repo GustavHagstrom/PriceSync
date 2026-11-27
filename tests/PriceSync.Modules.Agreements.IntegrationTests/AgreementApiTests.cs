@@ -22,6 +22,33 @@ public sealed partial class AgreementApiTests(PostgreSqlFixture fixture) : IAsyn
     public Task DisposeAsync() => Task.CompletedTask;
 
     [Fact]
+    public async Task Creating_another_agreement_preserves_the_customers_existing_choice_and_price_list()
+    {
+        var scope = await PublicationScope();
+        await using var app = scope.App;
+        using var supplier = scope.Client;
+        var version = await PublishSelectionTerms(supplier, scope.Agreement, scope.List);
+        var owner = await AddAcceptanceActor(scope.Customer, OrganizationRole.Owner);
+        await using var customerApp = new ApiApplication(fixture.ConnectionString, owner);
+        using var customer = AcceptanceClient(customerApp, scope.Customer);
+        var selectionUrl = SelectionUrl(version.RelationshipId);
+        await ChangeSelection(customer, selectionUrl, null, version.Id);
+        var acceptanceUrl = $"{version.Location}/acceptance";
+        var listUrl = $"/api/v1/price-lists/{scope.List}";
+        var acceptance = await supplier.GetFromJsonAsync<JsonElement>(acceptanceUrl);
+        var history = await supplier.GetFromJsonAsync<JsonElement>($"{selectionUrl}/history");
+        var list = await supplier.GetFromJsonAsync<JsonElement>(listUrl);
+
+        using var created = await PostAgreement(supplier, version.RelationshipId);
+
+        created.StatusCode.Should().Be(HttpStatusCode.Created);
+        (await ReadActiveSelection(supplier, selectionUrl)).Should().Be(version.Id);
+        JsonElement.DeepEquals(history, await supplier.GetFromJsonAsync<JsonElement>($"{selectionUrl}/history")).Should().BeTrue();
+        JsonElement.DeepEquals(acceptance, await supplier.GetFromJsonAsync<JsonElement>(acceptanceUrl)).Should().BeTrue();
+        JsonElement.DeepEquals(list, await supplier.GetFromJsonAsync<JsonElement>(listUrl)).Should().BeTrue();
+    }
+
+    [Fact]
     public async Task Supplier_owner_can_create_and_read_a_stable_agreement_without_terms()
     {
         var person = new PersonId(Guid.CreateVersion7());

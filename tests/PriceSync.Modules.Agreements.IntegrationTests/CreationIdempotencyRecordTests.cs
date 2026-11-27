@@ -43,7 +43,7 @@ public sealed partial class AgreementApiTests
     }
 
     [Fact]
-    public async Task Matching_retry_replays_the_original_success_across_application_instances()
+    public async Task Matching_retry_replays_the_original_success_across_application_instances_and_time()
     {
         var person = new PersonId(Guid.CreateVersion7());
         var supplier = await SeedOrganization(person);
@@ -55,8 +55,13 @@ public sealed partial class AgreementApiTests
         var original = await PostAgreement(client, relationship.Id.Value, "repeat");
         original.StatusCode.Should().Be(HttpStatusCode.Created);
 
+        var createdAt = (await original.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("createdAt").GetDateTimeOffset();
         await using var restarted = new ApiApplication(fixture.ConnectionString, person, services =>
-            services.Configure<Microsoft.AspNetCore.Http.Json.JsonOptions>(options => options.SerializerOptions.WriteIndented = true));
+        {
+            services.Configure<Microsoft.AspNetCore.Http.Json.JsonOptions>(options => options.SerializerOptions.WriteIndented = true);
+            services.RemoveAll<TimeProvider>();
+            services.AddSingleton<TimeProvider>(new ListTestClock(createdAt.AddYears(10)));
+        });
         using var retryClient = restarted.CreateClient();
         retryClient.DefaultRequestHeaders.Add("organization_id", supplier.ToString());
         var replay = await PostAgreement(retryClient, relationship.Id.Value, "repeat");
