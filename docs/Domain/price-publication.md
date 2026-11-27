@@ -10,7 +10,7 @@ The area covers General Price Lists, Customer-Specific Net Price Lists, and Cust
 
 ### PriceList
 
-`PriceList` is the aggregate root for the stable logical identity and scope across publications. Its type, currency, market, and applicable Customer scope are fixed after first publication, while display metadata such as Name may remain mutable according to the domain rules.
+`PriceList` is the aggregate root for the stable logical identity and scope across publications. Its owning Organization, type, currency, market and applicable Customer are immutable from creation. Changing scope requires a new logical Price List. Name remains mutable display metadata. Agreement publication verifies immutable scope through a Price Publication-owned read contract without writing scope locks.
 
 Its transactional boundary exists because stable list scope and one publication decision must remain internally consistent without loading all drafts, published versions, or Customer activation state into the same aggregate.
 
@@ -62,6 +62,16 @@ The transactional boundary around `CustomerPriceListState` exists to keep the si
 
 ## Commands / decisions
 
+### Implemented logical Price List creation and reads
+
+The current implementation supports creating and reading Supplier-owned General and Customer-Specific Net Price Lists before any Price List Version exists. Customer-managed external lists, draft/import and version publication workflows, withdrawal and Customer activation remain outside this implemented slice.
+
+Creation requires an active Owner membership in the Active acting Organization, which becomes the list owner. A General Price List has no Customer binding. A Customer-Specific Net Price List requires an existing Active Customer Organization, checked through OrganizationAccess at creation; the current creation operation does not require a Trading Relationship or Price Agreement.
+
+Reading logical list metadata requires an active membership (Member or Owner) in the Active owning Organization. The current read operation returns Not Found for both unknown lists and lists owned by another Organization; a Customer binding does not itself grant read access. Returned metadata consists of list identity, name, owner, type, currency, market and applicable Customer, without article or price content.
+
+### Domain responsibilities
+
 This area owns decisions such as:
 
 - create/update a logical Price List within its allowed lifecycle
@@ -72,6 +82,8 @@ This area owns decisions such as:
 - maintain the Customer-private External Supplier Reference for external lists
 
 ## Core invariants
+
+- Each article entry in a Price List Version has at most one Supplier Price Group code, preserved as part of the immutable version. Price Publication validates this membership limit. Codes are text; case and leading zeros are significant, and any import normalization must occur explicitly before publication.
 
 - At most one active Price Draft exists per logical Price List.
 - Publication is atomic: a complete valid draft becomes one complete immutable Price List Version.

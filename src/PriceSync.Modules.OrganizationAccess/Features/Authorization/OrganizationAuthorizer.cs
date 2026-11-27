@@ -29,7 +29,7 @@ internal class OrganizationAuthorizer(
         if (organization.Status != OrganizationStatus.Active)
             return Deny("OrganizationArchived");
 
-        if (capability is not (OrganizationCapability.ReadTradingRelationships or OrganizationCapability.ManageTradingRelationships))
+        if (!Enum.IsDefined(capability))
             throw new ArgumentOutOfRangeException(nameof(capability), capability, "Invalid capability value.");
 
         var membership = await dbContext.OrganizationMemberships.FirstOrDefaultAsync(
@@ -37,7 +37,8 @@ internal class OrganizationAuthorizer(
                  m.Status == OrganizationMembershipStatus.Active, cancellationToken);
         if (membership is null)
             return Deny("NoActiveMembership");
-        if (capability == OrganizationCapability.ManageTradingRelationships &&
+        if (capability is (OrganizationCapability.ManageTradingRelationships or OrganizationCapability.CreatePriceLists
+            or OrganizationCapability.PublishAgreements or OrganizationCapability.ManageCustomerAgreements) &&
             !membership.Roles.Contains(OrganizationRole.Owner))
             return Deny("RequiredRoleMissing");
 

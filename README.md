@@ -35,7 +35,9 @@ The repository currently contains the backend foundation. Price import, publicat
 | Modular monolith | Module projects, separate contracts, and architecture tests on `main` |
 | Organization & Access | Domain rules, PostgreSQL persistence and migrations, and two read endpoints on `main` |
 | Trading Relationships | Create, End, Get, and Supplier/Customer lists with PostgreSQL persistence and concurrency tests on `main` |
-| Price ingestion, agreements, publication, and consumption | Domain documentation and module scaffolding; workflows remain to be implemented |
+| Logical Price Lists | Supplier-owned General and Customer-Specific Net lists: authenticated create/read, immutable scope, PostgreSQL persistence and complete-set verification for Agreements |
+| Price Agreements | Supplier-owned agreement creation and immutable version publication, authorized exact and paged reads, and an exact-version module contract |
+| Price file ingestion, Price List Version publication, and Customer Price consumption | Domain documentation and module scaffolding |
 | Production authentication | Pending; the default host does not authenticate users, so protected endpoints return `401` |
 
 ## Technology and architecture
@@ -76,6 +78,8 @@ Integration tests require a running Docker-compatible container runtime. Testcon
 
 ```sh
 dotnet test tests/PriceSync.Modules.OrganizationAccess.IntegrationTests
+dotnet test tests/PriceSync.Modules.PricePublication.IntegrationTests
+dotnet test tests/PriceSync.Modules.Agreements.IntegrationTests
 ```
 
 ## Run the API host
@@ -86,7 +90,92 @@ dotnet run --project src/PriceSync.Api
 
 Use the URL printed at startup. `GET /` returns the service name. The protected organization endpoints require authentication that is currently supplied only by the integration-test host; there is no interactive authenticated demo yet.
 
-For database-backed development, configure `ConnectionStrings:OrganizationAccess` for your PostgreSQL instance. The default configuration points to a local `pricesync` database; the API host does not automatically apply migrations or seed data.
+For database-backed development, configure `ConnectionStrings:OrganizationAccess`, `ConnectionStrings:TradingRelationships`, `ConnectionStrings:PricePublication` and `ConnectionStrings:Agreements` for your PostgreSQL instance. The default configuration points to a local `pricesync` database; the API host does not automatically apply migrations or seed data.
+
+### Price Agreements
+
+`POST /api/v1/agreements` creates a stable Price Agreement with a JSON body containing the required `tradingRelationshipId` (UUID), without commercial terms. Supply the acting Supplier in `organization_id`; an active Supplier Owner and an Active Trading Relationship are required. Supply one `Idempotency-Key` header of 1–200 characters, without control characters. Keys are case-sensitive and scoped to the Person, acting Organization and create operation. The response is `201` with Location, a server-generated UUIDv7, relationship identity and creation metadata. No version is published.
+
+Matching retries return the original status, Location and JSON representation, even across application restarts. Reusing a key for another relationship returns `409`; distinct keys create separate agreements. Authority and relationship access are checked again before replay, so lost membership, an Archived acting Organization or an Ended relationship prevents replay. Successful replay records have no expiry. A reservation-first local Read Committed transaction commits the agreement and completed replay together; concurrent matching requests wait, and rollback leaves neither record.
+
+`GET /api/v1/agreements/{agreementId}` is available to active Members (including Owners) of either party, including after the relationship has Ended. The acting Organization must be Active. Agreements owns its `agreements` schema and migration history:
+
+```powershell
+$env:PRICESYNC_AGREEMENTS_DESIGN_TIME_CONNECTION_STRING = "Host=localhost;Database=pricesync;Username=pricesync"
+dotnet ef database update --project src/PriceSync.Modules.Agreements
+```
+
+`GET /api/v1/agreements?tradingRelationshipId={id}` lists agreements within one relationship, including those without published versions. The same read authority applies to single reads and list pages, including Ended relationships. Results contain `items` and a nullable `nextCursor`, ordered newest first by `createdAt` and agreement ID. The default `pageSize` is 50; valid values are 1–100. Pass the returned `nextCursor` as the `cursor` query parameter to continue. Invalid pagination produces field-addressable `400` errors.
+
+#### Publish and read Agreement Versions
+
+Publish via `POST /api/v1/agreements/{agreementId}/versions` with the acting Supplier in the `organization_id` header. An active Supplier Owner and an Active Trading Relationship are required. Set `expectedLatestVersionId` explicitly to `null` for the first publication. For the next publication, supply the current `latestVersionId` from the Agreement and send the complete replacement terms.
+
+```json
+{
+  "expectedLatestVersionId": null,
+  "validFrom": "2026-11-01",
+  "validTo": "2026-11-30",
+  "coverage": [
+    {
+      "priceListId": "018f01be-5c01-79a0-8000-000000000001",
+      "type": "general",
+      "generalDiscount": 12.5
+    },
+    {
+      "priceListId": "018f01be-5c01-79a0-8000-000000000002",
+      "type": "customerSpecificNet"
+    }
+  ],
+  "groupDiscounts": [{ "code": "01", "discount": 15 }]
+}
+```
+
+Use calendar dates in `YYYY-MM-DD` form. `validFrom` is required and `validTo` is optional and inclusive. When supplied, it must be on or after `validFrom`. Validity periods may overlap. Coverage must contain at least one unique logical Price List. Both list types can appear together, and net-only coverage is valid. A net list must match the Agreement Customer and carries no discount. Price Publication verifies every list's existence, type, Supplier and applicable Customer, including lists that have no published Price List Version.
+
+General coverage requires an explicit discount, including zero. Discounts are JSON numbers from 0 to 100 inclusive, with at most one decimal place in their exact value. Optional group discounts use exact, case-sensitive codes and preserve leading zeros. A matching group discount replaces the list discount for that group across covered General lists. Codes may be defined before they occur in list content. Duplicate list IDs and group codes are rejected.
+
+A new publication returns `201 Created`, a `Location` for the exact version, and the complete version JSON. The response contains `id` (UUIDv7), `agreementId`, `tradingRelationshipId`, nullable `predecessorVersionId`, `ordinal`, validity, `publishedAt`, `publishedByPersonId`, `coverage`, `groupDiscounts`, and the stored `rounding` rule. The initial rule stores four decimal places, midpoint away from zero, and a single final rounding after discount without intermediate rounding, preserving Price Quantity and Unit of Measure. Price calculation belongs to Customer Pricing. To correct published terms, publish another version.
+
+A matching retry returns `200 OK` with the saved immediate successor and its original metadata and rounding. Comparison ignores collection order and equivalent numeric representations. A different payload or a later intervening publication returns `409`. This publication operation identifies retries through the expected predecessor and submitted terms.
+
+`GET /api/v1/agreements/{agreementId}/versions/{versionId}` returns the same complete facts for an exact version. `GET /api/v1/agreements/{agreementId}/versions?pageSize=50` returns `items` in descending publication ordinal and a nullable `nextCursor`. Pass the cursor back with `cursor` for the same Agreement to continue. The default page size is 50 and the maximum is 100. Active Members of either party may read, including after the relationship has Ended.
+
+| Status | Problem code | When it applies |
+| --- | --- | --- |
+| 400 | `organization_context.required`, `validation_failed` | Missing acting Organization, invalid terms or list scope, or invalid pagination. Validation errors are keyed by field. |
+| 401 | | Authentication is required. |
+| 403 | `forbidden` | The actor lacks the required authority in the acting Organization. |
+| 404 | `agreement_not_found`, `agreement_version_not_found` | The resource is unknown or outside the actor's party scope. Exact reads also use 404 for an incorrect Agreement/version pair. |
+| 409 | `agreement_relationship_ended`, `agreement_publication_conflict` | The relationship has ended, or the publication conflicts with the current version. |
+| 503 | `agreement_list_verification_unavailable` | Price List scope could not be verified. The response includes `retryable: true` and the publication leaves no changes. |
+
+Trusted modules can resolve `IAgreementVersionReader` from dependency injection and call `GetAsync(AgreementVersionId, CancellationToken)`. It returns typed, immutable `AgreementVersionFacts` for that exact version, or `null` for an unknown ID. Technical failures propagate to the consumer. HTTP is the paginated listing surface and enforces party authorization.
+
+### Logical Price Lists
+
+`POST /api/v1/price-lists` creates a Supplier-owned logical list before any prices or versions exist. Supply the acting Supplier in the `organization_id` header. OrganizationAccess requires an active Owner to create and an active Member (including Owner) to read through `GET /api/v1/price-lists/{id}`. Reads are private to the owning Supplier.
+
+```json
+{
+  "name": "General SEK",
+  "type": "general",
+  "currency": "SEK",
+  "market": "Sweden",
+  "customerOrganizationId": null
+}
+```
+
+The supported types are `general` (no Customer binding) and `customerSpecificNet` (exactly one active Customer Organization). Name is display metadata, limited to 200 characters; Market is required and limited to 100 characters. Currency uses three uppercase letters. Each creation assigns a new UUIDv7, even for identical names and scope. Owner, type, currency, market and applicable Customer cannot change; both EF mappings and a PostgreSQL trigger protect that scope. There is no scope-update endpoint.
+
+Price Publication exposes `IPriceListScopeVerifier` for trusted module callers. Pass the intended Supplier/Customer and the complete collection of `PriceListReference` values, each with an expected `PriceListType`. Only `Verified` returns immutable scopes for the complete request. `Invalid` returns structured invalid references; `Unavailable` is explicitly retryable. No partial result, Price List Version, publication, or scope lock is involved. The verifier does not authorize HTTP actors; its caller must enforce the caller's own workflow authority before using it.
+
+Price Publication owns the `price_publication` PostgreSQL schema and its own migration history. To apply its migrations with the EF CLI, configure the design-time connection separately:
+
+```powershell
+$env:PRICESYNC_PRICE_PUBLICATION_DESIGN_TIME_CONNECTION_STRING = "Host=localhost;Database=pricesync;Username=pricesync"
+dotnet ef database update --project src/PriceSync.Modules.PricePublication
+```
 
 ## How to read the documentation
 

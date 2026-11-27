@@ -16,12 +16,16 @@ public static class OrganizationAccessEndpointRouteBuilderExtensions
             .RequireAuthorization();
 
         api.MapGet("", ListMyOrganizationsEndpoint.HandleAsync)
+
             .WithName("ListMyOrganizations")
-            .WithSummary("Lists all organizations the current user has access to.");
+            .WithSummary("List the signed-in user's organizations")
+            .WithDescription("Returns the organizations accessible to the signed-in user, so they can choose which organization to act on behalf of.");
 
         api.MapGet("/{organizationId:guid}", GetOrganizationEndpoint.HandleAsync)
+
             .WithName("GetOrganization")
-            .WithSummary("Gets the details of a specific organization.");
+            .WithSummary("Get organization details")
+            .WithDescription("Returns details for the supplied organization ID when the signed-in user has access to that organization.");
 
         return endpoints;
     }

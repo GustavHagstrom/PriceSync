@@ -1,0 +1,542 @@
+using System.Net;
+using System.Net.Http.Json;
+using System.Text.Json;
+using System.Text.Json.Nodes;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
+using PriceSync.Modules.PricePublication.Contracts;
+using PriceSync.Modules.OrganizationAccess.Contracts;
+using Npgsql;
+using PriceSync.Modules.Agreements.Domain;
+using PriceSync.Modules.Agreements.Persistence;
+using FluentAssertions;
+
+namespace PriceSync.Modules.Agreements.IntegrationTests;
+
+public sealed partial class AgreementApiTests
+{
+    [Fact]
+    public async Task Publication_does_not_initialize_acceptance_or_selection()
+    {
+        var scope = await PublicationScope();
+        await using var app = scope.App;
+        using var supplier = scope.Client;
+        var version = await PublishSelectionTerms(supplier, scope.Agreement, scope.List);
+
+        var acceptance = await supplier.GetFromJsonAsync<JsonElement>($"{version.Location}/acceptance");
+        acceptance.GetProperty("accepted").GetBoolean().Should().BeFalse();
+        var url = SelectionUrl(version.RelationshipId);
+        (await ReadActiveSelection(supplier, url)).Should().BeNull();
+        (await supplier.GetFromJsonAsync<JsonElement>($"{url}/history")).GetProperty("items").GetArrayLength()
+            .Should().Be(0);
+        await using var db = SelectionContext();
+        (await db.Set<CustomerAgreementState>().AnyAsync()).Should().BeFalse();
+        (await db.Set<AgreementAcceptance>().AnyAsync()).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task Commercial_terms_preserve_exact_group_codes_across_publication_and_read()
+    {
+        var scope = await PublicationScope();
+        await using var app = scope.App;
+        using var client = scope.Client;
+        var request = Publication(scope.List);
+        request["groupDiscounts"] = JsonNode.Parse("""
+            [{"code":"A","discount":0},{"code":"a","discount":100},{"code":"01","discount":12.5},{"code":"1","discount":99.9}]
+            """);
+        var publication = await client.PostAsJsonAsync($"{scope.Agreement}/versions", request);
+        publication.StatusCode.Should().Be(HttpStatusCode.Created);
+        var read = await client.GetAsync(publication.Headers.Location);
+        read.StatusCode.Should().Be(HttpStatusCode.OK);
+        (await read.Content.ReadAsStringAsync()).Should().Be(await publication.Content.ReadAsStringAsync());
+        var discounts = (await read.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("groupDiscounts")
+            .EnumerateArray().ToDictionary(item => item.GetProperty("code").GetString()!, item => item.GetProperty("discount").GetDecimal());
+        discounts.Should().BeEquivalentTo(new Dictionary<string, decimal> { ["A"] = 0, ["a"] = 100, ["01"] = 12.5m, ["1"] = 99.9m });
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Commercial_terms_round_trip_for_net_only_or_mixed_coverage(bool mixed)
+    {
+        var scope = await PublicationScope();
+        await using var app = scope.App;
+        using var client = scope.Client;
+        var list = await client.PostAsJsonAsync("/api/v1/price-lists", new
+        { name = "Net", type = "customerSpecificNet", currency = "SEK", market = "SE", customerOrganizationId = scope.Customer.Value });
+        list.StatusCode.Should().Be(HttpStatusCode.Created);
+        var id = (await list.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid();
+        var request = Publication(id);
+        request["coverage"]![0]!["type"] = "customerSpecificNet";
+        request["coverage"]![0]!.AsObject().Remove("generalDiscount");
+        if (mixed)
+        {
+            var coverageItems = request["coverage"]!.AsArray();
+            coverageItems.Add(Publication(scope.List)["coverage"]![0]!.DeepClone());
+            var invalid = Publication(Guid.CreateVersion7())["coverage"]![0]!.DeepClone();
+            coverageItems.Add(invalid);
+            var rejected = await client.PostAsJsonAsync($"{scope.Agreement}/versions", request);
+            rejected.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+            (await rejected.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("errors")
+                .TryGetProperty("coverage[2].priceListId", out _).Should().BeTrue();
+            await using var db = new AgreementsDbContext(fixture.CreateAgreementOptions());
+            (await db.Versions.CountAsync()).Should().Be(0);
+            (await db.Coverage.CountAsync()).Should().Be(0);
+            (await db.PriceAgreements.SingleAsync()).LatestVersionId.Should().BeNull();
+            coverageItems.RemoveAt(2);
+        }
+        var publication = await client.PostAsJsonAsync($"{scope.Agreement}/versions", request);
+        publication.StatusCode.Should().Be(HttpStatusCode.Created, await publication.Content.ReadAsStringAsync());
+        var read = await client.GetAsync(publication.Headers.Location);
+        read.StatusCode.Should().Be(HttpStatusCode.OK);
+        (await read.Content.ReadAsStringAsync()).Should().Be(await publication.Content.ReadAsStringAsync());
+        var items = (await read.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("coverage");
+        items.GetArrayLength().Should().Be(mixed ? 2 : 1);
+        var coverage = items.EnumerateArray().Single(item => item.GetProperty("priceListId").GetGuid() == id);
+        coverage.GetProperty("priceListId").GetGuid().Should().Be(id);
+        coverage.GetProperty("type").GetString().Should().Be("customerSpecificNet");
+        coverage.GetProperty("generalDiscount").ValueKind.Should().Be(JsonValueKind.Null);
+    }
+
+    private async Task<(ApiApplication App, HttpClient Client, string Agreement, Guid List, OrganizationId Customer)> PublicationScope()
+    {
+        var scope = await SeedAgreementScope();
+        var app = new ApiApplication(fixture.ConnectionString, scope.Owner);
+        var client = app.CreateClient();
+        client.DefaultRequestHeaders.Add("organization_id", scope.Supplier.ToString());
+        var list = await client.PostAsJsonAsync("/api/v1/price-lists", new
+        { name = "General", type = "general", currency = "SEK", market = "SE" });
+        list.StatusCode.Should().Be(HttpStatusCode.Created);
+        var listId = (await list.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid();
+        var agreement = await PostAgreement(client, scope.Relationship.Value);
+        agreement.StatusCode.Should().Be(HttpStatusCode.Created);
+        return (app, client, agreement.Headers.Location!.ToString(), listId, scope.Customer);
+    }
+
+    private static JsonObject Publication(Guid list) => JsonSerializer.SerializeToNode(new
+    {
+        expectedLatestVersionId = (Guid?)null, validFrom = "2026-10-26", validTo = (string?)null,
+        coverage = new[] { new { priceListId = list, type = "general", generalDiscount = 0m } },
+        groupDiscounts = Array.Empty<object>(),
+    })!.AsObject();
+
+    [Fact]
+    public async Task Real_scope_verification_rejects_wrong_supplier_type_and_customer()
+    {
+        var scope = await PublicationScope();
+        await using var app = scope.App;
+        using var client = scope.Client;
+        var net = await client.PostAsJsonAsync("/api/v1/price-lists", new
+        { name = "Net", type = "customerSpecificNet", currency = "SEK", market = "SE", customerOrganizationId = scope.Customer.Value });
+        net.StatusCode.Should().Be(HttpStatusCode.Created);
+        var netId = (await net.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid();
+        var otherOwner = new PersonId(Guid.CreateVersion7());
+        var otherSupplier = await SeedOrganization(otherOwner, "5560004615");
+        await using var otherApp = new ApiApplication(fixture.ConnectionString, otherOwner);
+        using var otherClient = otherApp.CreateClient();
+        otherClient.DefaultRequestHeaders.Add("organization_id", otherSupplier.ToString());
+        var other = await otherClient.PostAsJsonAsync("/api/v1/price-lists", new
+        { name = "Other", type = "general", currency = "SEK", market = "SE" });
+        other.StatusCode.Should().Be(HttpStatusCode.Created);
+        var otherId = (await other.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid();
+        var wrongCustomer = await client.PostAsJsonAsync("/api/v1/price-lists", new
+        { name = "Other customer's net list", type = "customerSpecificNet", currency = "SEK", market = "SE", customerOrganizationId = otherSupplier.Value });
+        wrongCustomer.StatusCode.Should().Be(HttpStatusCode.Created);
+        var wrongCustomerId = (await wrongCustomer.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid();
+        foreach (var listId in new[] { netId, otherId, wrongCustomerId })
+        {
+            var request = Publication(listId);
+            if (listId == wrongCustomerId)
+            {
+                request["coverage"]![0]!["type"] = "customerSpecificNet";
+                request["coverage"]![0]!.AsObject().Remove("generalDiscount");
+            }
+            var response = await client.PostAsJsonAsync($"{scope.Agreement}/versions", request);
+            response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+            (await response.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("errors")
+                .TryGetProperty("coverage[0].priceListId", out _).Should().BeTrue();
+        }
+        await using var db = new AgreementsDbContext(fixture.CreateAgreementOptions());
+        (await db.Versions.CountAsync()).Should().Be(0);
+        (await db.PriceAgreements.SingleAsync()).LatestVersionId.Should().BeNull();
+    }
+
+    [Theory]
+    [InlineData("0.1")]
+    [InlineData("99.9")]
+    [InlineData("10e-2")]
+    [InlineData("12300e-3")]
+    [InlineData("0.1000000000000000000000000000000")]
+    [InlineData("100")]
+    public async Task Publication_preserves_allowed_exact_discount_values(string value)
+    {
+        var scope = await PublicationScope();
+        await using var app = scope.App;
+        using var client = scope.Client;
+        var discount = decimal.Parse(value, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture);
+        var request = Publication(scope.List);
+        request["coverage"]![0]!["generalDiscount"] = JsonNode.Parse(value);
+        var response = await client.PostAsJsonAsync($"{scope.Agreement}/versions", request);
+        response.StatusCode.Should().Be(HttpStatusCode.Created);
+        (await response.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("coverage")[0]
+            .GetProperty("generalDiscount").GetDecimal().Should().Be(discount);
+        await using var db = new AgreementsDbContext(fixture.CreateAgreementOptions());
+        (await db.Coverage.SingleAsync()).GeneralDiscount.Should().Be(discount);
+    }
+
+    [Fact]
+    public async Task Database_rejects_a_latest_ordinal_without_a_latest_version()
+    {
+        var scope = await PublicationScope();
+        await using var app = scope.App;
+        using var client = scope.Client;
+        await using var db = new AgreementsDbContext(fixture.CreateAgreementOptions());
+        var change = async () => await db.Database.ExecuteSqlRawAsync("""
+            UPDATE agreements.price_agreements SET "LatestOrdinal" = 1
+            """);
+        (await change.Should().ThrowAsync<PostgresException>()).Which.SqlState.Should().Be(PostgresErrorCodes.CheckViolation);
+    }
+
+    [Theory]
+    [InlineData(false, false, false)]
+    [InlineData(false, true, false)]
+    [InlineData(true, false, false)]
+    [InlineData(true, true, false)]
+    [InlineData(true, false, true)]
+    public async Task Concurrent_publications_resolve_against_the_committed_latest(bool next, bool matching, bool rollback)
+    {
+        var scope = await PublicationScope();
+        await using var app = scope.App;
+        using var initialClient = scope.Client;
+        var request = Publication(scope.List);
+        if (next)
+        {
+            var previous = await initialClient.PostAsJsonAsync($"{scope.Agreement}/versions", request);
+            previous.StatusCode.Should().Be(HttpStatusCode.Created);
+            request["expectedLatestVersionId"] = (await previous.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid();
+        }
+        var contender = request.DeepClone();
+        if (rollback)
+        {
+            var extra = await initialClient.PostAsJsonAsync("/api/v1/price-lists", new
+            { name = "Extra", type = "general", currency = "SEK", market = "SE" });
+            extra.StatusCode.Should().Be(HttpStatusCode.Created);
+            var extraId = (await extra.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid();
+            request["coverage"]!.AsArray().Add(Publication(extraId)["coverage"]![0]!.DeepClone());
+            request["groupDiscounts"] = JsonNode.Parse(""" [{"code":"A","discount":1},{"code":"B","discount":2}] """);
+            contender["groupDiscounts"] = JsonNode.Parse(""" [{"code":"C","discount":3}] """);
+        }
+        if (!matching) contender["coverage"]![0]!["generalDiscount"] = 25m;
+        var gate = new CommitGate(false, databaseFailure: rollback);
+        await using var guarded = app.WithWebHostBuilder(builder => builder.ConfigureServices(services =>
+            services.ConfigureDbContext<AgreementsDbContext>(options => options.AddInterceptors(gate))));
+        using var client = guarded.CreateClient();
+        client.DefaultRequestHeaders.Add("organization_id", initialClient.DefaultRequestHeaders.GetValues("organization_id"));
+        var first = client.PostAsJsonAsync($"{scope.Agreement}/versions", request);
+        Task<HttpResponseMessage> second;
+        try
+        {
+            await gate.Entered.Task.WaitAsync(TimeSpan.FromSeconds(10));
+            gate.Isolation.Should().Be(System.Data.IsolationLevel.ReadCommitted);
+            second = client.PostAsJsonAsync($"{scope.Agreement}/versions", contender);
+            using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+            await using var connection = new NpgsqlConnection(fixture.ConnectionString);
+            await connection.OpenAsync(timeout.Token);
+            await using var command = new NpgsqlCommand("""
+                SELECT EXISTS (SELECT 1 FROM pg_stat_activity
+                    WHERE datname = current_database() AND wait_event_type = 'Lock'
+                    AND query LIKE '%FROM agreements.price_agreements%FOR UPDATE%')
+                """, connection);
+            while (!(bool)(await command.ExecuteScalarAsync(timeout.Token))!) await Task.Delay(20, timeout.Token);
+            second.IsCompleted.Should().BeFalse();
+        }
+        finally { gate.Release.TrySetResult(); }
+        var winner = await first;
+        var waiter = await second;
+        winner.StatusCode.Should().Be(rollback ? HttpStatusCode.InternalServerError : HttpStatusCode.Created);
+        waiter.StatusCode.Should().Be(rollback ? HttpStatusCode.Created : matching ? HttpStatusCode.OK : HttpStatusCode.Conflict);
+        if (rollback)
+        {
+            var failure = await winner.Content.ReadFromJsonAsync<JsonElement>();
+            failure.GetProperty("status").GetInt32().Should().Be(500);
+            failure.GetProperty("code").GetString().Should().Be("internal_server_error");
+            var stored = await initialClient.GetAsync(waiter.Headers.Location);
+            stored.StatusCode.Should().Be(HttpStatusCode.OK);
+            (await stored.Content.ReadAsStringAsync()).Should().Be(await waiter.Content.ReadAsStringAsync());
+        }
+        else if (!matching)
+        {
+            var conflict = await waiter.Content.ReadFromJsonAsync<JsonElement>();
+            conflict.GetProperty("code").GetString().Should().Be("agreement_publication_conflict");
+        }
+        if (matching) (await waiter.Content.ReadAsStringAsync()).Should().Be(await winner.Content.ReadAsStringAsync());
+        var id = (await (rollback ? waiter : winner).Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid();
+        await using var db = new AgreementsDbContext(fixture.CreateAgreementOptions());
+        (await db.PriceAgreements.SingleAsync()).LatestVersionId!.Value.Value.Should().Be(id);
+        (await db.Versions.CountAsync()).Should().Be(next ? 2 : 1);
+        (await db.Coverage.CountAsync()).Should().Be(next ? 2 : 1);
+        var groups = await db.GroupDiscounts.Select(group => group.Code).ToListAsync();
+        groups.Should().BeEquivalentTo(rollback ? new[] { "C" } : Array.Empty<string>());
+    }
+
+    [Fact]
+    public async Task Failure_before_commit_rolls_back_version_coverage_and_latest_and_allows_first_publication_again()
+    {
+        var scope = await PublicationScope();
+        await using var app = scope.App;
+        using var initialClient = scope.Client;
+        var gate = new CommitGate(true);
+        gate.Release.SetResult();
+        await using var guarded = app.WithWebHostBuilder(builder => builder.ConfigureServices(services =>
+            services.ConfigureDbContext<AgreementsDbContext>(options => options.AddInterceptors(gate))));
+        using var client = guarded.CreateClient();
+        client.DefaultRequestHeaders.Add("organization_id", initialClient.DefaultRequestHeaders.GetValues("organization_id"));
+        var failed = await client.PostAsJsonAsync($"{scope.Agreement}/versions", Publication(scope.List));
+        failed.StatusCode.Should().Be(HttpStatusCode.InternalServerError);
+        await using (var db = new AgreementsDbContext(fixture.CreateAgreementOptions()))
+        {
+            (await db.Versions.CountAsync()).Should().Be(0);
+            (await db.Coverage.CountAsync()).Should().Be(0);
+            var agreement = await db.PriceAgreements.SingleAsync();
+            agreement.LatestVersionId.Should().BeNull();
+            agreement.LatestOrdinal.Should().Be(0);
+        }
+        var retry = await client.PostAsJsonAsync($"{scope.Agreement}/versions", Publication(scope.List));
+        retry.StatusCode.Should().Be(HttpStatusCode.Created, await retry.Content.ReadAsStringAsync());
+    }
+
+    [Fact]
+    public async Task Invalid_list_scope_and_unavailable_verification_never_publish()
+    {
+        var scope = await PublicationScope();
+        await using var app = scope.App;
+        using var client = scope.Client;
+        var invalid = await client.PostAsJsonAsync($"{scope.Agreement}/versions", Publication(Guid.CreateVersion7()));
+        invalid.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await invalid.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("errors")
+            .TryGetProperty("coverage[0].priceListId", out _).Should().BeTrue();
+        await using var unavailable = app.WithWebHostBuilder(builder => builder.ConfigureServices(services =>
+        {
+            services.RemoveAll<IPriceListScopeVerifier>();
+            services.AddSingleton<IPriceListScopeVerifier, UnavailableListVerifier>();
+        }));
+        using var unavailableClient = unavailable.CreateClient();
+        unavailableClient.DefaultRequestHeaders.Add("organization_id", client.DefaultRequestHeaders.GetValues("organization_id"));
+        var response = await unavailableClient.PostAsJsonAsync($"{scope.Agreement}/versions", Publication(scope.List));
+        response.StatusCode.Should().Be(HttpStatusCode.ServiceUnavailable);
+        var problem = await response.Content.ReadFromJsonAsync<JsonElement>();
+        problem.GetProperty("code").GetString().Should().Be("agreement_list_verification_unavailable");
+        problem.GetProperty("retryable").GetBoolean().Should().BeTrue();
+        await using var db = new AgreementsDbContext(fixture.CreateAgreementOptions());
+        (await db.Versions.CountAsync()).Should().Be(0);
+        (await db.Coverage.CountAsync()).Should().Be(0);
+        (await db.PriceAgreements.SingleAsync()).LatestVersionId.Should().BeNull();
+    }
+
+    private sealed class UnavailableListVerifier : IPriceListScopeVerifier
+    {
+        public Task<PriceListVerificationResult> VerifyAsync(OrganizationId supplier, OrganizationId customer,
+            IReadOnlyCollection<PriceListReference> references, CancellationToken cancellationToken = default) =>
+            Task.FromResult<PriceListVerificationResult>(new PriceListVerificationResult.Unavailable());
+    }
+
+    [Fact]
+    public async Task Successful_publication_updates_the_durable_agreement_latest_pointer_and_repeated_first_attempt_replays()
+    {
+        var scope = await PublicationScope();
+        await using var app = scope.App;
+        using var client = scope.Client;
+        var request = Publication(scope.List);
+        var published = await client.PostAsJsonAsync($"{scope.Agreement}/versions", request);
+        published.StatusCode.Should().Be(HttpStatusCode.Created);
+        var version = await published.Content.ReadFromJsonAsync<JsonElement>();
+        var read = await client.GetFromJsonAsync<JsonElement>(scope.Agreement);
+        read.GetProperty("latestVersionId").GetGuid().Should().Be(version.GetProperty("id").GetGuid());
+        var retry = await client.PostAsJsonAsync($"{scope.Agreement}/versions", request);
+        retry.StatusCode.Should().Be(HttpStatusCode.OK);
+        (await retry.Content.ReadAsStringAsync()).Should().Be(await published.Content.ReadAsStringAsync());
+        await using var db = new AgreementsDbContext(fixture.CreateAgreementOptions());
+        var stored = await db.Versions.SingleAsync();
+        stored.Id.Value.Should().Be(version.GetProperty("id").GetGuid());
+        stored.PublishedAt.Should().Be(version.GetProperty("publishedAt").GetDateTimeOffset());
+        stored.Midpoint.Should().Be("AwayFromZero");
+        stored.RoundingStage.Should().Be("OnceAfterDiscountWithoutIntermediateRounding");
+        stored.DecimalPlaces.Should().Be(4);
+        stored.PreservePriceQuantityAndUnitOfMeasure.Should().BeTrue();
+        (await db.Coverage.SingleAsync()).GeneralDiscount.Should().Be(0);
+        (await db.PriceAgreements.SingleAsync()).LatestOrdinal.Should().Be(1);
+    }
+
+    [Fact]
+    public async Task Invalid_coverage_and_group_terms_are_rejected_without_partial_publication()
+    {
+        var scope = await PublicationScope();
+        await using var app = scope.App;
+        using var client = scope.Client;
+        foreach (var scenario in new[] { "missing", "empty", "duplicateList", "netDiscount", "unknownType", "emptyId", "duplicateGroup", "missingCode", "missingGroupDiscount", "negativeGroup", "largeGroup", "preciseGroup" })
+        {
+            var request = Publication(scope.List);
+            var field = "coverage";
+            switch (scenario)
+            {
+                case "missing": request.Remove("coverage"); break;
+                case "empty": request["coverage"] = new JsonArray(); break;
+                case "duplicateList":
+                    request["coverage"]!.AsArray().Add(request["coverage"]![0]!.DeepClone());
+                    field = "coverage[1].priceListId";
+                    break;
+                case "netDiscount": request["coverage"]![0]!["type"] = "customerSpecificNet"; field = "coverage[0].generalDiscount"; break;
+                case "unknownType": request["coverage"]![0]!["type"] = "invalid"; field = "coverage[0].type"; break;
+                case "emptyId": request["coverage"]![0]!["priceListId"] = Guid.Empty; field = "coverage[0].priceListId"; break;
+                case "duplicateGroup":
+                    request["groupDiscounts"] = JsonNode.Parse(""" [{"code":"01","discount":1},{"code":"01","discount":1}] """);
+                    field = "groupDiscounts[1].code";
+                    break;
+                case "missingCode":
+                    request["groupDiscounts"] = JsonNode.Parse(""" [{"discount":1}] """);
+                    field = "groupDiscounts[0].code";
+                    break;
+                default:
+                    var discount = scenario switch
+                    {
+                        "negativeGroup" => -0.1m,
+                        "largeGroup" => 100.1m,
+                        "preciseGroup" => 0.01m,
+                        _ => (decimal?)null,
+                    };
+                    request["groupDiscounts"] = JsonSerializer.SerializeToNode(new[] { new { code = "01", discount } });
+                    field = "groupDiscounts[0].discount";
+                    break;
+            }
+            var response = await client.PostAsJsonAsync($"{scope.Agreement}/versions", request);
+            response.StatusCode.Should().Be(HttpStatusCode.BadRequest, scenario);
+            (await response.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("errors")
+                .TryGetProperty(field, out _).Should().BeTrue(scenario);
+        }
+        await using var db = new AgreementsDbContext(fixture.CreateAgreementOptions());
+        (await db.Versions.CountAsync()).Should().Be(0);
+        (await db.PriceAgreements.SingleAsync()).LatestVersionId.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task General_discount_is_required_and_rejects_out_of_range_or_excessive_precision()
+    {
+        var scope = await PublicationScope();
+        await using var app = scope.App;
+        using var client = scope.Client;
+        foreach (var value in new decimal?[] { null, -0.1m, 100.1m, 0.01m })
+        {
+            var request = Publication(scope.List);
+            request["coverage"]![0]!["generalDiscount"] = JsonValue.Create(value);
+            var response = await client.PostAsJsonAsync($"{scope.Agreement}/versions", request);
+            response.StatusCode.Should().Be(HttpStatusCode.BadRequest, await response.Content.ReadAsStringAsync());
+            (await response.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("errors")
+                .TryGetProperty("coverage[0].generalDiscount", out _).Should().BeTrue();
+        }
+        await using var db = new AgreementsDbContext(fixture.CreateAgreementOptions());
+        (await db.Versions.CountAsync()).Should().Be(0);
+    }
+
+    [Theory]
+    [InlineData(false, "0.1000000000000000000000000000001")]
+    [InlineData(true, "0.1000000000000000000000000000001")]
+    [InlineData(false, "1e-100")]
+    [InlineData(true, "1e-100")]
+    public async Task Publication_rejects_precision_before_decimal_conversion(bool group, string number)
+    {
+        var scope = await PublicationScope();
+        await using var app = scope.App;
+        using var client = scope.Client;
+        var request = Publication(scope.List);
+        var field = group ? "groupDiscounts[0].discount" : "coverage[0].generalDiscount";
+        if (group) request["groupDiscounts"] = JsonNode.Parse("[{\"code\":\"A\",\"discount\":" + number + "}]");
+        else request["coverage"]![0]!["generalDiscount"] = JsonNode.Parse(number);
+        var response = await client.PostAsJsonAsync($"{scope.Agreement}/versions", request);
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        var result = await response.Content.ReadFromJsonAsync<JsonElement>();
+        result.GetProperty("errors").TryGetProperty(field, out _).Should().BeTrue();
+        await using var db = new AgreementsDbContext(fixture.CreateAgreementOptions());
+        (await db.Versions.CountAsync()).Should().Be(0);
+    }
+
+    [Fact]
+    public async Task Publication_requires_a_valid_whole_version_validity_period()
+    {
+        var scope = await PublicationScope();
+        await using var app = scope.App;
+        using var client = scope.Client;
+        foreach (var field in new[] { "validFrom", "validTo" })
+        {
+            var request = Publication(scope.List);
+            if (field == "validFrom") request.Remove(field);
+            else request[field] = "2026-10-25";
+            var response = await client.PostAsJsonAsync($"{scope.Agreement}/versions", request);
+            response.StatusCode.Should().Be(HttpStatusCode.BadRequest, await response.Content.ReadAsStringAsync());
+            (await response.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("errors")
+                .TryGetProperty(field, out _).Should().BeTrue();
+        }
+        await using var db = new AgreementsDbContext(fixture.CreateAgreementOptions());
+        (await db.Versions.CountAsync()).Should().Be(0);
+    }
+
+    [Fact]
+    public async Task First_publication_requires_an_explicit_null_predecessor()
+    {
+        var scope = await PublicationScope();
+        await using var app = scope.App;
+        using var client = scope.Client;
+        var request = Publication(scope.List);
+        request.Remove("expectedLatestVersionId");
+        var response = await client.PostAsJsonAsync($"{scope.Agreement}/versions", request);
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        var problem = await response.Content.ReadFromJsonAsync<JsonElement>();
+        problem.GetProperty("errors").TryGetProperty("expectedLatestVersionId", out _).Should().BeTrue();
+        await using var db = new AgreementsDbContext(fixture.CreateAgreementOptions());
+        (await db.Versions.CountAsync()).Should().Be(0);
+    }
+
+    [Fact]
+    public async Task Supplier_owner_publishes_first_version_with_explicit_zero_discount()
+    {
+        var person = new OrganizationAccess.Contracts.PersonId(Guid.CreateVersion7());
+        var supplier = await SeedOrganization(person);
+        var customer = await SeedOrganization(new(Guid.CreateVersion7()), "5560360793");
+        var relationship = await SeedRelationship(supplier, customer);
+        await using var app = new ApiApplication(fixture.ConnectionString, person);
+        using var client = app.CreateClient();
+        client.DefaultRequestHeaders.Add("organization_id", supplier.ToString());
+        var list = await client.PostAsJsonAsync("/api/v1/price-lists", new
+        { name = "General", type = "general", currency = "SEK", market = "SE" });
+        list.StatusCode.Should().Be(HttpStatusCode.Created, await list.Content.ReadAsStringAsync());
+        var listId = (await list.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid();
+        var agreement = await PostAgreement(client, relationship.Id.Value);
+        var before = DateTimeOffset.UtcNow;
+        var response = await client.PostAsJsonAsync($"{agreement.Headers.Location}/versions", new
+        {
+            expectedLatestVersionId = (Guid?)null, validFrom = "2026-10-26", validTo = "2026-10-26",
+            coverage = new[] { new { priceListId = listId, type = "general", generalDiscount = 0m } },
+            groupDiscounts = Array.Empty<object>(),
+        });
+        response.StatusCode.Should().Be(HttpStatusCode.Created, await response.Content.ReadAsStringAsync());
+        var version = await response.Content.ReadFromJsonAsync<JsonElement>();
+        var id = version.GetProperty("id").GetGuid();
+        id.Version.Should().Be(7);
+        response.Headers.Location!.ToString().Should().Be($"{agreement.Headers.Location}/versions/{id}");
+        version.GetProperty("ordinal").GetInt64().Should().Be(1);
+        version.GetProperty("publishedByPersonId").GetGuid().Should().Be(person.Value);
+        version.GetProperty("publishedAt").GetDateTimeOffset().Should().BeOnOrAfter(before);
+        version.GetProperty("validFrom").GetString().Should().Be("2026-10-26");
+        version.GetProperty("validTo").GetString().Should().Be("2026-10-26");
+        version.GetProperty("predecessorVersionId").ValueKind.Should().Be(JsonValueKind.Null);
+        version.GetProperty("tradingRelationshipId").GetGuid().Should().Be(relationship.Id.Value);
+        version.GetProperty("coverage")[0].GetProperty("priceListId").GetGuid().Should().Be(listId);
+        version.GetProperty("coverage")[0].GetProperty("generalDiscount").GetDecimal().Should().Be(0);
+        var rounding = version.GetProperty("rounding");
+        rounding.GetProperty("decimalPlaces").GetInt32().Should().Be(4);
+        rounding.GetProperty("midpoint").GetString().Should().Be("AwayFromZero");
+        rounding.GetProperty("stage").GetString().Should().Be("OnceAfterDiscountWithoutIntermediateRounding");
+        rounding.GetProperty("preservePriceQuantityAndUnitOfMeasure").GetBoolean().Should().BeTrue();
+    }
+}

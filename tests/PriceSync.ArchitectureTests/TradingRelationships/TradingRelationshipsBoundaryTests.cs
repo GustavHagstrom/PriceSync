@@ -63,21 +63,27 @@ public sealed class TradingRelationshipsBoundaryTests
     }
 
     [Fact]
-    public void Trading_relationships_contracts_exports_only_the_existing_identifier()
+    public void Trading_relationships_contracts_exports_only_identifier_and_relationship_facts()
     {
         typeof(PriceSync.Modules.TradingRelationships.Contracts.TradingRelationshipId).Assembly.ExportedTypes
             .Select(type => type.FullName)
             .Should()
             .BeEquivalentTo(
-                ["PriceSync.Modules.TradingRelationships.Contracts.TradingRelationshipId"]);
+                [
+                    "PriceSync.Modules.TradingRelationships.Contracts.TradingRelationshipId",
+                    "PriceSync.Modules.TradingRelationships.Contracts.ITradingRelationshipReader",
+                    "PriceSync.Modules.TradingRelationships.Contracts.TradingRelationshipDetails",
+                    "PriceSync.Modules.TradingRelationships.Contracts.TradingRelationshipStatus",
+                ]);
     }
 
     [Fact]
-    public void Trading_relationships_contracts_has_no_project_references()
+    public void Trading_relationships_contracts_references_only_organization_identity_contracts()
     {
         _projects["PriceSync.Modules.TradingRelationships.Contracts"].ProjectReferences
             .Should()
-            .BeEmpty("contracts must remain independent without speculative cross-module dependencies");
+            .BeEquivalentTo(["PriceSync.Modules.OrganizationAccess.Contracts"],
+                "relationship details exchange the exact Organization-owned identifiers");
     }
 
     [Fact]
