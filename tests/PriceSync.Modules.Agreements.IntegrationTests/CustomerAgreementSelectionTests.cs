@@ -108,6 +108,30 @@ public sealed partial class AgreementApiTests
         history[1].ToVersionId.Should().BeNull();
     }
 
+    [Fact]
+    public async Task Selection_history_uses_sequence_order_when_the_clock_moves_backwards()
+    {
+        var versionId = await PublishSelectionVersion();
+        await using var db = SelectionContext();
+        var relationshipId = (await db.Versions.SingleAsync()).TradingRelationshipId;
+        var firstDecision = new DateTimeOffset(2026, 11, 27, 12, 0, 0, TimeSpan.Zero);
+        var clock = new ListTestClock(firstDecision);
+        var store = new CustomerAgreementSelectionStore(db, clock);
+        var owner = new PersonId(Guid.NewGuid());
+
+        (await store.ChangeAsync(relationshipId, null, versionId, owner, default)).Should().Be(SelectionChange.Changed);
+        clock.Now = firstDecision.AddMinutes(-1);
+        (await store.ChangeAsync(relationshipId, versionId, null, owner, default)).Should().Be(SelectionChange.Changed);
+        (await store.ChangeAsync(relationshipId, versionId, null, owner, default)).Should().Be(SelectionChange.Unchanged);
+        clock.Now = firstDecision.AddMinutes(1);
+        (await store.ChangeAsync(relationshipId, null, versionId, owner, default)).Should().Be(SelectionChange.Changed);
+
+        await using var reader = SelectionContext();
+        var history = await reader.Set<CustomerAgreementTransition>().OrderBy(x => x.Sequence).ToListAsync();
+        history.Select(x => x.Sequence).Should().Equal(1, 2, 3);
+        history.Select(x => x.DecidedAt).Should().Equal(firstDecision, firstDecision, clock.Now);
+    }
+
     private async Task<AgreementVersionId> PublishSelectionVersion()
     {
         var scope = await PublicationScope();
