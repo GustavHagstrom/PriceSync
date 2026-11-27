@@ -41,6 +41,40 @@ public sealed partial class AgreementApiTests
         (await reader.GetActiveVersionIdAsync(id)).Should().Be(new AgreementVersionId(versionId));
         await ChangeSelection(customer, url, versionId, null);
         (await reader.GetActiveVersionIdAsync(id)).Should().BeNull();
+        (await reader.GetActiveVersionIdAsync(id, asOfUtc: null, throughSequence: 1))
+            .Should().Be(new AgreementVersionId(versionId));
+        (await reader.GetHistoryAsync(id, pageSize: 1)).Items.Single().ToVersionId
+            .Should().Be(new AgreementVersionId(versionId));
+        (await supplier.GetFromJsonAsync<JsonElement>($"{url}?throughSequence=1"))
+            .GetProperty("activeVersionId").GetGuid().Should().Be(versionId);
+        var page = await supplier.GetFromJsonAsync<JsonElement>($"{url}/history?pageSize=1");
+        var transition = page.GetProperty("items").EnumerateArray().Single();
+        transition.GetProperty("sequence").GetInt64().Should().Be(1);
+        transition.GetProperty("fromVersionId").ValueKind.Should().Be(JsonValueKind.Null);
+        transition.GetProperty("toVersionId").GetGuid().Should().Be(versionId);
+        transition.GetProperty("personId").GetGuid().Should().Be(owner.Value);
+        page.GetProperty("nextAfterSequence").GetInt64().Should().Be(1);
+        var next = await supplier.GetFromJsonAsync<JsonElement>($"{url}/history?afterSequence=1");
+        next.GetProperty("items").EnumerateArray().Single().GetProperty("toVersionId").ValueKind.Should().Be(JsonValueKind.Null);
+        next.GetProperty("nextAfterSequence").ValueKind.Should().Be(JsonValueKind.Null);
+    }
+
+    [Theory]
+    [InlineData("?asOfUtc=2026-11-27T12:00:00", "asOfUtc")]
+    [InlineData("?asOfUtc=2026-11-27T12:00:00Z&throughSequence=1", "throughSequence")]
+    [InlineData("?throughSequence=-1", "throughSequence")]
+    [InlineData("/history?afterSequence=-1", "afterSequence")]
+    [InlineData("/history?pageSize=101", "pageSize")]
+    public async Task Selection_read_endpoints_reject_invalid_query_parameters(string suffix, string parameter)
+    {
+        var scope = await PublicationScope();
+        await using var app = scope.App;
+        using var supplier = scope.Client;
+        var version = await PublishSelectionTerms(supplier, scope.Agreement, scope.List);
+        using var response = await supplier.GetAsync(SelectionUrl(version.RelationshipId) + suffix);
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await response.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("errors")
+            .TryGetProperty(parameter, out _).Should().BeTrue();
     }
 
     [Fact]
@@ -126,5 +160,9 @@ public sealed partial class AgreementApiTests
         deactivated.StatusCode.Should().Be(HttpStatusCode.OK);
         (await deactivated.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("activeVersionId").ValueKind
             .Should().Be(JsonValueKind.Null);
+        (await customerMember.GetFromJsonAsync<JsonElement>($"{url}?throughSequence=1"))
+            .GetProperty("activeVersionId").GetGuid().Should().Be(versionId);
+        (await customerMember.GetFromJsonAsync<JsonElement>($"{url}/history"))
+            .GetProperty("items").GetArrayLength().Should().Be(2);
     }
 }

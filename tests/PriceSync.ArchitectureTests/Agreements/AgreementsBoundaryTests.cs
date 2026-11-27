@@ -21,6 +21,8 @@ public sealed class AgreementsBoundaryTests
                 "PriceSync.Modules.Agreements.Contracts.AgreementVersionId",
                 "PriceSync.Modules.Agreements.Contracts.IAgreementVersionReader",
                 "PriceSync.Modules.Agreements.Contracts.ICustomerAgreementSelectionReader",
+                "PriceSync.Modules.Agreements.Contracts.CustomerAgreementHistoryPage",
+                "PriceSync.Modules.Agreements.Contracts.CustomerAgreementHistoryItem",
                 "PriceSync.Modules.Agreements.Contracts.AgreementVersionFacts",
                 "PriceSync.Modules.Agreements.Contracts.AgreementVersionListCoverage",
                 "PriceSync.Modules.Agreements.Contracts.AgreementVersionRounding",
@@ -35,7 +37,8 @@ public sealed class AgreementsBoundaryTests
         var ownRoot = Path.Combine(root, "src", "PriceSync.Modules.Agreements");
         var forbidden = new[] { "AgreementsDbContext", "PriceSync.Modules.Agreements.Persistence",
             "agreements.price_agreements", "agreements.creation_idempotency_records",
-            "agreements.agreement_versions", "agreements.agreement_version_coverage" };
+            "agreements.agreement_versions", "agreements.agreement_version_coverage",
+            "agreements.customer_agreement_states", "agreements.customer_agreement_transitions" };
         var violations = Directory.EnumerateFiles(Path.Combine(root, "src"), "*.cs", SearchOption.AllDirectories)
             .Where(path => Path.GetRelativePath(ownRoot, path).StartsWith("..", StringComparison.Ordinal))
             .Where(path => forbidden.Any(File.ReadAllText(path).Contains)).ToArray();

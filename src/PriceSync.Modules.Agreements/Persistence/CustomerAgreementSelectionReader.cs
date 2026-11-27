@@ -1,7 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using PriceSync.Modules.Agreements.Contracts;
 using PriceSync.Modules.Agreements.Domain;
-using PriceSync.Modules.OrganizationAccess.Contracts;
 using PriceSync.Modules.TradingRelationships.Contracts;
 
 namespace PriceSync.Modules.Agreements.Persistence;
@@ -15,7 +14,7 @@ internal sealed class CustomerAgreementSelectionReader(AgreementsDbContext db) :
             .Select(state => state.ActiveVersionId)
             .SingleOrDefaultAsync(cancellationToken);
 
-    internal Task<AgreementVersionId?> GetActiveVersionIdAsync(TradingRelationshipId relationshipId,
+    public Task<AgreementVersionId?> GetActiveVersionIdAsync(TradingRelationshipId relationshipId,
         DateTimeOffset? asOfUtc, long? throughSequence, CancellationToken cancellationToken = default)
     {
         if (asOfUtc is not null && throughSequence is not null)
@@ -38,7 +37,7 @@ internal sealed class CustomerAgreementSelectionReader(AgreementsDbContext db) :
             .FirstOrDefaultAsync(cancellationToken);
     }
 
-    internal async Task<CustomerAgreementHistoryPage> GetHistoryAsync(TradingRelationshipId relationshipId,
+    public async Task<CustomerAgreementHistoryPage> GetHistoryAsync(TradingRelationshipId relationshipId,
         long? afterSequence = null, int pageSize = 50, CancellationToken cancellationToken = default)
     {
         var after = afterSequence.GetValueOrDefault();
@@ -67,9 +66,3 @@ internal sealed class CustomerAgreementSelectionReader(AgreementsDbContext db) :
         db.Set<CustomerAgreementTransition>().AsNoTracking()
             .Where(transition => transition.TradingRelationshipId == relationshipId);
 }
-
-internal sealed record CustomerAgreementHistoryPage(IReadOnlyList<CustomerAgreementHistoryItem> Items,
-    long? NextAfterSequence);
-
-internal sealed record CustomerAgreementHistoryItem(long Sequence, AgreementVersionId? FromVersionId,
-    AgreementVersionId? ToVersionId, PersonId PersonId, DateTimeOffset DecidedAt);
