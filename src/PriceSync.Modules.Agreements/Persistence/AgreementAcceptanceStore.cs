@@ -14,13 +14,17 @@ internal sealed class AgreementAcceptanceStore(AgreementsDbContext db, TimeProvi
             x => x.TradingRelationshipId == relationshipId && x.VersionId == versionId, cancellationToken);
 
     // A caller can include this operation in its current Agreements transaction.
+    internal Task<AgreementAcceptance> AcceptAsync(TradingRelationshipId relationshipId,
+        AgreementVersionId versionId, PersonId personId, CancellationToken cancellationToken) =>
+        AcceptAsync(relationshipId, versionId, personId, clock.GetUtcNow(), cancellationToken);
+
     internal async Task<AgreementAcceptance> AcceptAsync(TradingRelationshipId relationshipId,
-        AgreementVersionId versionId, PersonId personId, CancellationToken cancellationToken)
+        AgreementVersionId versionId, PersonId personId, DateTimeOffset acceptedAt, CancellationToken cancellationToken)
     {
         await db.Database.ExecuteSqlInterpolatedAsync($"""
             INSERT INTO agreements.agreement_acceptances
                 ("TradingRelationshipId", "VersionId", "AcceptedByPersonId", "AcceptedAt")
-            VALUES ({relationshipId.Value}, {versionId.Value}, {personId.Value}, {clock.GetUtcNow()})
+            VALUES ({relationshipId.Value}, {versionId.Value}, {personId.Value}, {acceptedAt})
             ON CONFLICT ("TradingRelationshipId", "VersionId") DO NOTHING
             """, cancellationToken);
 

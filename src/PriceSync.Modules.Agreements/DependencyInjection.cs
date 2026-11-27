@@ -20,6 +20,9 @@ public static class DependencyInjection
         services.AddSingleton(Domain.AgreementRoundingPolicy.Default);
         services.AddScoped<CreateHandler>();
         services.AddScoped<AgreementAcceptanceStore>();
+        services.AddScoped<CustomerAgreementSelectionStore>();
+        services.AddScoped<Contracts.ICustomerAgreementSelectionReader, CustomerAgreementSelectionReader>();
+        services.AddScoped<Features.AgreementSelection.AgreementSelectionHandler>();
         services.AddScoped<Acceptance.AcceptanceScopeReader>();
         services.AddScoped<Features.AcceptVersion.AcceptVersionHandler>();
         services.AddScoped<Features.GetVersionAcceptance.GetVersionAcceptanceHandler>();

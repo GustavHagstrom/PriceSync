@@ -4,5 +4,4 @@ using PriceSync.Modules.TradingRelationships.Contracts;
 
 namespace PriceSync.Modules.Agreements.Domain;
 
-internal sealed record AgreementAcceptance(TradingRelationshipId TradingRelationshipId,
-    AgreementVersionId VersionId, PersonId AcceptedByPersonId, DateTimeOffset AcceptedAt);
+internal sealed record AgreementAcceptance(TradingRelationshipId TradingRelationshipId, AgreementVersionId VersionId, PersonId AcceptedByPersonId, DateTimeOffset AcceptedAt);

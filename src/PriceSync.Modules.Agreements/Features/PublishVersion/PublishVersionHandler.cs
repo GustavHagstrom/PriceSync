@@ -53,23 +53,18 @@ internal sealed class PublishVersionHandler(AgreementsDbContext db, TimeProvider
             if (!groupDiscounts.TryAdd(code, discount))
                 return Invalid($"{field}.code", "Duplicate Supplier Price Group code.");
         }
-        var coverageTerms = new List<CoverageResponse>();
+        var coverageTerms = new List<(PriceListId PriceListId, PriceListType Type, decimal? GeneralDiscount)>();
         var references = new Dictionary<PriceListId, PriceListReference>();
         for (var index = 0; index < command.Coverage.Length; index++)
         {
             var field = $"coverage[{index}]";
             var item = command.Coverage[index];
             if (item is null) return Invalid(field, "Coverage is required.");
-            var type = item.Type switch
-            {
-                "general" => PriceListType.General,
-                "customerSpecificNet" => PriceListType.CustomerSpecificNet,
-                _ => (PriceListType?)null,
-            };
-            if (type is null) return Invalid($"{field}.type", "Unsupported Price List type.");
+            if (CoverageType.Parse(item.Type) is not { } type)
+                return Invalid($"{field}.type", "Unsupported Price List type.");
             if (item.PriceListId == Guid.Empty) return Invalid($"{field}.priceListId", "Price List is required.");
             var listId = new PriceListId(item.PriceListId);
-            if (!references.TryAdd(listId, new(listId, type.Value)))
+            if (!references.TryAdd(listId, new(listId, type)))
                 return Invalid($"{field}.priceListId", "Duplicate Price List.");
             decimal? generalDiscount = null;
             if (type == PriceListType.General)
@@ -81,7 +76,7 @@ internal sealed class PublishVersionHandler(AgreementsDbContext db, TimeProvider
             else if (item.GeneralDiscount.ValueKind is not (JsonValueKind.Null or JsonValueKind.Undefined))
                 return Invalid($"{field}.generalDiscount", "Net coverage cannot carry a discount.");
 
-            coverageTerms.Add(new(item.PriceListId, item.Type!, generalDiscount));
+            coverageTerms.Add((listId, type, generalDiscount));
         }
         var verification = await lists.VerifyAsync(acting, relationship.CustomerOrganizationId,
             references.Values, cancellationToken);
@@ -98,7 +93,8 @@ internal sealed class PublishVersionHandler(AgreementsDbContext db, TimeProvider
             return new PublishVersionResult.ListVerificationUnavailable();
 
         var normalized = Normalize(expected?.Value, command.ValidFrom.Value, command.ValidTo,
-            coverageTerms,
+            coverageTerms.Select(item => new CoverageResponse(item.PriceListId.Value,
+                CoverageType.Format(item.Type), item.GeneralDiscount)),
             groupDiscounts.Select(group => new GroupDiscountResponse(group.Key, group.Value)));
 
         await using var transaction = await db.Database.BeginTransactionAsync(IsolationLevel.ReadCommitted, cancellationToken);
@@ -127,7 +123,7 @@ internal sealed class PublishVersionHandler(AgreementsDbContext db, TimeProvider
         var version = PriceAgreementVersion.Create(agreement, command.ValidFrom.Value, command.ValidTo, person.PersonId,
             clock.GetUtcNow(), rounding, normalized);
         var coverage = coverageTerms.Select(item =>
-            AgreementVersionCoverage.Create(version.Id, new(item.PriceListId), item.Type, item.GeneralDiscount)).ToArray();
+            AgreementVersionCoverage.Create(version.Id, item.PriceListId, item.Type, item.GeneralDiscount)).ToArray();
         var groups = groupDiscounts.Select(group =>
             AgreementVersionGroupDiscount.Create(version.Id, group.Key, group.Value)).ToArray();
         db.Versions.Add(version);

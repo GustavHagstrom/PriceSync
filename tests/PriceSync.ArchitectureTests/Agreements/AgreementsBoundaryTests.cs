@@ -20,6 +20,7 @@ public sealed class AgreementsBoundaryTests
             .Should().BeEquivalentTo(["PriceSync.Modules.Agreements.Contracts.AgreementId",
                 "PriceSync.Modules.Agreements.Contracts.AgreementVersionId",
                 "PriceSync.Modules.Agreements.Contracts.IAgreementVersionReader",
+                "PriceSync.Modules.Agreements.Contracts.ICustomerAgreementSelectionReader",
                 "PriceSync.Modules.Agreements.Contracts.AgreementVersionFacts",
                 "PriceSync.Modules.Agreements.Contracts.AgreementVersionListCoverage",
                 "PriceSync.Modules.Agreements.Contracts.AgreementVersionRounding",

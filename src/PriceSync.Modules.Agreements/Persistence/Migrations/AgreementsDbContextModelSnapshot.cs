@@ -107,6 +107,59 @@ namespace PriceSync.Modules.Agreements.Persistence.Migrations
                     b.ToTable("agreement_version_withdrawals", "agreements");
                 });
 
+            modelBuilder.Entity("PriceSync.Modules.Agreements.Domain.CustomerAgreementState", b =>
+                {
+                    b.Property<Guid>("TradingRelationshipId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("ActiveVersionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<long>("Sequence")
+                        .HasColumnType("bigint");
+
+                    b.HasKey("TradingRelationshipId");
+
+                    b.HasIndex("TradingRelationshipId", "ActiveVersionId");
+
+                    b.ToTable("customer_agreement_states", "agreements", t =>
+                        {
+                            t.HasCheckConstraint("ck_customer_agreement_state_sequence", " \"Sequence\" > 0 OR (\"Sequence\" = 0 AND \"ActiveVersionId\" IS NULL) ");
+                        });
+                });
+
+            modelBuilder.Entity("PriceSync.Modules.Agreements.Domain.CustomerAgreementTransition", b =>
+                {
+                    b.Property<Guid>("TradingRelationshipId")
+                        .HasColumnType("uuid");
+
+                    b.Property<long>("Sequence")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTimeOffset>("DecidedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("FromVersionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("PersonId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("ToVersionId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("TradingRelationshipId", "Sequence");
+
+                    b.HasIndex("TradingRelationshipId", "FromVersionId");
+
+                    b.HasIndex("TradingRelationshipId", "ToVersionId");
+
+                    b.ToTable("customer_agreement_transitions", "agreements", t =>
+                        {
+                            t.HasCheckConstraint("ck_customer_agreement_transition", " \"Sequence\" > 0 AND \"FromVersionId\" IS DISTINCT FROM \"ToVersionId\" ");
+                        });
+                });
+
             modelBuilder.Entity("PriceSync.Modules.Agreements.Domain.PriceAgreement", b =>
                 {
                     b.Property<Guid>("Id")
@@ -271,6 +324,34 @@ namespace PriceSync.Modules.Agreements.Persistence.Migrations
                         .HasForeignKey("PriceSync.Modules.Agreements.Domain.AgreementVersionWithdrawal", "VersionId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
+                });
+
+            modelBuilder.Entity("PriceSync.Modules.Agreements.Domain.CustomerAgreementState", b =>
+                {
+                    b.HasOne("PriceSync.Modules.Agreements.Domain.AgreementAcceptance", null)
+                        .WithMany()
+                        .HasForeignKey("TradingRelationshipId", "ActiveVersionId")
+                        .OnDelete(DeleteBehavior.Restrict);
+                });
+
+            modelBuilder.Entity("PriceSync.Modules.Agreements.Domain.CustomerAgreementTransition", b =>
+                {
+                    b.HasOne("PriceSync.Modules.Agreements.Domain.CustomerAgreementState", null)
+                        .WithMany()
+                        .HasForeignKey("TradingRelationshipId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("PriceSync.Modules.Agreements.Domain.AgreementAcceptance", null)
+                        .WithMany()
+                        .HasForeignKey("TradingRelationshipId", "FromVersionId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("PriceSync.Modules.Agreements.Domain.AgreementAcceptance", null)
+                        .WithMany()
+                        .HasForeignKey("TradingRelationshipId", "ToVersionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("FK_customer_agreement_transitions_agreement_acceptances_Tradi~1");
                 });
 
             modelBuilder.Entity("PriceSync.Modules.Agreements.Domain.PriceAgreement", b =>
