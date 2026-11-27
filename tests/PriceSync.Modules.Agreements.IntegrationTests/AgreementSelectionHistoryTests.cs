@@ -1,14 +1,75 @@
+using System.Net;
+using System.Net.Http.Json;
+using System.Text.Json;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using PriceSync.Modules.Agreements.Contracts;
+using PriceSync.Modules.Agreements.Domain;
 using PriceSync.Modules.Agreements.Persistence;
 using PriceSync.Modules.OrganizationAccess.Contracts;
+using PriceSync.Modules.OrganizationAccess.Domain;
 using PriceSync.Modules.TradingRelationships.Contracts;
 
 namespace PriceSync.Modules.Agreements.IntegrationTests;
 
 public sealed partial class AgreementApiTests
 {
+    [Fact]
+    public async Task Historical_reads_preserve_persisted_state_and_only_return_actual_customer_choices()
+    {
+        var scope = await PublicationScope();
+        await using var app = scope.App;
+        using var supplier = scope.Client;
+        var selected = await PublishSelectionTerms(supplier, scope.Agreement, scope.List);
+        var owner = await AddAcceptanceActor(scope.Customer, OrganizationRole.Owner);
+        await using var customerApp = new ApiApplication(fixture.ConnectionString, owner);
+        using var customer = AcceptanceClient(customerApp, scope.Customer);
+        var url = SelectionUrl(selected.RelationshipId);
+        await ChangeSelection(customer, url, null, selected.Id);
+        var unselected = await PublishSelectionTerms(supplier, scope.Agreement, scope.List, selected.Id);
+        using var withdrawal = await supplier.PostAsJsonAsync($"{selected.Location}/withdraw", new { reason = "Superseded" });
+        withdrawal.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var snapshot = async (AgreementsDbContext db) => new
+        {
+            Selections = await db.Set<CustomerAgreementState>().AsNoTracking().ToListAsync(),
+            Transitions = await db.Set<CustomerAgreementTransition>().AsNoTracking().ToListAsync(),
+            Acceptances = await db.Set<AgreementAcceptance>().AsNoTracking().ToListAsync(),
+            Agreements = await db.PriceAgreements.AsNoTracking().ToListAsync(),
+            Versions = await db.Versions.AsNoTracking().ToListAsync(),
+            Coverage = await db.Coverage.AsNoTracking().ToListAsync(),
+            GroupDiscounts = await db.GroupDiscounts.AsNoTracking().ToListAsync(),
+            Withdrawals = await db.Withdrawals.AsNoTracking().ToListAsync(),
+        };
+        await using var before = SelectionContext();
+        var expected = await snapshot(before);
+
+        await using var services = app.Services.CreateAsyncScope();
+        var reader = services.ServiceProvider.GetRequiredService<ICustomerAgreementSelectionReader>();
+        var versions = services.ServiceProvider.GetRequiredService<IAgreementVersionReader>();
+        var relationship = TradingRelationshipId.FromGuid(selected.RelationshipId);
+        var selectedId = new AgreementVersionId(selected.Id);
+        var unselectedId = new AgreementVersionId(unselected.Id);
+        var unselectedTerms = await versions.GetAsync(unselectedId);
+        unselectedTerms.Should().NotBeNull();
+        var history = (await reader.GetHistoryAsync(relationship)).Items.Should().ContainSingle().Which;
+        history.FromVersionId.Should().BeNull();
+        history.ToVersionId.Should().Be(selectedId);
+        (await reader.GetActiveVersionIdAsync(relationship, null, long.MaxValue)).Should().Be(selectedId);
+
+        var page = await supplier.GetFromJsonAsync<JsonElement>($"{url}/history");
+        page.GetProperty("items").EnumerateArray().Single()
+            .GetProperty("toVersionId").GetGuid().Should().Be(selected.Id);
+        var asOf = unselectedTerms!.PublishedAt > history.DecidedAt ? unselectedTerms.PublishedAt : history.DecidedAt;
+        var cutoff = Uri.EscapeDataString(asOf.ToString("O"));
+        (await supplier.GetFromJsonAsync<JsonElement>($"{url}?asOfUtc={cutoff}"))
+            .GetProperty("activeVersionId").GetGuid().Should().Be(selected.Id);
+
+        await using var after = SelectionContext();
+        (await snapshot(after)).Should().BeEquivalentTo(expected);
+    }
+
     [Fact]
     public async Task Historical_selection_reconstructs_switches_and_deactivation_from_inclusive_boundaries()
     {

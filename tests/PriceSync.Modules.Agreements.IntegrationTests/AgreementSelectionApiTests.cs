@@ -5,6 +5,7 @@ using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using PriceSync.Modules.Agreements.Contracts;
+using PriceSync.Modules.OrganizationAccess.Contracts;
 using PriceSync.Modules.OrganizationAccess.Domain;
 using PriceSync.Modules.TradingRelationships.Persistence;
 using PriceSync.Modules.TradingRelationships.Contracts;
@@ -163,6 +164,15 @@ public sealed partial class AgreementApiTests
         (await customerMember.GetFromJsonAsync<JsonElement>($"{url}?throughSequence=1"))
             .GetProperty("activeVersionId").GetGuid().Should().Be(versionId);
         (await customerMember.GetFromJsonAsync<JsonElement>($"{url}/history"))
+            .GetProperty("items").GetArrayLength().Should().Be(2);
+
+        var supplierId = new OrganizationId(Guid.Parse(supplier.DefaultRequestHeaders.GetValues("organization_id").Single()));
+        var supplierMemberId = await AddAcceptanceActor(supplierId, OrganizationRole.Member);
+        await using var supplierMemberApp = new ApiApplication(fixture.ConnectionString, supplierMemberId);
+        using var supplierMember = AcceptanceClient(supplierMemberApp, supplierId);
+        (await supplierMember.GetFromJsonAsync<JsonElement>($"{url}?throughSequence=1"))
+            .GetProperty("activeVersionId").GetGuid().Should().Be(versionId);
+        (await supplierMember.GetFromJsonAsync<JsonElement>($"{url}/history"))
             .GetProperty("items").GetArrayLength().Should().Be(2);
     }
 }
